@@ -1,6 +1,6 @@
 // resources/js/hooks/useLeadFilters.ts
-import { useState, useEffect, useCallback, useRef } from 'react';
 import { router } from '@inertiajs/react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface UseLeadFiltersProps {
   initialFilters?: {

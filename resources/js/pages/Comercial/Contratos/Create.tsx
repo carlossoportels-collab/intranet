@@ -1,24 +1,52 @@
 // resources/js/Pages/Comercial/Contratos/Create.tsx
-import React, { useState, useEffect } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { 
     User, Building, CreditCard, Truck, FileText, 
     Plus, Trash2, Save, ArrowLeft, ArrowUpCircle 
 } from 'lucide-react';
-import { useToast } from '@/contexts/ToastContext';
+import React, { useState, useEffect } from 'react';
+
 import DatosCliente from '@/components/contratos/sections/DatosCliente';
 import DatosEmpresa from '@/components/contratos/sections/DatosEmpresa';
 import DatosPersonalesCliente from '@/components/contratos/sections/DatosPersonalesCliente';
-import ResponsablesSection from '@/components/contratos/sections/ResponsablesSection';
-import VehiculosSection from '@/components/contratos/sections/VehiculosSection';
 import MetodoPagoSection from '@/components/contratos/sections/MetodoPagoSection';
+import ResponsablesSection from '@/components/contratos/sections/ResponsablesSection';
 import ResumenContrato from '@/components/contratos/sections/ResumenContrato';
+import VehiculosSection from '@/components/contratos/sections/VehiculosSection';
+import { useToast } from '@/contexts/ToastContext';
+import AppLayout from '@/layouts/app-layout';
+
+// Interfaces específicas
+interface Presupuesto {
+    id: number;
+    cantidad_vehiculos: number;
+    lead?: any;
+    // ... otros campos
+}
+
+interface Empresa {
+    id: number;
+    nombre_fantasia: string;
+    razon_social: string;
+    cuit: string;
+    // ... otros campos
+}
+
+interface Contacto {
+    id: number;
+    tipo_responsabilidad_id?: number;
+    lead?: {
+        nombre_completo: string;
+        email?: string;
+        telefono?: string;
+    };
+    // ... otros campos
+}
 
 interface Props {
-    presupuesto: any;
-    empresa: any;
-    contacto: any;
+    presupuesto: Presupuesto;
+    empresa: Empresa;
+    contacto: Contacto;
     responsables: any[];
     tiposResponsabilidad: any[];
     tiposDocumento: any[];
@@ -45,7 +73,6 @@ export default function CreateContrato({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isVisible, setIsVisible] = useState(false); 
     const toast = useToast();
-
 
     // Estado para vehículos
     const [vehiculos, setVehiculos] = useState<any[]>([
@@ -74,7 +101,7 @@ export default function CreateContrato({
         tipo_tarjeta: 'debito'
     });
 
-    // 👈 EFECTO PARA EL BOTÓN SCROLL TO TOP
+    // Efecto para el botón scroll to top
     useEffect(() => {
         const toggleVisibility = () => {
             if (window.scrollY > 300) {
@@ -110,9 +137,7 @@ export default function CreateContrato({
         }, {
             onSuccess: () => {
                 toast.success('Contrato generado exitosamente');
-                setTimeout(() => {
-                    window.location.href = `/comercial/empresas/${empresa.id}`;
-                }, 1500);
+                setIsSubmitting(false);
             },
             onError: (errors) => {
                 console.error(errors);
@@ -163,7 +188,7 @@ export default function CreateContrato({
                         {/* Datos del Cliente (precargados, no editables) */}
                         <DatosCliente lead={presupuesto.lead} />
                         
-                        {/* Datos Personales del Cliente (antes DatosContacto) */}
+                        {/* Datos Personales del Cliente */}
                         <DatosPersonalesCliente contacto={contacto} />
                         
                         {/* Datos de la Empresa (precargados, no editables) */}
@@ -204,7 +229,7 @@ export default function CreateContrato({
                 </div>
             </div>
 
-            {/* Botón flotante para volver arriba*/}
+            {/* Botón flotante para volver arriba */}
             <button
                 onClick={scrollToTop}
                 className={`fixed bottom-6 right-6 p-3 bg-[rgb(247,98,0)] text-white rounded-full shadow-lg hover:bg-[rgb(220,80,0)] transition-all duration-300 z-50 ${

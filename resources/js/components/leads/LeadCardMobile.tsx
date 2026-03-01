@@ -1,8 +1,9 @@
-import React from 'react';
 import { Link } from '@inertiajs/react';
 import { Eye, Edit, MessageSquare, FileText, Clock } from 'lucide-react';
-import { Lead, Origen, EstadoLead, NotaLead } from '@/types/leads';
+import React from 'react';
+
 import { BadgeEstado, BadgeOrigen } from '@/components/ui';
+import { Lead, Origen, EstadoLead, NotaLead } from '@/types/leads';
 
 
 interface LeadCardMobileProps {

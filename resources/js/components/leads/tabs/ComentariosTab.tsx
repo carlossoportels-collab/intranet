@@ -1,6 +1,6 @@
 // resources/js/components/leads/tabs/ComentariosTab.tsx
-import React from 'react';
 import { MessageSquare, User, Clock, Tag } from 'lucide-react';
+import React from 'react';
 
 interface Comentario {
   id: number;

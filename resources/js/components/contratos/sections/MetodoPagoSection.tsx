@@ -1,6 +1,6 @@
 // resources/js/components/contratos/sections/MetodoPagoSection.tsx
-import React from 'react';
 import { CreditCard, Landmark } from 'lucide-react';
+import React from 'react';
 
 interface Props {
     metodoPago: 'cbu' | 'tarjeta' | null;

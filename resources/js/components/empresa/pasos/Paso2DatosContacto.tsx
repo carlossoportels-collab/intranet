@@ -1,6 +1,7 @@
 // resources/js/components/empresa/pasos/Paso2DatosContacto.tsx
-import React from 'react';
 import { User, CreditCard, Globe, Calendar, MapPin } from 'lucide-react';
+import React from 'react';
+
 import { DatosContactoForm, TipoResponsabilidad, TipoDocumento, Nacionalidad } from '@/types/empresa';
 
 interface Props {

@@ -1,7 +1,9 @@
 // resources/js/Components/Modals/EditarLeadModal.tsx
-import React, { useEffect, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { X, User, Phone, Mail, MapPin, Briefcase, Building, AlertCircle, Check, Loader } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+
+import Toast from '@/components/ui/toast';
 import {
     Lead,
     Origen,
@@ -10,7 +12,6 @@ import {
     Localidad,
     Comercial
 } from '@/types/leads';
-import Toast from '@/components/ui/toast';
 
 interface EditarLeadModalProps {
     isOpen: boolean;
@@ -135,7 +136,7 @@ export default function EditarLeadModal({
     useEffect(() => {
         if (isOpen && lead) {
             // Extraer solo el nombre de la localidad
-            const localidadNombre = lead.localidad?.localidad?.trim() || '';
+            const localidadNombre = lead.localidad?.nombre?.trim() || ''; // ← Cambiado de 'localidad' a 'nombre'
             const provinciaId = lead.localidad?.provincia_id?.toString() || '';
             
             setFormData({
@@ -191,10 +192,10 @@ export default function EditarLeadModal({
             const result = await response.json();
             
             if (result.success) {
-                // Transformar los datos si es necesario
+                // Transformar los datos
                 const localidadesTransformadas = result.data.map((item: any) => ({
                     id: item.id,
-                    localidad: item.localidad || item.nombre, // Manejar ambos casos
+                    nombre: item.nombre || item.localidad, // ← Usar 'nombre'
                     provincia_id: item.provincia_id,
                     provincia: item.provincia,
                     codigo_postal: item.codigo_postal,
@@ -214,7 +215,7 @@ export default function EditarLeadModal({
         setFormData(prev => ({
             ...prev,
             localidad_id: localidad.id.toString(),
-            localidad_nombre: localidad.localidad.trim(), // Solo nombre, limpio
+            localidad_nombre: localidad.nombre?.trim() || '', // ← Usar 'nombre'
             provincia_id: localidad.provincia_id?.toString() || ''
         }));
         setShowLocalidadesDropdown(false);
@@ -586,7 +587,7 @@ export default function EditarLeadModal({
                                                                     onClick={() => handleLocalidadSelect(localidad)}
                                                                     className="w-full text-left px-4 py-2 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 border-b border-gray-100 last:border-b-0"
                                                                 >
-                                                                    <div className="font-medium">{localidad.localidad}</div>
+                                                                    <div className="font-medium">{localidad.nombre}</div> {/* ← Cambiado a 'nombre' */}
                                                                     <div className="text-sm text-gray-600">
                                                                         {localidad.provincia} 
                                                                     </div>

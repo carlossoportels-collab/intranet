@@ -1,8 +1,9 @@
 // resources/js/components/filters/FilterBar.tsx
-import React, { useState, useRef } from 'react';
-import { Calendar, X, ChevronLeft, ChevronRight, User } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Calendar, X, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+
 import { EstadoLead, Origen } from '@/types/leads';
 
 interface PrefijoFiltro {
@@ -199,7 +200,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   const applyQuickDateRange = (range: 'today' | 'week' | 'month' | 'all') => {
     const today = getToday();
     let startDate: Date | null = null;
-    let endDate = today;
+    const endDate = today;
     
     switch(range) {
       case 'today':

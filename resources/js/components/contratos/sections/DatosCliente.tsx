@@ -1,6 +1,7 @@
 // resources/js/components/contratos/sections/DatosCliente.tsx
-import React from 'react';
 import { User, Phone, Mail, MapPin, Briefcase, Building } from 'lucide-react';
+import React from 'react';
+
 import { Lead } from '@/types/contratos';
 
 interface Props {
@@ -8,8 +9,9 @@ interface Props {
 }
 
 export default function DatosCliente({ lead }: Props) {
+    // Actualizado para usar 'nombre' en lugar de 'localidad' y 'provincia'
     const localidadCompleta = lead.localidad ? 
-        `${lead.localidad.localidad}${lead.localidad.provincia ? `, ${lead.localidad.provincia.provincia}` : ''}` 
+        `${lead.localidad.nombre || lead.localidad.localidad || ''}${lead.localidad.provincia ? `, ${lead.localidad.provincia.nombre || lead.localidad.provincia.provincia || ''}` : ''}` 
         : '-';
 
     return (

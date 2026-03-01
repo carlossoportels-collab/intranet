@@ -1,6 +1,7 @@
 // resources/js/components/leads/tabs/TiemposTab.tsx
-import React from 'react';
 import { Clock, TrendingUp, BarChart3, Target } from 'lucide-react';
+import React from 'react';
+
 import { useLeadTiempos } from '@/hooks/useLeadTiempos';
 
 interface TiemposTabProps {

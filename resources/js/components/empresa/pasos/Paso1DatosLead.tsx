@@ -1,6 +1,7 @@
 // resources/js/components/empresa/pasos/Paso1DatosLead.tsx
-import React, { useState, useEffect } from 'react';
 import { User, Phone, Mail, MapPin, Briefcase, Building, Loader } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
 import { DatosLeadForm } from '@/types/empresa';
 import { Origen, Rubro, Provincia, Localidad } from '@/types/leads';
 
@@ -11,8 +12,8 @@ interface Props {
     provincias: Provincia[];
     onChange: (field: string, value: any) => void;
     errores: Record<string, string>;
-    localidadInicial?: string; // Nuevo
-    provinciaInicial?: number | string; // Nuevo
+    localidadInicial?: string;
+    provinciaInicial?: number | string;
 }
 
 export default function Paso1DatosLead({
@@ -50,7 +51,7 @@ export default function Paso1DatosLead({
         setShowLocalidadesDropdown(false);
     };
 
-    // Búsqueda de localidades (exactamente igual que en EditarLeadModal)
+    // Búsqueda de localidades
     const handleLocalidadSearch = async (searchTerm: string) => {
         setSearchLocalidad(searchTerm);
         
@@ -68,7 +69,7 @@ export default function Paso1DatosLead({
             params.append('search', searchTerm);
             
             if (provinciaId) {
-                params.append('provincia_id', provinciaId.toString()); // Convertir a string
+                params.append('provincia_id', provinciaId.toString());
             }
             
             const response = await fetch(`/comercial/localidades/buscar?${params}`);
@@ -77,7 +78,7 @@ export default function Paso1DatosLead({
             if (result.success) {
                 const localidadesTransformadas = result.data.map((item: any) => ({
                     id: item.id,
-                    localidad: item.localidad || item.nombre,
+                    nombre: item.nombre || item.localidad, // ← Cambiado a 'nombre'
                     provincia_id: item.provincia_id,
                     provincia: item.provincia,
                     codigo_postal: item.codigo_postal,
@@ -96,7 +97,7 @@ export default function Paso1DatosLead({
     // Al seleccionar una localidad
     const handleLocalidadSelect = (localidad: Localidad) => {
         onChange('localidad_id', localidad.id);
-        setSearchLocalidad(localidad.localidad);
+        setSearchLocalidad(localidad.nombre); // ← Cambiado a 'nombre'
         setProvinciaId(localidad.provincia_id?.toString() || '');
         setShowLocalidadesDropdown(false);
         setLocalidadesResult([]);
@@ -226,7 +227,7 @@ export default function Paso1DatosLead({
                         <option value="">Seleccionar provincia</option>
                         {provincias.map((provincia) => (
                             <option key={provincia.id} value={provincia.id}>
-                                {provincia.nombre}
+                                {provincia.nombre} {/* ← Cambiado de 'provincia' a 'nombre' */}
                             </option>
                         ))}
                     </select>
@@ -269,7 +270,7 @@ export default function Paso1DatosLead({
                                     onClick={() => handleLocalidadSelect(localidad)}
                                     className="w-full text-left px-4 py-2 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 border-b border-gray-100 last:border-b-0"
                                 >
-                                    <div className="font-medium">{localidad.localidad}</div>
+                                    <div className="font-medium">{localidad.nombre}</div> {/* ← Cambiado a 'nombre' */}
                                     <div className="text-sm text-gray-600">
                                         {localidad.provincia}
                                     </div>

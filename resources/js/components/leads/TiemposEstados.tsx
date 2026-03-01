@@ -1,6 +1,6 @@
 // resources/js/Components/Lead/TiemposEstados.tsx
-import React, { useState, useEffect } from 'react';
 import { Clock, TrendingUp, Calendar, BarChart3, Target, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 
 interface TiempoEstado {
     desde: string;

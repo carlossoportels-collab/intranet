@@ -1,7 +1,7 @@
 // resources/js/components/Modals/ClienteComentarioModal.tsx
-import React, { useEffect, useState } from 'react';
 import { useForm, router } from '@inertiajs/react';
 import { X, MessageSquare, Bell, Save, XCircle, Briefcase } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 
 interface TipoComentario {
     id: number;

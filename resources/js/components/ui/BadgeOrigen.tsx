@@ -1,5 +1,6 @@
 // resources/js/components/ui/BadgeOrigen.tsx
 import React from 'react';
+
 import { Origen } from '@/types/leads';
 
 interface BadgeOrigenProps {

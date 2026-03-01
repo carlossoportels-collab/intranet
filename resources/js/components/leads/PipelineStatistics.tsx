@@ -83,7 +83,6 @@ const PipelineStatistics: React.FC<PipelineStatisticsProps> = ({ estadisticas, e
             }`}
             style={colorHex ? getInlineStyle(colorHex) : {}}
             onClick={() => {
-              console.log(`Filtrar por ${stage.label}`);
             }}
           >
             <h3 className="font-medium text-xs mb-1 truncate">{stage.label}</h3>

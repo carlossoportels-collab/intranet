@@ -1,8 +1,8 @@
 // resources/js/Components/Modals/DownloadModal.tsx
-import React, { useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Download, X, FileText, Building2, CheckSquare, Square } from 'lucide-react';
+import React, { useState } from 'react';
 
 interface Tipo {
     id: number;

@@ -1,7 +1,5 @@
 // resources/js/Components/Notificaciones/NotificacionesDropdown.tsx
-import React, { useState, useEffect } from 'react';
 import { router, usePage, } from '@inertiajs/react';
-import { notificacionesApi } from '@/utils/axiosHelper';
 import { 
   Bell, 
   Check, 
@@ -14,6 +12,10 @@ import {
   Calendar,
   Eye
 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
+import { notificacionesApi } from '@/utils/axiosHelper';
+
 
 interface Notificacion {
   id: number;

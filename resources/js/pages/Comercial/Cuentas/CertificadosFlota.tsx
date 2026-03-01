@@ -1,5 +1,6 @@
 // resources/js/Pages/Comercial/Cuentas/CertificadosFlota.tsx
 import React from 'react';
+
 import AppLayout from '@/layouts/app-layout';
 
 export default function CertificadosFlota() {

@@ -1,8 +1,9 @@
-import React, { ReactNode, useState } from 'react';
 import { Head, usePage } from '@inertiajs/react';
-import SidebarNav from '@/components/layout/SidebarNav';
-import Header from '@/components/layout/Header';
+import React, { ReactNode, useState } from 'react';
+
 import Footer from '@/components/layout/Footer';
+import Header from '@/components/layout/Header';
+import SidebarNav from '@/components/layout/SidebarNav';
 
 interface AppLayoutProps {
     children: ReactNode;

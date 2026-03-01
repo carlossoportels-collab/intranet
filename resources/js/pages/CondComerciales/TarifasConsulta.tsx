@@ -1,10 +1,11 @@
 // resources/js/Pages/CondComerciales/TarifasConsulta.tsx
+import { router } from '@inertiajs/react';
 import React, { useState, useEffect } from 'react';
-import AppLayout from '@/layouts/app-layout';
+
 import DownloadModal from '@/components/Modals/DownloadModal';
 import { SpecialPriceButton } from '@/components/ui/SpecialPriceButton';
+import AppLayout from '@/layouts/app-layout';
 import { sendWhatsApp, createPriceQueryMessage } from '@/utils/whatsapp.utils';
-import { router } from '@inertiajs/react';
 
 interface ProductoServicio {
     id: number;

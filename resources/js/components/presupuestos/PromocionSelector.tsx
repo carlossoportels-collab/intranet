@@ -1,5 +1,7 @@
 // resources/js/components/presupuestos/PromocionSelector.tsx
+import { Gift, AlertCircle } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+
 import {
   Select,
   SelectContent,
@@ -7,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Gift, AlertCircle } from 'lucide-react';
 import { PromocionDTO } from '@/types/presupuestos';
 
 interface Props {

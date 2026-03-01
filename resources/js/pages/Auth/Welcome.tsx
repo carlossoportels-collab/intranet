@@ -1,7 +1,7 @@
 // resources/js/Pages/Auth/Welcome.tsx
-import React, { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import { CheckCircle, Loader2, User, Shield, Building2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 
 interface WelcomeProps {
     compania: string;

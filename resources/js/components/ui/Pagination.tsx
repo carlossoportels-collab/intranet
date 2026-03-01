@@ -1,6 +1,6 @@
 // resources/js/components/ui/Pagination.tsx
-import React from 'react';
 import { Link } from '@inertiajs/react';
+import React from 'react';
 
 interface PaginationProps {
   currentPage: number;

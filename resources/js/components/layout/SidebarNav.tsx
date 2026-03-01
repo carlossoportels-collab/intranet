@@ -1,5 +1,4 @@
 // SidebarNav.tsx - Versión limpia
-import React, { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { 
     ChevronDown, ChevronRight, 
@@ -16,6 +15,7 @@ import {
     Eye, Search, BookOpen, Receipt,
     ClipboardCheck, Phone, Mail
 } from 'lucide-react';
+import React, { useState } from 'react';
 
 interface SidebarNavProps {
     className?: string;

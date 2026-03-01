@@ -1,8 +1,9 @@
 // resources/js/Pages/RRHH/Personal/Cumpleanos.tsx
-import React, { useState, useEffect } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Cake, Gift, Calendar, PartyPopper, Users, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Head } from '@inertiajs/react';
+import { Cake, Gift, Calendar, PartyPopper, Users, ChevronRight, ChevronLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
+import AppLayout from '@/layouts/app-layout';
 
 interface EmpleadoCumple {
     id: number;

@@ -153,4 +153,10 @@ class Empresa extends Model
         return $this->hasMany(EmpresaResponsable::class, 'empresa_id')
                     ->where('es_activo', true);
     }
+
+    public function cambiosRazonSocial()
+    {
+    return $this->hasMany(CambioRazonSocial::class, 'empresa_id');
+    }
+
 }

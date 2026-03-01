@@ -68,7 +68,7 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 0px;  /* Reducido de 4px a 0px */
+            margin-bottom: 0px;
         }
                 
         .company-logo {
@@ -456,16 +456,23 @@
 <body>
     @php
         $formatMoney = function($value) {
-            if (!$value && $value !== 0) return '$ 0,00';
+            if ($value === null || $value === '') return '-';
+            if (!is_numeric($value)) return '-';
             return '$ ' . number_format($value, 2, ',', '.');
         };
+        
+        // Verificar si el contrato tiene presupuesto (viene de cambio de razón social o de presupuesto)
+        $tienePresupuesto = !empty($contrato->presupuesto);
         
         // FUNCIÓN ACTUALIZADA PARA MÉTODO DE PAGO (usa camelCase)
         $getMetodoPagoTexto = function() use ($contrato) {
             if (!empty($contrato->debitoCbu)) return "CBU";
             if (!empty($contrato->debitoTarjeta)) return "TARJETA DE CRÉDITO/DÉBITO";
-            return "CUENTA/TARJETA DE CRÉDITO";
+            return null;
         };
+        
+        // Verificar si tiene método de pago
+        $tieneMetodoPago = !empty($contrato->debitoCbu) || !empty($contrato->debitoTarjeta);
         
         // Función para enmascarar tarjeta
         $enmascararTarjeta = function($numero) {
@@ -475,6 +482,31 @@
         };
         
         $metodoPago = $getMetodoPagoTexto();
+        
+        // Calcular totales para contratos sin presupuesto
+        $totalInversion = 0;
+        $costoMensual = 0;
+        
+        if ($tienePresupuesto) {
+            // Contrato con presupuesto
+            $totalInversion = ($contrato->presupuesto->subtotal_tasa ?? 0);
+            $costoMensual = ($contrato->presupuesto->subtotal_abono ?? 0);
+            
+            if (!empty($contrato->presupuesto->agregados)) {
+                foreach ($contrato->presupuesto->agregados as $item) {
+                    if ($item->tipo_id == 5) {
+                        $totalInversion += $item->subtotal ?? 0;
+                    } elseif ($item->tipo_id == 3) {
+                        $costoMensual += $item->subtotal ?? 0;
+                    }
+                }
+            }
+        } else {
+            // Contrato desde cambio de razón social (sin presupuesto)
+            $costoMensual = $contrato->presupuesto_total_mensual ?? 0;
+        }
+        
+        $totalPrimerMes = $totalInversion + $costoMensual;
     @endphp
 
     <div class="contract-container">
@@ -531,7 +563,7 @@
             </div>
         </div>
 
-        <!-- Datos del Cliente (sin cambios) -->
+        <!-- Datos del Cliente -->
         <div class="section">
             <div class="section-title">Datos del Cliente</div>
             
@@ -615,333 +647,319 @@
         <div class="section">
             <div class="section-title">Servicios Contratados</div>
             
-            <div class="tables-container">
-                <!-- Inversión Inicial -->
-                <div>
-                    <div class="table-header">INVERSIÓN INICIAL</div>
-                    <table class="service-table">
-                        <thead>
-                            <tr>
-                                <th>Descripción</th>
-                                <th>Cant.</th>
-                                <th>P.Unit.</th>
-                                <th>Desc.</th>
-                                <th>Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Tasa de instalación -->
-                            @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->tasa))
-                                <tr class="category-row">
-                                    <td colspan="5">SERVICIOS DE INSTALACIÓN</td>
-                                </tr>
+            @if($tienePresupuesto)
+                <!-- Vista para contratos con presupuesto -->
+                <div class="tables-container">
+                    <!-- Inversión Inicial -->
+                    <div>
+                        <div class="table-header">INVERSIÓN INICIAL</div>
+                        <table class="service-table">
+                            <thead>
                                 <tr>
-                                    <td>{{ $contrato->presupuesto->tasa->nombre }}</td>
-                                    <td class="number">{{ $contrato->presupuesto_cantidad_vehiculos }}</td>
-                                    <td class="number">{{ $formatMoney($contrato->presupuesto->valor_tasa) }}</td>
-                                    <td class="number">
-                                        @php
-                                            $tasaPromo = null;
-                                            if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
-                                                $tasaPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $contrato->presupuesto->tasa->id);
-                                            }
-                                            
-                                            $descuentoTexto = '-';
-                                            if ($tasaPromo) {
-                                                if ($tasaPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
-                                                elseif ($tasaPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
-                                                elseif ($tasaPromo->tipo_promocion === 'porcentaje') {
-                                                    $bonificacion = $tasaPromo->bonificacion ?? $contrato->presupuesto->tasa_bonificacion;
-                                                    $descuentoTexto = $bonificacion . '%';
-                                                }
-                                            } elseif (!empty($contrato->presupuesto->tasa_bonificacion) && $contrato->presupuesto->tasa_bonificacion > 0) {
-                                                $descuentoTexto = $contrato->presupuesto->tasa_bonificacion . '%';
-                                            }
-                                        @endphp
-                                        {{ $descuentoTexto }}
-                                    </td>
-                                    <td class="number">{{ $formatMoney($contrato->presupuesto->subtotal_tasa) }}</td>
+                                    <th>Descripción</th>
+                                    <th>Cant.</th>
+                                    <th>P.Unit.</th>
+                                    <th>Desc.</th>
+                                    <th>Subtotal</th>
                                 </tr>
-                            @endif
-
-                            <!-- Accesorios -->
-                            @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->agregados))
-                                @php
-                                    $accesorios = collect($contrato->presupuesto->agregados)->filter(function($item) {
-                                        return $item->tipo_id == 5;
-                                    });
-                                @endphp
-                                @if($accesorios->count() > 0)
+                            </thead>
+                            <tbody>
+                                <!-- Tasa de instalación -->
+                                @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->tasa))
                                     <tr class="category-row">
-                                        <td colspan="5">ACCESORIOS</td>
+                                        <td colspan="5">SERVICIOS DE INSTALACIÓN</td>
                                     </tr>
-                                    @foreach($accesorios as $item)
-                                        @php
-                                            $itemPromo = null;
-                                            if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
-                                                $itemPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $item->prd_servicio_id);
-                                            }
-                                            
-                                            $descuentoTexto = '-';
-                                            if ($itemPromo) {
-                                                if ($itemPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
-                                                elseif ($itemPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
-                                                elseif ($itemPromo->tipo_promocion === 'porcentaje') {
-                                                    $bonificacion = $itemPromo->bonificacion ?? $item->bonificacion;
-                                                    $descuentoTexto = $bonificacion . '%';
+                                    <tr>
+                                        <td>{{ $contrato->presupuesto->tasa->nombre }}</td>
+                                        <td class="number">{{ $contrato->presupuesto_cantidad_vehiculos }}</td>
+                                        <td class="number">{{ $formatMoney($contrato->presupuesto->valor_tasa) }}</td>
+                                        <td class="number">
+                                            @php
+                                                $tasaPromo = null;
+                                                if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
+                                                    $tasaPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $contrato->presupuesto->tasa->id);
                                                 }
-                                            } elseif (!empty($item->bonificacion) && $item->bonificacion > 0) {
-                                                $descuentoTexto = $item->bonificacion . '%';
-                                            }
-                                        @endphp
-                                        <tr>
-                                            <td>{{ $item->producto_nombre ?? 'Producto' }}</td>
-                                            <td class="number">{{ $item->cantidad }}</td>
-                                            <td class="number">{{ $formatMoney($item->valor) }}</td>
-                                            <td class="number">{{ $descuentoTexto }}</td>
-                                            <td class="number">{{ $formatMoney($item->subtotal) }}</td>
-                                        </tr>
-                                    @endforeach
+                                                
+                                                $descuentoTexto = '-';
+                                                if ($tasaPromo) {
+                                                    if ($tasaPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
+                                                    elseif ($tasaPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
+                                                    elseif ($tasaPromo->tipo_promocion === 'porcentaje') {
+                                                        $bonificacion = $tasaPromo->bonificacion ?? $contrato->presupuesto->tasa_bonificacion;
+                                                        $descuentoTexto = $bonificacion . '%';
+                                                    }
+                                                } elseif (!empty($contrato->presupuesto->tasa_bonificacion) && $contrato->presupuesto->tasa_bonificacion > 0) {
+                                                    $descuentoTexto = $contrato->presupuesto->tasa_bonificacion . '%';
+                                                }
+                                            @endphp
+                                            {{ $descuentoTexto }}
+                                        </td>
+                                        <td class="number">{{ $formatMoney($contrato->presupuesto->subtotal_tasa) }}</td>
+                                    </tr>
                                 @endif
-                            @endif
-                        </tbody>
-                    </table>
+
+                                <!-- Accesorios -->
+                                @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->agregados))
+                                    @php
+                                        $accesorios = collect($contrato->presupuesto->agregados)->filter(function($item) {
+                                            return $item->tipo_id == 5;
+                                        });
+                                    @endphp
+                                    @if($accesorios->count() > 0)
+                                        <tr class="category-row">
+                                            <td colspan="5">ACCESORIOS</td>
+                                        </tr>
+                                        @foreach($accesorios as $item)
+                                            @php
+                                                $itemPromo = null;
+                                                if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
+                                                    $itemPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $item->prd_servicio_id);
+                                                }
+                                                
+                                                $descuentoTexto = '-';
+                                                if ($itemPromo) {
+                                                    if ($itemPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
+                                                    elseif ($itemPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
+                                                    elseif ($itemPromo->tipo_promocion === 'porcentaje') {
+                                                        $bonificacion = $itemPromo->bonificacion ?? $item->bonificacion;
+                                                        $descuentoTexto = $bonificacion . '%';
+                                                    }
+                                                } elseif (!empty($item->bonificacion) && $item->bonificacion > 0) {
+                                                    $descuentoTexto = $item->bonificacion . '%';
+                                                }
+                                            @endphp
+                                            <tr>
+                                                <td>{{ $item->producto_nombre ?? 'Producto' }}</td>
+                                                <td class="number">{{ $item->cantidad }}</td>
+                                                <td class="number">{{ $formatMoney($item->valor) }}</td>
+                                                <td class="number">{{ $descuentoTexto }}</td>
+                                                <td class="number">{{ $formatMoney($item->subtotal) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    @endif
+                                @endif
+                            </tbody>
+                        </table>
+                    </div>
                     
-                    <!-- Total Inversión (Tasa + Accesorios) -->
-                    @php
-                        $totalInversion = 0;
-                        if ($contrato->presupuesto) {
-                            $totalInversion += $contrato->presupuesto->subtotal_tasa ?? 0;
-                            if (!empty($contrato->presupuesto->agregados)) {
-                                foreach ($contrato->presupuesto->agregados as $item) {
-                                    if ($item->tipo_id == 5) {
-                                        $totalInversion += $item->subtotal ?? 0;
-                                    }
-                                }
-                            }
-                        }
-                    @endphp
-                    <div style="text-align: right; margin-top: 5px; padding: 3px 4px; background: #fff3e0; font-weight: bold; border-top: 1px solid rgb(247, 98, 0); color: rgb(60, 60, 62); font-size: 9px;">
-                        Inversión Inicial: <span style="font-family: 'Courier New', monospace;">{{ $formatMoney($totalInversion) }}</span>
+                    <!-- Abonos Mensuales -->
+                    <div>
+                        <div class="table-header">COSTO MENSUAL</div>
+                        <table class="service-table">
+                            <thead>
+                                <tr>
+                                    <th>Descripción</th>
+                                    <th>Cant.</th>
+                                    <th>P.Unit.</th>
+                                    <th>Desc.</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Abono base -->
+                                @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->abono))
+                                    <tr class="category-row">
+                                        <td colspan="5">ABONO BASE</td>
+                                    </tr>
+                                    <tr>
+                                        <td>{{ $contrato->presupuesto->abono->nombre }}</td>
+                                        <td class="number">{{ $contrato->presupuesto_cantidad_vehiculos }}</td>
+                                        <td class="number">{{ $formatMoney($contrato->presupuesto->valor_abono) }}</td>
+                                        <td class="number">
+                                            @php
+                                                $abonoPromo = null;
+                                                if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
+                                                    $abonoPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $contrato->presupuesto->abono->id);
+                                                }
+                                                
+                                                $descuentoTexto = '-';
+                                                if ($abonoPromo) {
+                                                    if ($abonoPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
+                                                    elseif ($abonoPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
+                                                    elseif ($abonoPromo->tipo_promocion === 'porcentaje') {
+                                                        $bonificacion = $abonoPromo->bonificacion ?? $contrato->presupuesto->abono_bonificacion;
+                                                        $descuentoTexto = $bonificacion . '%';
+                                                    }
+                                                } elseif (!empty($contrato->presupuesto->abono_bonificacion) && $contrato->presupuesto->abono_bonificacion > 0) {
+                                                    $descuentoTexto = $contrato->presupuesto->abono_bonificacion . '%';
+                                                }
+                                            @endphp
+                                            {{ $descuentoTexto }}
+                                        </td>
+                                        <td class="number">{{ $formatMoney($contrato->presupuesto->subtotal_abono) }}</td>
+                                    </tr>
+                                @endif
+
+                                <!-- Servicios -->
+                                @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->agregados))
+                                    @php
+                                        $servicios = collect($contrato->presupuesto->agregados)->filter(function($item) {
+                                            return $item->tipo_id == 3;
+                                        });
+                                    @endphp
+                                    @if($servicios->count() > 0)
+                                        <tr class="category-row">
+                                            <td colspan="5">SERVICIOS ADICIONALES</td>
+                                        </tr>
+                                        @foreach($servicios as $item)
+                                            @php
+                                                $itemPromo = null;
+                                                if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
+                                                    $itemPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $item->prd_servicio_id);
+                                                }
+                                                
+                                                $descuentoTexto = '-';
+                                                if ($itemPromo) {
+                                                    if ($itemPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
+                                                    elseif ($itemPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
+                                                    elseif ($itemPromo->tipo_promocion === 'porcentaje') {
+                                                        $bonificacion = $itemPromo->bonificacion ?? $item->bonificacion;
+                                                        $descuentoTexto = $bonificacion . '%';
+                                                    }
+                                                } elseif (!empty($item->bonificacion) && $item->bonificacion > 0) {
+                                                    $descuentoTexto = $item->bonificacion . '%';
+                                                }
+                                            @endphp
+                                            <tr>
+                                                <td>{{ $item->producto_nombre ?? 'Servicio' }}</td>
+                                                <td class="number">{{ $item->cantidad }}</td>
+                                                <td class="number">{{ $formatMoney($item->valor) }}</td>
+                                                <td class="number">{{ $descuentoTexto }}</td>
+                                                <td class="number">{{ $formatMoney($item->subtotal) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    @endif
+                                @endif
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                
-                <!-- Abonos Mensuales -->
-                <div>
-                    <div class="table-header">COSTO MENSUAL</div>
-                    <table class="service-table">
-                        <thead>
-                            <tr>
-                                <th>Descripción</th>
-                                <th>Cant.</th>
-                                <th>P.Unit.</th>
-                                <th>Desc.</th>
-                                <th>Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Abono base -->
-                            @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->abono))
-                                <tr class="category-row">
-                                    <td colspan="5">ABONO BASE</td>
-                                </tr>
-                                <tr>
-                                    <td>{{ $contrato->presupuesto->abono->nombre }}</td>
-                                    <td class="number">{{ $contrato->presupuesto_cantidad_vehiculos }}</td>
-                                    <td class="number">{{ $formatMoney($contrato->presupuesto->valor_abono) }}</td>
-                                    <td class="number">
-                                        @php
-                                            $abonoPromo = null;
-                                            if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
-                                                $abonoPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $contrato->presupuesto->abono->id);
-                                            }
-                                            
-                                            $descuentoTexto = '-';
-                                            if ($abonoPromo) {
-                                                if ($abonoPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
-                                                elseif ($abonoPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
-                                                elseif ($abonoPromo->tipo_promocion === 'porcentaje') {
-                                                    $bonificacion = $abonoPromo->bonificacion ?? $contrato->presupuesto->abono_bonificacion;
-                                                    $descuentoTexto = $bonificacion . '%';
-                                                }
-                                            } elseif (!empty($contrato->presupuesto->abono_bonificacion) && $contrato->presupuesto->abono_bonificacion > 0) {
-                                                $descuentoTexto = $contrato->presupuesto->abono_bonificacion . '%';
-                                            }
-                                        @endphp
-                                        {{ $descuentoTexto }}
-                                    </td>
-                                    <td class="number">{{ $formatMoney($contrato->presupuesto->subtotal_abono) }}</td>
-                                </tr>
-                            @endif
-
-                            <!-- Servicios -->
-                            @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->agregados))
-                                @php
-                                    $servicios = collect($contrato->presupuesto->agregados)->filter(function($item) {
-                                        return $item->tipo_id == 3;
-                                    });
-                                @endphp
-                                @if($servicios->count() > 0)
-                                    <tr class="category-row">
-                                        <td colspan="5">SERVICIOS ADICIONALES</td>
-                                    </tr>
-                                    @foreach($servicios as $item)
-                                        @php
-                                            $itemPromo = null;
-                                            if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
-                                                $itemPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $item->prd_servicio_id);
-                                            }
-                                            
-                                            $descuentoTexto = '-';
-                                            if ($itemPromo) {
-                                                if ($itemPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
-                                                elseif ($itemPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
-                                                elseif ($itemPromo->tipo_promocion === 'porcentaje') {
-                                                    $bonificacion = $itemPromo->bonificacion ?? $item->bonificacion;
-                                                    $descuentoTexto = $bonificacion . '%';
-                                                }
-                                            } elseif (!empty($item->bonificacion) && $item->bonificacion > 0) {
-                                                $descuentoTexto = $item->bonificacion . '%';
-                                            }
-                                        @endphp
-                                        <tr>
-                                            <td>{{ $item->producto_nombre ?? 'Servicio' }}</td>
-                                            <td class="number">{{ $item->cantidad }}</td>
-                                            <td class="number">{{ $formatMoney($item->valor) }}</td>
-                                            <td class="number">{{ $descuentoTexto }}</td>
-                                            <td class="number">{{ $formatMoney($item->subtotal) }}</td>
-                                        </tr>
-                                    @endforeach
-                                @endif
-                            @endif
-                        </tbody>
-                    </table>
-                    
-                    <!-- Costo Mensual (Abono + Servicios) -->
-                    @php
-                        $costoMensual = 0;
-                        if ($contrato->presupuesto) {
-                            $costoMensual += $contrato->presupuesto->subtotal_abono ?? 0;
-                            if (!empty($contrato->presupuesto->agregados)) {
-                                foreach ($contrato->presupuesto->agregados as $item) {
-                                    if ($item->tipo_id == 3) {
-                                        $costoMensual += $item->subtotal ?? 0;
-                                    }
-                                }
-                            }
-                        }
-                    @endphp
-                    <div style="text-align: right; margin-top: 5px; padding: 3px 4px; background: #fff3e0; font-weight: bold; border-top: 1px solid rgb(247, 98, 0); color: rgb(60, 60, 62); font-size: 9px;">
-                        Costo Mensual: <span style="font-family: 'Courier New', monospace;">{{ $formatMoney($costoMensual) }}</span>
+            @else
+                <!-- Vista simplificada para contratos sin presupuesto (cambio de razón social) -->
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 3px; margin-bottom: 10px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <div class="table-header">COSTO MENSUAL</div>
+                            <div style="margin-top: 10px;">
+                                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
+                                    <span>Abonos de la flota ({{ $contrato->presupuesto_cantidad_vehiculos ?? 0 }} vehículos)</span>
+                                    <span style="font-family: 'Courier New', monospace; font-weight: bold;">{{ $formatMoney($costoMensual) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="table-header">TOTAL</div>
+                            <div style="margin-top: 10px;">
+                                <div style="display: flex; justify-content: space-between; padding: 8px; background: #fff3e0; font-weight: bold; border: 1px solid rgb(247, 98, 0); border-radius: 3px;">
+                                    <span>Costo mensual total:</span>
+                                    <span style="font-family: 'Courier New', monospace;">{{ $formatMoney($costoMensual) }}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            @endif
             
-            <!-- TOTAL PRIMER MES (debajo de ambas tablas) -->
-            @php
-                $totalPrimerMes = $totalInversion + $costoMensual;
-            @endphp
-            <div style="text-align: right; margin-top: 10px; padding: 5px 8px; background: #e6f0fa; font-weight: bold; border: 1px solid rgb(60, 60, 62); border-radius: 3px; color: rgb(60, 60, 62); font-size: 11px;">
-                TOTAL PRIMER MES: <span style="font-family: 'Courier New', monospace; font-size: 12px;">{{ $formatMoney($totalPrimerMes) }}</span>
-            </div>
+            <!-- TOTAL PRIMER MES (solo se muestra si hay inversión inicial) -->
+            @if($tienePresupuesto && $totalInversion > 0)
+                <div style="text-align: right; margin-top: 10px; padding: 5px 8px; background: #e6f0fa; font-weight: bold; border: 1px solid rgb(60, 60, 62); border-radius: 3px; color: rgb(60, 60, 62); font-size: 11px;">
+                    TOTAL PRIMER MES: <span style="font-family: 'Courier New', monospace; font-size: 12px;">{{ $formatMoney($totalPrimerMes) }}</span>
+                </div>
+            @endif
         </div>
 
-        <!-- Método de Pago - VERSIÓN ACTUALIZADA (usa camelCase) -->
-        <div class="payment-section">
-            <div class="section-title">Método de Pago y Autorización</div>
-            
-            <div class="payment-info">
-                <div class="payment-header">
-                    <div class="payment-title">Débito automático autorizado</div>
-                </div>
+        <!-- Método de Pago - Solo se muestra si hay método de pago registrado -->
+        @if($tieneMetodoPago)
+            <div class="payment-section">
+                <div class="section-title">Método de Pago y Autorización</div>
                 
-                <div class="payment-details">
-                    @if(!empty($contrato->debitoCbu))
-                        <!-- Datos de CBU -->
-                        <div class="payment-field">
-                            <span class="payment-label">Banco:</span>
-                            <span class="payment-value">{{ $contrato->debitoCbu->nombre_banco ?? '-' }}</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">CBU:</span>
-                            <span class="payment-value">{{ $contrato->debitoCbu->cbu ?? '-' }}</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">Alias:</span>
-                            <span class="payment-value">{{ $contrato->debitoCbu->alias_cbu ?? '-' }}</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">Titular:</span>
-                            <span class="payment-value">{{ $contrato->debitoCbu->titular_cuenta ?? '-' }}</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">Tipo cuenta:</span>
-                            <span class="payment-value">{{ ($contrato->debitoCbu->tipo_cuenta ?? '') === 'caja_ahorro' ? 'Caja de ahorro' : 'Cuenta corriente' }}</span>
-                        </div>
-                    @elseif(!empty($contrato->debitoTarjeta))
-                        <!-- Datos de Tarjeta -->
-                        <div class="payment-field">
-                            <span class="payment-label">Banco:</span>
-                            <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_banco ?? '-' }}</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">Tarjeta:</span>
-                            <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_emisor ?? '-' }}</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">Número:</span>
-                            <span class="payment-value">{{ $enmascararTarjeta($contrato->debitoTarjeta->tarjeta_numero ?? '') }}</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">Vencimiento:</span>
-                            <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_expiracion ?? '-' }}</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">CVV:</span>
-                            <span class="payment-value">***</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">Titular:</span>
-                            <span class="payment-value">{{ $contrato->debitoTarjeta->titular_tarjeta ?? '-' }}</span>
-                        </div>
-                        <div class="payment-field">
-                            <span class="payment-label">Tipo:</span>
-                            <span class="payment-value">{{ ($contrato->debitoTarjeta->tipo_tarjeta ?? '') === 'debito' ? 'Débito' : 'Crédito' }}</span>
-                        </div>
-                    @else
-                        <!-- Sin datos de pago -->
-                        <div style="grid-column: span 2; text-align: center; padding: 10px; color: #999;">
-                            No se registró método de pago
+                <div class="payment-info">
+                    <div class="payment-header">
+                        <div class="payment-title">Débito automático autorizado</div>
+                    </div>
+                    
+                    <div class="payment-details">
+                        @if(!empty($contrato->debitoCbu))
+                            <!-- Datos de CBU -->
+                            <div class="payment-field">
+                                <span class="payment-label">Banco:</span>
+                                <span class="payment-value">{{ $contrato->debitoCbu->nombre_banco ?? '-' }}</span>
+                            </div>
+                            <div class="payment-field">
+                                <span class="payment-label">CBU:</span>
+                                <span class="payment-value">{{ $contrato->debitoCbu->cbu ?? '-' }}</span>
+                            </div>
+                            <div class="payment-field">
+                                <span class="payment-label">Alias:</span>
+                                <span class="payment-value">{{ $contrato->debitoCbu->alias_cbu ?? '-' }}</span>
+                            </div>
+                            <div class="payment-field">
+                                <span class="payment-label">Titular:</span>
+                                <span class="payment-value">{{ $contrato->debitoCbu->titular_cuenta ?? '-' }}</span>
+                            </div>
+                            <div class="payment-field">
+                                <span class="payment-label">Tipo cuenta:</span>
+                                <span class="payment-value">{{ ($contrato->debitoCbu->tipo_cuenta ?? '') === 'caja_ahorro' ? 'Caja de ahorro' : 'Cuenta corriente' }}</span>
+                            </div>
+                        @elseif(!empty($contrato->debitoTarjeta))
+                            <!-- Datos de Tarjeta -->
+                            <div class="payment-field">
+                                <span class="payment-label">Banco:</span>
+                                <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_banco ?? '-' }}</span>
+                            </div>
+                            <div class="payment-field">
+                                <span class="payment-label">Tarjeta:</span>
+                                <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_emisor ?? '-' }}</span>
+                            </div>
+                            <div class="payment-field">
+                                <span class="payment-label">Número:</span>
+                                <span class="payment-value">{{ $enmascararTarjeta($contrato->debitoTarjeta->tarjeta_numero ?? '') }}</span>
+                            </div>
+                            <div class="payment-field">
+                                <span class="payment-label">Vencimiento:</span>
+                                <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_expiracion ?? '-' }}</span>
+                            </div>
+                            <div class="payment-field">
+                                <span class="payment-label">Titular:</span>
+                                <span class="payment-value">{{ $contrato->debitoTarjeta->titular_tarjeta ?? '-' }}</span>
+                            </div>
+                            <div class="payment-field">
+                                <span class="payment-label">Tipo:</span>
+                                <span class="payment-value">{{ ($contrato->debitoTarjeta->tipo_tarjeta ?? '') === 'debito' ? 'Débito' : 'Crédito' }}</span>
+                            </div>
+                        @endif
+                    </div>
+                    
+                    <!-- Declaración de Autorización - Solo se muestra si hay método de pago -->
+                    @if($metodoPago)
+                        <div class="authorization-box">
+                            <div class="authorization-title">Declaración de Autorización</div>
+                            <div class="authorization-text">
+                                <p>Autorizo por la presente a que el pago correspondiente a las facturas mensuales por la contratación del servicio ofrecido por {{ $compania['nombre'] }} sean debitados en forma directa y automática en el resumen de mi {{ $metodoPago }}.</p>
+                                <p>Dejo especialmente establecido que podrá dar por cumplida la presente autorización mediante la sola declaración fehaciente comunicada, sin perjuicio tal, de los importes que pudieran corresponderme en función de servicios ya recibidos con anterioridad.</p>
+                                <p>La aprobación de esta solicitud será supeditada a la aceptación de la entidad emisora. Asimismo faculto a {{ $compania['nombre'] }} a presentar esta AUTORIZACIÓN donde sea requerida a efectos de cumplimentar la misma.</p>
+                                <p><em>Nota: IVA (21%) no incluido.</em></p>
+                            </div>
+                            
+                            <div class="signature-fields-three">
+                                <div class="signature-field">
+                                    <span class="signature-label">Firma:</span>
+                                    <div class="signature-line"></div>
+                                </div>
+                                <div class="signature-field">
+                                    <span class="signature-label">Aclaración:</span>
+                                    <div class="signature-line"></div>
+                                </div>
+                                <div class="signature-field">
+                                    <span class="signature-label">Tipo y Nro. documento:</span>
+                                    <div class="signature-line"></div>
+                                </div>
+                            </div>
                         </div>
                     @endif
                 </div>
-                
-                <div class="authorization-box">
-                    <div class="authorization-title">Declaración de Autorización</div>
-                    <div class="authorization-text">
-                        <p>Autorizo por la presente a que el pago correspondiente a las facturas mensuales por la contratación del servicio ofrecido por {{ $compania['nombre'] }} sean debitados en forma directa y automática en el resumen de mi {{ $metodoPago }}.</p>
-                        <p>Dejo especialmente establecido que podrá dar por cumplida la presente autorización mediante la sola declaración fehaciente comunicada, sin perjuicio tal, de los importes que pudieran corresponderme en función de servicios ya recibidos con anterioridad.</p>
-                        <p>La aprobación de esta solicitud será supeditada a la aceptación de la entidad emisora. Asimismo faculto a {{ $compania['nombre'] }} a presentar esta AUTORIZACIÓN donde sea requerida a efectos de cumplimentar la misma.</p>
-                        <p><em>Nota: IVA (21%) no incluido.</em></p>
-                    </div>
-                    
-                    <div class="signature-fields-three">
-                        <div class="signature-field">
-                            <span class="signature-label">Firma:</span>
-                            <div class="signature-line"></div>
-                        </div>
-                        <div class="signature-field">
-                            <span class="signature-label">Aclaración:</span>
-                            <div class="signature-line"></div>
-                        </div>
-                        <div class="signature-field">
-                            <span class="signature-label">Tipo y Nro. documento:</span>
-                            <div class="signature-line"></div>
-                        </div>
-                    </div>
-                </div>
             </div>
-        </div>
+        @endif
 
         <!-- Datos de Instalación -->
         <div class="section">
@@ -1012,6 +1030,7 @@
     <div class="section-title">CONDICIONES GENERALES DEL SERVICIO</div>
     
     <div style="font-family: Arial, sans-serif; font-size: 7pt; line-height: 1.3; text-align: justify;">
+        <!-- ... resto del contenido de condiciones ... -->
         <p style="margin-bottom: 8px;">
             <u><strong>GLOSARIO:</strong></u><br />
             <strong>a) Modem GPS:</strong> consiste en un equipo informático propiedad exclusiva de la EMPRESA que se instala en el vehículo del CLIENTE. Este equipo informático emite señales que por medio de satélites se logra determinar la ubicación geográfica del vehículo en un mapa digitalizado.<br />

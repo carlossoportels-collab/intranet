@@ -1,8 +1,5 @@
 // resources/js/Pages/Comercial/LeadsPerdidos.tsx
-import React, { useState, useEffect } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import SeguimientoLeadModal from '@/components/Modals/SeguimientoPerdidosModal';
 import { 
   AlertCircle, 
   Filter, 
@@ -30,6 +27,11 @@ import {
   Calendar as CalendarIcon,
   MoreVertical
 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
+import SeguimientoLeadModal from '@/components/Modals/SeguimientoPerdidosModal';
+import AppLayout from '@/layouts/app-layout';
+
 
 // Definir tipos
 interface LeadPerdido {

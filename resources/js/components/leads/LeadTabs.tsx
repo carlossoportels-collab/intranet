@@ -1,6 +1,6 @@
 // resources/js/components/leads/LeadTabs.tsx
-import React from 'react';
 import { User, MessageSquare, Bell, TrendingUp } from 'lucide-react';
+import React from 'react';
 
 export interface Tab {
   id: string;

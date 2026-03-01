@@ -1,6 +1,7 @@
 // resources/js/components/empresa/pasos/Paso3DatosEmpresa.tsx
-import React, { useState } from 'react';
 import { Building, Hash, MapPin, Phone, Mail, Briefcase, Tag, Truck, Search, Loader } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
 import { DatosEmpresaForm, CategoriaFiscal, Plataforma } from '@/types/empresa';
 import { Provincia, Localidad } from '@/types/leads';
 
@@ -12,6 +13,8 @@ interface Props {
     provincias: Provincia[];
     onChange: (field: string, value: any) => void;
     errores: Record<string, string>;
+    localidadInicial?: string;
+    provinciaInicial?: number | string;
 }
 
 export default function Paso3DatosEmpresa({
@@ -21,13 +24,30 @@ export default function Paso3DatosEmpresa({
     plataformas,
     provincias,
     onChange,
-    errores
+    errores,
+    localidadInicial = '',
+    provinciaInicial = ''
 }: Props) {
-    const [searchLocalidad, setSearchLocalidad] = useState('');
+    const [searchLocalidad, setSearchLocalidad] = useState(localidadInicial);
     const [showLocalidadesDropdown, setShowLocalidadesDropdown] = useState(false);
     const [searching, setSearching] = useState(false);
     const [localidadesResult, setLocalidadesResult] = useState<Localidad[]>([]);
-    const [provinciaId, setProvinciaId] = useState<number | ''>('');
+    const [provinciaId, setProvinciaId] = useState<number | string>(provinciaInicial);
+
+    // Actualizar cuando cambian las props iniciales
+    useEffect(() => {
+        console.log('Paso3DatosEmpresa - Props recibidas:', { localidadInicial, provinciaInicial });
+        
+        if (provinciaInicial) {
+            console.log('Seteando provinciaId a:', provinciaInicial);
+            setProvinciaId(provinciaInicial);
+        }
+        
+        if (localidadInicial) {
+            console.log('Seteando searchLocalidad a:', localidadInicial);
+            setSearchLocalidad(localidadInicial);
+        }
+    }, [localidadInicial, provinciaInicial]);
 
     const handleSearchLocalidad = async (value: string) => {
         setSearchLocalidad(value);
@@ -46,7 +66,7 @@ export default function Paso3DatosEmpresa({
                 if (result.success) {
                     const localidadesTransformadas = result.data.map((item: any) => ({
                         id: item.id,
-                        localidad: item.localidad || item.nombre,
+                        nombre: item.nombre || item.localidad, // ← Cambiado a 'nombre'
                         provincia_id: item.provincia_id,
                         provincia: item.provincia,
                         codigo_postal: item.codigo_postal,
@@ -67,7 +87,7 @@ export default function Paso3DatosEmpresa({
 
     const handleSelectLocalidad = (localidad: Localidad) => {
         onChange('localidad_fiscal_id', localidad.id);
-        setSearchLocalidad(localidad.localidad);
+        setSearchLocalidad(localidad.nombre); // ← Cambiado a 'nombre'
         setProvinciaId(localidad.provincia_id || '');
         setShowLocalidadesDropdown(false);
         setLocalidadesResult([]);
@@ -286,7 +306,7 @@ export default function Paso3DatosEmpresa({
                     <option value="">Seleccionar provincia</option>
                     {provincias.map((provincia) => (
                         <option key={provincia.id} value={provincia.id}>
-                            {provincia.nombre}
+                            {provincia.nombre} {/* ← Cambiado de 'provincia' a 'nombre' */}
                         </option>
                     ))}
                 </select>
@@ -322,7 +342,7 @@ export default function Paso3DatosEmpresa({
                                     onClick={() => handleSelectLocalidad(localidad)}
                                     className="w-full text-left px-4 py-2 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 border-b border-gray-100 last:border-b-0"
                                 >
-                                    <div className="font-medium">{localidad.localidad}</div>
+                                    <div className="font-medium">{localidad.nombre}</div> {/* ← Cambiado a 'nombre' */}
                                     <div className="text-sm text-gray-600">{localidad.provincia}</div>
                                 </button>
                             ))}
@@ -436,13 +456,6 @@ export default function Paso3DatosEmpresa({
                 {errores['empresa.nombre_flota'] && (
                     <p className="text-xs text-red-600">{errores['empresa.nombre_flota']}</p>
                 )}
-            </div>
-
-            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mt-4">
-                <p className="text-xs text-yellow-800 flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-yellow-600" />
-                    <span>El número de flota (numeroalfa) se asignará automáticamente después del alta.</span>
-                </p>
             </div>
         </div>
     );

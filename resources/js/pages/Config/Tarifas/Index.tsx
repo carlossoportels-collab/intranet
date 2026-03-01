@@ -1,6 +1,4 @@
 // resources/js/Pages/Config/Tarifas/Index.tsx
-import React, { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { router } from '@inertiajs/react';
 import { 
     Search, Plus, Edit2, Trash2, Save, X, 
@@ -8,9 +6,12 @@ import {
     Truck, DollarSign, AlertCircle, XCircle,
     ChevronDown, ChevronUp
 } from 'lucide-react';
-import Pagination from '@/components/ui/Pagination';
+import React, { useState } from 'react';
+
 import CargarPreciosModal from '@/components/Modals/CargarPreciosModal';
 import CrearProductoModal from '@/components/Modals/CrearProductoModal';
+import Pagination from '@/components/ui/Pagination';
+import AppLayout from '@/layouts/app-layout';
 
 interface ProductoServicio {
     id: number;

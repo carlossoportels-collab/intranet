@@ -183,22 +183,20 @@ class LeadFilterService
     public function getDatosFiltros($usuario = null): array
     {
         $data = [
-            'origenes' => DB::table('origenes_contacto')->where('activo', 1)->get(),
-            'estadosLead' => EstadoLead::where('activo', 1)
+            'origenes' => \App\Models\OrigenContacto::where('activo', true)->get(),
+            'estadosLead' => \App\Models\EstadoLead::where('activo', true)
                 ->whereNotIn('tipo', ['recontacto', 'final_negativo','final_positivo'])
                 ->get(),
-            'tiposComentario' => DB::table('tipo_comentario')
-                ->where('es_activo', 1)
+            'tiposComentario' => \App\Models\TipoComentario::where('es_activo', true)
                 ->where(function($query) {
                     $query->where('aplica_a', 'lead')
                         ->orWhere('aplica_a', 'ambos');
                 })
                 ->get(),
-            'rubros' => DB::table('rubros')->where('activo', 1)->get(),
-            'provincias' => DB::table('provincias')
-                ->where('activo', 1)
-                ->orderBy('provincia')
-                ->get(['id', 'provincia as nombre']),
+            'rubros' => \App\Models\Rubro::where('activo', true)->get(),
+            'provincias' => \App\Models\Provincia::where('activo', true)
+                ->orderBy('nombre')
+                ->get(['id', 'nombre']),
         ];
         
         // Si se pasa el usuario, incluir comerciales

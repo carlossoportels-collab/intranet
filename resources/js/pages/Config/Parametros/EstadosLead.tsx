@@ -1,11 +1,12 @@
 // resources/js/Pages/Config/Parametros/EstadosLead.tsx - VERSIÓN RESPONSIVE
-import React, { useState, useEffect } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { router, useForm } from '@inertiajs/react';
 import { 
     Plus, Edit2, Trash2, X, AlertCircle, 
     ChevronDown, ChevronUp, Eye, EyeOff 
 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
+import AppLayout from '@/layouts/app-layout';
 
 // Define el tipo para el estado del formulario
 interface EstadoLeadForm {

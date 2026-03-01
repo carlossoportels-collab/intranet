@@ -1,7 +1,8 @@
 // resources/js/Pages/Comercial/Presupuestos/PDF.tsx
 
-import React from 'react';
 import { Head } from '@inertiajs/react';
+import React from 'react';
+
 import { PDFGenerator } from '@/components/presupuestos/PDFGenerator';
 
 interface Props {

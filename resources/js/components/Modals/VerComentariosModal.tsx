@@ -1,8 +1,8 @@
 // resources/js/Components/Modals/VerComentariosModal.tsx
-import React, { useState, useEffect } from 'react';
-import { X, MessageSquare, User, Clock, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { X, MessageSquare, User, Clock, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 
 interface TipoComentario {
     id: number;

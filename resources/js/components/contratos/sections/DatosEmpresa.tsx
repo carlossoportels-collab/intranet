@@ -1,6 +1,7 @@
 // resources/js/components/contratos/sections/DatosEmpresa.tsx
-import React from 'react';
 import { Building, Hash, MapPin, Phone, Mail, Briefcase, Tag, Cpu } from 'lucide-react';
+import React from 'react';
+
 import { Empresa } from '@/types/contratos';
 
 interface Props {
@@ -8,8 +9,9 @@ interface Props {
 }
 
 export default function DatosEmpresa({ empresa }: Props) {
+    // Actualizado para usar 'nombre' en lugar de 'localidad' y 'provincia'
     const direccionFiscalCompleta = 
-        `${empresa.direccion_fiscal || ''}${empresa.localidad_fiscal ? `, ${empresa.localidad_fiscal.localidad}` : ''}${empresa.localidad_fiscal?.provincia ? `, ${empresa.localidad_fiscal.provincia.provincia}` : ''}${empresa.codigo_postal_fiscal ? ` (CP: ${empresa.codigo_postal_fiscal})` : ''}`.trim() || '-';
+        `${empresa.direccion_fiscal || ''}${empresa.localidad_fiscal ? `, ${empresa.localidad_fiscal.nombre || empresa.localidad_fiscal.localidad || ''}` : ''}${empresa.localidad_fiscal?.provincia ? `, ${empresa.localidad_fiscal.provincia.nombre || empresa.localidad_fiscal.provincia.provincia || ''}` : ''}${empresa.codigo_postal_fiscal ? ` (CP: ${empresa.codigo_postal_fiscal})` : ''}`.trim() || '-';
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

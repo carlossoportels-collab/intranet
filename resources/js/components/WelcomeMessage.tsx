@@ -1,6 +1,6 @@
 // resources/js/Components/WelcomeMessage.tsx
-import React from 'react';
 import { CheckCircle, Users, ShieldCheck, Clock } from 'lucide-react';
+import React from 'react';
 
 interface WelcomeMessageProps {
     userName?: string;

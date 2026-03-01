@@ -1,7 +1,8 @@
 // resources/js/components/ui/SensitiveData.tsx
-import React, { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
 import { router } from '@inertiajs/react';
+import { Eye, EyeOff } from 'lucide-react';
+import React, { useState } from 'react';
+
 import { useToast } from '@/contexts/ToastContext';
 
 interface Props {

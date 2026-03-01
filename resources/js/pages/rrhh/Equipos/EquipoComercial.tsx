@@ -1,7 +1,8 @@
 // resources/js/Pages/rrhh/Equipos/EquipoComercial.tsx
-import React, { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { TrendingUp, Target, Award, DollarSign, Users, BarChart3, Star, TrendingDown } from 'lucide-react';
+import React, { useState } from 'react';
+
+import AppLayout from '@/layouts/app-layout';
 
 interface MiembroComercial {
     id: number;

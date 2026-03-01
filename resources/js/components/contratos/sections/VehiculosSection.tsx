@@ -1,6 +1,6 @@
 // resources/js/components/contratos/sections/VehiculosSection.tsx
-import React from 'react';
 import { Truck, Plus, Trash2, ArrowUpCircle } from 'lucide-react';
+import React from 'react';
 
 interface Props {
     vehiculos: any[];

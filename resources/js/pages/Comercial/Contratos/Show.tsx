@@ -1,14 +1,15 @@
 // resources/js/Pages/Comercial/Contratos/Show.tsx
 
-import React, { useState } from 'react';
 import { Head, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
 import { ArrowLeft, FileText, Calendar, User, Building, Truck, CreditCard, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState } from 'react';
+
+import { Amount } from '@/components/ui/Amount';
 import { DataCard } from '@/components/ui/DataCard';
 import { InfoRow } from '@/components/ui/InfoRow';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Amount } from '@/components/ui/Amount';
 import { SensitiveData } from '@/components/ui/SensitiveData';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/utils/formatters';
 
 interface Props {

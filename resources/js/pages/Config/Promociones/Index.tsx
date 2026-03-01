@@ -1,15 +1,16 @@
 // resources/js/Pages/Config/Promociones/Index.tsx
-import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
 import { 
     Tag, Calendar, Edit2, Trash2, Plus, 
     AlertCircle, Gift, Percent, 
     CheckCircle, XCircle, Clock,
     ChevronDown, ChevronUp, Filter
 } from 'lucide-react';
-import Pagination from '@/components/ui/Pagination';
+import React, { useState } from 'react';
+
 import CrearPromocionModal from '@/components/Modals/CrearPromocionModal';
+import Pagination from '@/components/ui/Pagination';
+import AppLayout from '@/layouts/app-layout';
 import { Promocion, EstadisticasPromociones, ProductosAgrupados } from '@/types/promociones';
 
 interface Props {

@@ -1,8 +1,10 @@
 // resources/js/components/contratos/sections/ResponsablesSection.tsx
-import React, { useState } from 'react';
-import { Plus, Trash2, User, Info, AlertCircle, Save, X } from 'lucide-react';
-import { useToast } from '@/contexts/ToastContext';
 import { router } from '@inertiajs/react';
+import { Plus, Trash2, User, Info, AlertCircle, Save, X } from 'lucide-react';
+import React, { useState } from 'react';
+
+import { useToast } from '@/contexts/ToastContext';
+
 
 interface Props {
     responsables: any[];

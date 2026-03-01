@@ -13,7 +13,7 @@ class Provincia extends Model
     const UPDATED_AT = null;
     
     protected $fillable = [
-        'provincia',
+        'nombre', // ← Cambiamos de 'provincia' a 'nombre'
         'activo',
     ];
     
@@ -26,13 +26,13 @@ class Provincia extends Model
     {
         return $this->hasMany(Localidad::class)
                     ->where('activo', true)
-                    ->orderBy('localidad');
+                    ->orderBy('nombre'); // ← Cambiamos de 'localidad' a 'nombre'
     }
     
     public function localidadesTodas()
     {
         return $this->hasMany(Localidad::class)
-                    ->orderBy('localidad');
+                    ->orderBy('nombre'); // ← Cambiamos de 'localidad' a 'nombre'
     }
     
     public function scopeActivo($query)
@@ -42,6 +42,6 @@ class Provincia extends Model
     
     public function scopeOrdenar($query, $orden = 'asc')
     {
-        return $query->orderBy('provincia', $orden);
+        return $query->orderBy('nombre', $orden); // ← Cambiamos de 'provincia' a 'nombre'
     }
 }

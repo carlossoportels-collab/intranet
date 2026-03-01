@@ -1,6 +1,7 @@
-import React from 'react';
-import { LogOut } from 'lucide-react';
 import { usePage, Link } from '@inertiajs/react';
+import { LogOut } from 'lucide-react';
+import React from 'react';
+
 import { PageProps } from '@/types';
 
 export default function Footer({ className = '' }: { className?: string }) {

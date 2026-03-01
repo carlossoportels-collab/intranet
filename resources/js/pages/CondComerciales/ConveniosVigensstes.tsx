@@ -1,5 +1,6 @@
 // resources/js/Pages/Comercial/ConveniosVigentes.tsx
 import React, { useState } from 'react';
+
 import AppLayout from '@/layouts/app-layout';
 
 interface Convenio {

@@ -1,9 +1,10 @@
 // resources/js/components/leads/tabs/PresupuestosUnificadosTab.tsx
-import React, { useState, useMemo } from 'react';
 import { FileText, Calendar, Truck, Eye, Download, Tag, User, Loader, Building, ChevronDown, ChevronUp } from 'lucide-react';
-import Pagination from '@/components/ui/Pagination';
+import React, { useState, useMemo } from 'react';
+
 import { Amount } from '@/components/ui/Amount';
 import { Badge } from '@/components/ui/badge';
+import Pagination from '@/components/ui/Pagination';
 import { useToast } from '@/contexts/ToastContext';
 import { Lead, Origen, Rubro, Provincia } from '@/types/leads';
 

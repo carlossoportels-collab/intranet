@@ -1,13 +1,14 @@
-import React, { useState, useCallback } from 'react';
 import { Head, Link, router } from '@inertiajs/react'; 
-import AppLayout from '@/layouts/app-layout';
-import { useLeadFilters } from '@/hooks/useLeadFilters';
-import { LeadCardMobile, LeadTableRow, PipelineStatistics } from '@/components/leads';
+import React, { useState, useCallback } from 'react';
+
 import { FilterBar, ActiveFilters } from '@/components/filters';
-import { Pagination, EmptyState } from '@/components/ui';
+import { LeadCardMobile, LeadTableRow, PipelineStatistics } from '@/components/leads';
+import TiemposEstados from '@/components/leads/TiemposEstados';
 import NuevoComentarioModal from '@/components/Modals/NuevoComentarioModal';
 import VerNotaModal from '@/components/Modals/VerNotaModal';
-import TiemposEstados from '@/components/leads/TiemposEstados';
+import { Pagination, EmptyState } from '@/components/ui';
+import { useLeadFilters } from '@/hooks/useLeadFilters';
+import AppLayout from '@/layouts/app-layout';
 import {
   Lead,
   Origen,

@@ -1,6 +1,6 @@
 // resources/js/components/leads/tabs/NotificacionesTab.tsx
-import React from 'react';
 import { Bell, Clock } from 'lucide-react';
+import React from 'react';
 
 interface Notificacion {
   id: number;

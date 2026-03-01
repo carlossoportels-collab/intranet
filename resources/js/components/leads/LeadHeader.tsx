@@ -1,7 +1,8 @@
 // resources/js/components/leads/LeadHeader.tsx
-import React from 'react';
-import { ArrowLeft, User, UserCheck, Hash, Briefcase, Target, Calendar, Award, Edit, MessageSquare, FileText } from 'lucide-react';
 import { router, Link } from '@inertiajs/react';
+import { ArrowLeft, User, UserCheck, Hash, Briefcase, Target, Calendar, Award, Edit, MessageSquare, FileText } from 'lucide-react';
+import React from 'react';
+
 import { Lead } from '@/types/leads';
 
 interface LeadHeaderProps {

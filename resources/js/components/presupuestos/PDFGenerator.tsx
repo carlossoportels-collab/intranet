@@ -1,7 +1,7 @@
 // resources/js/Components/Presupuestos/PDFGenerator.tsx
-import { useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useEffect, useRef } from 'react';
 
 interface Props {
     presupuesto: any;

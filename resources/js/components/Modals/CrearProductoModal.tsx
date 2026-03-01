@@ -1,7 +1,7 @@
 // resources/js/Components/Modals/CrearProductoModal.tsx
-import React, { useState } from 'react';
-import { X, Save, Tag, FileText, DollarSign, Building2, CheckSquare, AlertCircle } from 'lucide-react';
 import axios from 'axios';
+import { X, Save, Tag, FileText, DollarSign, Building2, CheckSquare, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
 
 interface Tipo {
     id: number;

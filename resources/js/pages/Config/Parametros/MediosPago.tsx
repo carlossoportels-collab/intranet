@@ -1,5 +1,6 @@
 // resources/js/Pages/Config/Parametros/MediosPago.tsx
 import React, { useState } from 'react';
+
 import AppLayout from '@/layouts/app-layout';
 
 interface MedioPago {

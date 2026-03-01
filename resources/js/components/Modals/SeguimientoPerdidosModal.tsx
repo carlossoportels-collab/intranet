@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
 import { useForm, router } from '@inertiajs/react';
 import { X, MessageSquare, Bell, Calendar, Save, XCircle, AlertCircle, Lock, RefreshCw, CalendarDays, ThumbsUp, Mail, Phone } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+
 import Toast from '@/components/ui/toast';
 
 interface TipoComentarioSeguimiento {
@@ -254,7 +255,7 @@ export default function SeguimientoPerdidosModal({
             onError: (errors: InertiaErrorType) => {
                 console.error('Error al guardar seguimiento:', errors);
                 
-                let errorMessage = 'Error al guardar el seguimiento';
+                const errorMessage = 'Error al guardar el seguimiento';
                 
                 // Función helper para extraer mensaje de error
                 const extractErrorMessage = (err: InertiaErrorType): string => {

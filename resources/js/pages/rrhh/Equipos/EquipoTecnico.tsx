@@ -1,6 +1,4 @@
 // resources/js/Pages/rrhh/Equipos/EquipoTecnico.tsx
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { router } from '@inertiajs/react';
 import { 
     MapPin, Phone, Mail, Calendar, 
@@ -8,8 +6,11 @@ import {
     CheckCircle, XCircle, Search, MoreVertical,
     Wrench, Edit, Trash2, X
 } from 'lucide-react';
-import AlertSuccess from '@/components/alert-succes';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+
 import AlertError from '@/components/alert-error';
+import AlertSuccess from '@/components/alert-succes';
+import AppLayout from '@/layouts/app-layout';
 
 interface Tecnico {
     id: number;

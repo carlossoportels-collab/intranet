@@ -14,7 +14,7 @@ class Localidad extends Model
     
     protected $fillable = [
         'provincia_id',
-        'localidad',
+        'nombre', // ← Ya está correcto
         'codigo_postal',
         'activo',
     ];
@@ -39,9 +39,9 @@ class Localidad extends Model
     public function getNombreCompletoAttribute()
     {
         if ($this->provincia) {
-            return "{$this->localidad}, {$this->provincia->provincia}";
+            return "{$this->nombre}, {$this->provincia->nombre}"; // ← Cambiamos provincia->provincia a provincia->nombre
         }
-        return $this->localidad;
+        return $this->nombre; // ← Cambiamos de 'localidad' a 'nombre'
     }
     
     public function scopeActivo($query)
@@ -51,7 +51,7 @@ class Localidad extends Model
     
     public function scopeOrdenar($query, $orden = 'asc')
     {
-        return $query->orderBy('localidad', $orden);
+        return $query->orderBy('nombre', $orden); // ← Cambiamos de 'localidad' a 'nombre'
     }
     
     public function scopePorProvincia($query, $provinciaId)
@@ -66,7 +66,7 @@ class Localidad extends Model
     {
         return $query->where('activo', true)
             ->where(function($q) use ($termino) {
-                $q->where('localidad', 'LIKE', "%{$termino}%")
+                $q->where('nombre', 'LIKE', "%{$termino}%") // ← Cambiamos de 'localidad' a 'nombre'
                   ->orWhere('codigo_postal', 'LIKE', "%{$termino}%");
             });
     }

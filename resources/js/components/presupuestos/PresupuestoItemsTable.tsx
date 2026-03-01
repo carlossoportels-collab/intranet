@@ -1,6 +1,7 @@
 // resources/js/components/presupuestos/PresupuestoItemsTable.tsx
 
 import React from 'react';
+
 import { Amount } from '@/components/ui/Amount';
 
 interface Props {

@@ -1,12 +1,13 @@
 // resources/js/Pages/Comercial/Contactos.tsx
-import React, { useState, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { Pagination, EmptyState } from '@/components/ui';
-import ClienteComentarioModal from '@/components/Modals/ClienteComentarioModal';
-import { Eye, MessageSquare, FileText, Briefcase } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Eye, MessageSquare, FileText, Briefcase } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+
+import ClienteComentarioModal from '@/components/Modals/ClienteComentarioModal';
+import { Pagination, EmptyState } from '@/components/ui';
+import AppLayout from '@/layouts/app-layout';
 
 interface Lead {
     id: number;

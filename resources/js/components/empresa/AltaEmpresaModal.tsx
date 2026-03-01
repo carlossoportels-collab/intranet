@@ -1,12 +1,9 @@
 // resources/js/components/empresa/AltaEmpresaModal.tsx
-import React, { useState, useEffect } from 'react';
-import { X, User, Building, Check, ChevronLeft, ChevronRight, Loader, AlertCircle } from 'lucide-react';
-import { useToast } from '@/contexts/ToastContext';
 import { router } from '@inertiajs/react';
-import Paso1DatosLead from './pasos/Paso1DatosLead';
-import Paso2DatosContacto from './pasos/Paso2DatosContacto';
-import Paso3DatosEmpresa from './pasos/Paso3DatosEmpresa';
-import { Lead, Origen, Rubro, Provincia } from '@/types/leads';
+import { X, User, Building, Check, ChevronLeft, ChevronRight, Loader, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
+import { useToast } from '@/contexts/ToastContext';
 import { 
     DatosLeadForm,
     DatosContactoForm,
@@ -20,6 +17,11 @@ import {
     Paso2Response,
     Paso3Response
 } from '@/types/empresa';
+import { Lead, Origen, Rubro, Provincia } from '@/types/leads';
+
+import Paso1DatosLead from './pasos/Paso1DatosLead';
+import Paso2DatosContacto from './pasos/Paso2DatosContacto';
+import Paso3DatosEmpresa from './pasos/Paso3DatosEmpresa';
 
 interface Props {
     isOpen: boolean;
@@ -490,7 +492,7 @@ const handleSubmitPaso3 = () => {
                                         provincias={provincias}
                                         onChange={handleChangeLead}
                                         errores={errores}
-                                        localidadInicial={lead?.localidad?.localidad || ''}
+                                        localidadInicial={lead?.localidad?.nombre || ''}
                                         provinciaInicial={lead?.localidad?.provincia_id || ''}
                                     />
                                 )}

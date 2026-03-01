@@ -1,7 +1,4 @@
-import React, { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { notificacionesApi } from '@/utils/axiosHelper';
 import { 
   Bell, 
   Check, 
@@ -21,8 +18,12 @@ import {
   Menu,
   X as XIcon
 } from 'lucide-react';
+import React, { useState } from 'react';
+
 import AlertError from '@/components/alert-error';
 import AlertSuccess from '@/components/alert-succes';
+import AppLayout from '@/layouts/app-layout';
+import { notificacionesApi } from '@/utils/axiosHelper';
 
 interface Notificacion {
   id: number;

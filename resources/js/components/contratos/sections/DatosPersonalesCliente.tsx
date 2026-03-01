@@ -1,6 +1,7 @@
 // resources/js/components/contratos/sections/DatosPersonalesCliente.tsx
-import React from 'react';
 import { User, CreditCard, Globe, Calendar, MapPin } from 'lucide-react';
+import React from 'react';
+
 import { Contacto } from '@/types/contratos';
 
 interface Props {

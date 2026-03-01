@@ -1,5 +1,6 @@
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
+
 import { Usuario } from './models';
 
 export interface AuthUser {

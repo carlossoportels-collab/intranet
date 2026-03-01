@@ -2,12 +2,13 @@
 import React from 'react';
 
 interface AmountProps {
-    value: number | string;
+    value: number | string | null | undefined;
     className?: string;
     showSymbol?: boolean;
     symbol?: string;
     decimals?: number;
     color?: 'default' | 'success' | 'warning' | 'danger' | 'local';
+    fallback?: string; // Texto a mostrar cuando no hay valor
 }
 
 export const Amount: React.FC<AmountProps> = ({
@@ -16,14 +17,20 @@ export const Amount: React.FC<AmountProps> = ({
     showSymbol = true,
     symbol = '$',
     decimals = 2,
-    color = 'default'
+    color = 'default',
+    fallback = '-'
 }) => {
-    const formatMoney = (val: number | string): string => {
+    const formatMoney = (val: number | string | null | undefined): string => {
+        // Si es null o undefined, retornar fallback
+        if (val === null || val === undefined) {
+            return fallback;
+        }
+        
         // Convertir a número
         const num = typeof val === 'string' ? parseFloat(val) : val;
         
         // Verificar si es un número válido
-        if (isNaN(num)) return showSymbol ? `${symbol} 0,00` : '0,00';
+        if (isNaN(num)) return fallback;
         
         // Formatear número
         const formatted = num.toFixed(decimals)

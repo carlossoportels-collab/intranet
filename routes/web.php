@@ -128,16 +128,30 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::post('/', [App\Http\Controllers\Comercial\ContratoController::class, 'store'])->name('comercial.contratos.store');
             Route::get('/{id}/pdf', [App\Http\Controllers\Comercial\ContratoController::class, 'generarPdf'])->name('comercial.contratos.pdf');
             Route::get('/{id}', [App\Http\Controllers\Comercial\ContratoController::class, 'show'])->name('comercial.contratos.show');
+            
+            // Rutas para contrato desde empresa existente
+            Route::get('/desde-empresa/{empresaId}', [App\Http\Controllers\Comercial\ContratoController::class, 'createFromEmpresa'])
+                ->name('comercial.contratos.desde-empresa');  // GET para mostrar formulario
+            
+            Route::post('/desde-empresa', [App\Http\Controllers\Comercial\ContratoController::class, 'storeFromEmpresa'])
+                ->name('comercial.contratos.store-from-empresa');  // ← POST para guardar (FALTABA)
         });
-        
+                
         // ========== CUENTAS ==========
         Route::prefix('cuentas')->group(function () {
             Route::get('/', [DetallesController::class, 'index'])->name('comercial.cuentas.detalles');
             Route::get('/certificados', [CertificadosFlotaController::class, 'index'])->name('comercial.cuentas.certificados');
             Route::get('/cambio-titularidad', [CambioTitularidadController::class, 'index'])->name('comercial.cuentas.cambio-titularidad');
             Route::get('/cambio-razon-social', [CambioRazonSocialController::class, 'index'])->name('comercial.cuentas.cambio-razon-social');
+            Route::post('/cambio-razon-social', [CambioRazonSocialController::class, 'store'])->name('comercial.cuentas.cambio-razon-social.store');
+            
+            // Rutas nuevas
+            Route::post('/actualizar-contacto', [CambioRazonSocialController::class, 'actualizarContacto'])->name('comercial.cuentas.actualizar-contacto');
+            Route::post('/cambio-razon-social/completo', [CambioRazonSocialController::class, 'updateCompleto'])->name('comercial.cuentas.cambio-razon-social.completo'); // <-- FALTA ESTA
+            
+            Route::get('/cambio-razon-social/empresa/{id}/completa', [CambioRazonSocialController::class, 'getEmpresaDataCompleta'])->name('comercial.cuentas.cambio-razon-social.empresa-completa');
+            Route::get('/cambio-razon-social/{id}', [CambioRazonSocialController::class, 'show'])->name('comercial.cuentas.cambio-razon-social.show');
         });
-        
         // ========== RUTAS CON PARÁMETROS LEAD (AL FINAL) ==========
         Route::prefix('leads/{lead}')->group(function () {
             Route::get('/', [LeadController::class, 'show'])->name('comercial.leads.show');

@@ -1,10 +1,11 @@
 // resources/js/Components/Modals/CrearPromocionModal.tsx
-import React, { useState, useEffect } from 'react';
 import { X, Save, Gift, Calendar, Percent, Plus, Trash2, AlertCircle, Filter } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { es } from 'date-fns/locale';
 import axios from 'axios';
+
 import { ProductosAgrupados, Promocion, PromocionFormData } from '@/types/promociones';
 
 interface CrearPromocionModalProps {

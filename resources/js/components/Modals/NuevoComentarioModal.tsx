@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
 import { useForm,router } from '@inertiajs/react';
 import { X, MessageSquare, Bell, Calendar, Save, XCircle, AlertCircle, Lock, FileText, CalendarDays, ThumbsDown } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 
 
 interface TipoComentario {

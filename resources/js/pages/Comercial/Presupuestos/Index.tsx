@@ -1,10 +1,12 @@
 // resources/js/Pages/Comercial/Presupuestos/Index.tsx
-import React, { useState } from 'react';
 import { Link, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import Pagination from '@/components/ui/Pagination';
-import { PresupuestoFilterBar } from '@/components/presupuestos/PresupuestoFilterBar';
 import { Gift, Eye, Edit, FileText, ChevronDown, ChevronUp, Filter, Calendar, Truck, DollarSign } from 'lucide-react';
+import React, { useState } from 'react';
+
+import { PresupuestoFilterBar } from '@/components/presupuestos/PresupuestoFilterBar';
+import Pagination from '@/components/ui/Pagination';
+import AppLayout from '@/layouts/app-layout';
+
 
 interface Presupuesto {
     id: number;

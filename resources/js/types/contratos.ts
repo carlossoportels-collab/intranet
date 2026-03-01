@@ -2,13 +2,13 @@
 
 export interface Provincia {
     id: number;
-    provincia: string;  // 👈 La columna se llama 'provincia', no 'nombre'
+    nombre: string; 
     activo?: boolean;
 }
 
 export interface Localidad {
     id: number;
-    localidad: string;
+    nombre: string;
     provincia_id: number;
     provincia?: Provincia;
     codigo_postal?: string;

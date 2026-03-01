@@ -1,6 +1,6 @@
 // resources/js/components/leads/tabs/NotasTab.tsx
-import React from 'react';
 import { MessageSquare, User, Clock } from 'lucide-react';
+import React from 'react';
 
 interface Nota {
   id: number;

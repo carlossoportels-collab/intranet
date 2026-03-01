@@ -1,6 +1,7 @@
 // resources/js/components/contratos/sections/ResumenContrato.tsx
-import React from 'react';
 import { FileText, Calendar, Truck, Package, Box, Gift } from 'lucide-react';
+import React from 'react';
+
 import { Amount } from '@/components/ui/Amount';
 import { usePresupuestoData } from '@/hooks/usePresupuestoData';
 import { toNumber } from '@/utils/formatters';
@@ -10,7 +11,28 @@ interface Props {
 }
 
 export default function ResumenContrato({ presupuesto }: Props) {
+    // Si no hay presupuesto (contrato desde empresa)
+    if (!presupuesto) {
+        return (
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden sticky top-4">
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                    <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-orange-600" />
+                        Información del Contrato
+                    </h3>
+                </div>
+                <div className="p-6 text-center">
+                    <p className="text-sm text-gray-500">
+                        Contrato generado sin presupuesto asociado
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // Solo ejecutamos el hook si hay presupuesto
     const data = usePresupuestoData(presupuesto);
+    
     const formatMoney = (value: any): string => {
         const num = toNumber(value);
         return '$ ' + num.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -43,7 +65,7 @@ export default function ResumenContrato({ presupuesto }: Props) {
                     <p className="text-sm font-medium">{data.referencia}</p>
                     <div className="flex items-center gap-2 mt-2 text-xs text-gray-600">
                         <Calendar className="h-3 w-3" />
-                        {new Date(presupuesto.created).toLocaleDateString('es-AR')}
+                        {presupuesto.created ? new Date(presupuesto.created).toLocaleDateString('es-AR') : 'N/A'}
                         <Truck className="h-3 w-3 ml-2" />
                         {data.cantidadVehiculos} vehículo{data.cantidadVehiculos !== 1 ? 's' : ''}
                     </div>
@@ -214,7 +236,7 @@ export default function ResumenContrato({ presupuesto }: Props) {
                         </span>
                     </div>
                     <p className="text-xs text-gray-500 text-right mt-1">
-                        * Costo mensual desde el 2° mes: <Amount value={data.costoMensualTotal} />
+                        * Costo mensual desde el 2° mes: <Amount value={data.costoMensualTotal} fallback="-" />
                     </p>
                 </div>
             </div>

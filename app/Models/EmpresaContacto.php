@@ -37,7 +37,7 @@ class EmpresaContacto extends Model
     protected $casts = [
         'es_activo' => 'boolean',
         'es_contacto_principal' => 'boolean',
-        'fecha_nacimiento' => 'date',
+        'fecha_nacimiento' => 'date:Y-m-d',
         'created' => 'datetime',
         'modified' => 'datetime',
         'deleted_at' => 'datetime'
@@ -92,4 +92,9 @@ class EmpresaContacto extends Model
     {
         return $query->where('es_contacto_principal', true);
     }
+
+    public function getFechaNacimientoAttribute($value)
+{
+    return $value ? \Carbon\Carbon::parse($value)->format('Y-m-d') : null;
+}
 }

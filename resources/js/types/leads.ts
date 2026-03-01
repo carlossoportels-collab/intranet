@@ -18,7 +18,7 @@ export interface EstadoLead {
 
 export interface Localidad {
     id: number;
-    localidad: string;
+    nombre: string;
     provincia: string;
     codigo_postal: string;
     provincia_id?: number; // Para el formulario de edición
@@ -62,7 +62,7 @@ export interface Lead {
     deleted_by?: number;
     localidad?: {
         id: number;
-        localidad: string;
+        nombre: string;
         provincia_id: number;
         provincia?: string;
     };

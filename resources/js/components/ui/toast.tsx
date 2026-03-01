@@ -1,6 +1,6 @@
 // resources/js/components/ui/Toast.tsx
-import React, { useEffect, useState } from 'react';
 import { X, CheckCircle, XCircle, Info, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 

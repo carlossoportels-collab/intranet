@@ -1,7 +1,7 @@
 // resources/js/Pages/Auth/Login.tsx
-import React, { useState } from 'react';
 import { Head, useForm, Link } from '@inertiajs/react';
 import { Lock, Eye, EyeOff, Shield } from 'lucide-react';
+import React, { useState } from 'react';
 
 export default function Login() {
     const [showPassword, setShowPassword] = useState(false);

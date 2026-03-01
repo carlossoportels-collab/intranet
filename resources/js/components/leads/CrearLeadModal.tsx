@@ -1,8 +1,10 @@
 // resources/js/components/leads/CrearLeadModal.tsx
-import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Phone, Mail, MapPin, Briefcase, User, Check, Search, Loader } from 'lucide-react';
 import { router } from '@inertiajs/react';
+import { X, UserPlus, Phone, Mail, MapPin, Briefcase, User, Check, Search, Loader } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
 import Toast from '@/components/ui/toast';
+import { Origen, Rubro, Provincia, Localidad, Comercial } from '@/types/leads';
 
 interface Usuario {
     id: number;
@@ -15,44 +17,11 @@ interface Usuario {
     } | null;
 }
 
-interface OrigenContacto {
-    id: number;
-    nombre: string;
-    color: string;
-    icono: string;
-}
-
-interface Rubro {
-    id: number;
-    nombre: string;
-}
-
-interface Provincia {
-    id: number;
-    nombre: string;
-}
-
-interface Localidad {
-    id: number;
-    nombre: string;
-    provincia_id: number;
-    provincia: string;
-    codigo_postal: string;
-}
-
-interface Comercial {
-    id: number;
-    prefijo_id: number;
-    personal_id: number;
-    nombre: string;
-    email: string;
-}
-
 interface CrearLeadModalProps {
     isOpen: boolean;
     onClose: () => void;
     usuario: Usuario;
-    origenes: OrigenContacto[];
+    origenes: Origen[];
     rubros: Rubro[];
     provincias: Provincia[];
     comerciales: Comercial[];
@@ -120,6 +89,7 @@ export default function CrearLeadModal({
 
     // Resetear formulario cuando se abre
     useEffect(() => {
+        
         if (isOpen) {
             const prefijoId = usuario.comercial?.es_comercial ? 
                 (usuario.comercial.prefijo_id?.toString() || '') : '';
@@ -474,10 +444,10 @@ export default function CrearLeadModal({
                                                         onChange={handleChange}
                                                         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-sat focus:border-sat rounded-md"
                                                     >
+                                                        <option value="no_especifica">No especifica</option>
                                                         <option value="masculino">Masculino</option>
                                                         <option value="femenino">Femenino</option>
                                                         <option value="otro">Otro</option>
-                                                        <option value="no_especifica">No especifica</option>
                                                     </select>
                                                 </div>
                                             </div>

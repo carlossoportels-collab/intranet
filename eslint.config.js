@@ -57,6 +57,12 @@ export default [
         files: ['**/*.{ts,tsx}'],
     },
     {
+        files: ['**/*.{ts,tsx}'],
+        rules: {
+            'no-console': ['error', { allow: ['warn', 'error'] }],
+        },
+    },
+    {
         ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js'],
     },
     prettier, // Turn off all rules that might conflict with Prettier

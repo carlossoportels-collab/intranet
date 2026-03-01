@@ -1,5 +1,6 @@
 // resources/js/Pages/Comercial/Cuentas/CambioTitularidad.tsx
 import React, { useState } from 'react';
+
 import AppLayout from '@/layouts/app-layout';
 
 export default function CambioTitularidad() {

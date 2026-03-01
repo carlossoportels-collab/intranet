@@ -1,11 +1,12 @@
 // resources/js/Pages/Comercial/Actividad.tsx
-import React, { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { 
     Calendar, Users, FileText, FileSignature, Building, 
     ChevronRight, Filter, Plus, TrendingUp,
     UserPlus, Truck, Briefcase
 } from 'lucide-react';
+import React, { useState } from 'react';
+
+import AppLayout from '@/layouts/app-layout';
 
 interface ActividadComercialProps {
     // Props si las necesitas

@@ -1,7 +1,5 @@
 // resources/js/Pages/Notificaciones/Programadas.tsx
-import React, { useState } from 'react';
 import { Head, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
 import { 
   Bell, 
   Calendar, 
@@ -23,6 +21,10 @@ import {
   ChevronRight as ChevronRightIcon,
   User
 } from 'lucide-react';
+import React, { useState } from 'react';
+
+import AppLayout from '@/layouts/app-layout';
+
 
 interface PaginationData {
   data: any[];

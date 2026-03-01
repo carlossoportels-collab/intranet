@@ -22,7 +22,7 @@ class LeadFormService
                 'estadosLead' => EstadoLead::where('activo', 1)->get(),
                 'tiposComentario' => TipoComentario::where('es_activo', 1)->get(),
                 'rubros' => Rubro::where('activo', 1)->get(),
-                'provincias' => Provincia::orderBy('provincia')->get(),
+                'provincias' => Provincia::orderBy('nombre')->get(),
                 'comerciales' => $this->getComercialesActivos(),
             ];
         });

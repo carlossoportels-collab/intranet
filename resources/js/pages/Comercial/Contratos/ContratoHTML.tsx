@@ -10,30 +10,20 @@ interface Props {
     };
 }
 
-
 export default function ContratoHTML({ contrato, compania }: Props) {
     const formatMoney = (value: any) => {
-        if (!value) return '$ 0,00';
+        if (!value && value !== 0) return '-';
         return '$ ' + Number(value).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     };
-console.log('=== DATOS DEL CONTRATO EN FRONTEND ===');
-console.log('Contrato completo:', contrato);
-console.log('Debito Tarjeta:', contrato.debito_tarjeta);
-console.log('Campos de tarjeta:', {
-    numero: contrato.debito_tarjeta?.tarjeta_numero,
-    expiracion: contrato.debito_tarjeta?.tarjeta_expiracion,
-    codigo: contrato.debito_tarjeta?.tarjeta_codigo,
-    banco: contrato.debito_tarjeta?.tarjeta_banco,
-    emisor: contrato.debito_tarjeta?.tarjeta_emisor,
-    titular: contrato.debito_tarjeta?.titular_tarjeta,
-    tipo: contrato.debito_tarjeta?.tipo_tarjeta
-});
 
+    // Verificar si el contrato tiene presupuesto (viene de cambio de razón social o de presupuesto)
+    const tienePresupuesto = !!contrato.presupuesto;
+    
     // Determinar el método de pago para el texto de autorización
     const getMetodoPagoTexto = () => {
         if (contrato.debito_cbu) return "CBU";
         if (contrato.debito_tarjeta) return "TARJETA DE CRÉDITO/DÉBITO";
-        return "CUENTA/TARJETA DE CRÉDITO";
+        return null;
     };
 
     // Función para enmascarar número de tarjeta
@@ -42,6 +32,30 @@ console.log('Campos de tarjeta:', {
         const ultimos4 = numero.slice(-4);
         return `**** **** **** ${ultimos4}`;
     };
+
+    const metodoPago = getMetodoPagoTexto();
+    const tieneMetodoPago = !!(contrato.debito_cbu || contrato.debito_tarjeta);
+
+    // Calcular totales para contratos sin presupuesto (desde cambio de razón social)
+    const calcularTotales = () => {
+        if (tienePresupuesto) {
+            return {
+                inversionInicial: 0,
+                costoMensual: Number(contrato.presupuesto_total_mensual) || 0,
+                totalPrimerMes: Number(contrato.presupuesto_total_mensual) || 0
+            };
+        } else {
+            // Para contratos desde cambio de razón social, usamos el total_mensual_abonos
+            const costoMensual = Number(contrato.presupuesto_total_mensual) || 0;
+            return {
+                inversionInicial: 0,
+                costoMensual: costoMensual,
+                totalPrimerMes: costoMensual // No hay inversión inicial
+            };
+        }
+    };
+
+    const totales = calcularTotales();
 
     // Estilos con tipos correctos para React
     const styles = {
@@ -436,8 +450,6 @@ console.log('Campos de tarjeta:', {
         } as React.CSSProperties
     };
 
-    const metodoPago = getMetodoPagoTexto();
-
     return (
         <div style={styles.container}>
             {/* Header en 3 columnas */}
@@ -581,116 +593,216 @@ console.log('Campos de tarjeta:', {
                 </div>
             </div>
 
-            {/* Servicios Contratados */}
+            {/* Servicios Contratados - Condicional según tipo de contrato */}
             <div style={styles.section}>
                 <div style={styles.sectionTitle}>Servicios Contratados</div>
                 
-                <div style={styles.tablesContainer}>
-                    {/* Inversión Inicial */}
-                    <div>
-                        <div style={styles.tableHeader}>INVERSIÓN INICIAL</div>
-                        <table style={styles.serviceTable}>
-                            <thead>
-                                <tr>
-                                    <th style={styles.serviceTableTh}>Descripción</th>
-                                    <th style={styles.serviceTableTh}>Cant.</th>
-                                    <th style={styles.serviceTableTh}>P.Unit.</th>
-                                    <th style={styles.serviceTableTh}>Desc.</th>
-                                    <th style={styles.serviceTableTh}>Subtotal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {/* Tasa de instalación */}
-                                {contrato.presupuesto?.tasa && (
-                                    <>
+                {tienePresupuesto ? (
+                    // Vista para contratos con presupuesto (original)
+                    <>
+                        <div style={styles.tablesContainer}>
+                            {/* Inversión Inicial */}
+                            <div>
+                                <div style={styles.tableHeader}>INVERSIÓN INICIAL</div>
+                                <table style={styles.serviceTable}>
+                                    <thead>
                                         <tr>
-                                            <td colSpan={5} style={{ background: '#f2f2f2', fontWeight: 'bold', color: 'rgb(60,60,62)', fontSize: '9px', padding: '3px 4px' }}>
-                                                SERVICIOS DE INSTALACIÓN
-                                            </td>
+                                            <th style={styles.serviceTableTh}>Descripción</th>
+                                            <th style={styles.serviceTableTh}>Cant.</th>
+                                            <th style={styles.serviceTableTh}>P.Unit.</th>
+                                            <th style={styles.serviceTableTh}>Desc.</th>
+                                            <th style={styles.serviceTableTh}>Subtotal</th>
                                         </tr>
-                                        <tr>
-                                            <td style={styles.serviceTableTd}>{contrato.presupuesto.tasa.nombre}</td>
-                                            <td style={styles.serviceTableTd}>{contrato.presupuesto_cantidad_vehiculos}</td>
-                                            <td style={styles.serviceTableTd}>{formatMoney(contrato.presupuesto.valor_tasa)}</td>
-                                            <td style={styles.serviceTableTd}>
-                                                {(() => {
-                                                    const productoPromo = contrato.presupuesto.promocion?.productos?.find(
-                                                        (p: any) => p.producto_servicio_id === contrato.presupuesto.tasa.id
-                                                    );
-                                                    
-                                                    if (productoPromo) {
-                                                        if (productoPromo.tipo_promocion === '2x1') return '2x1';
-                                                        if (productoPromo.tipo_promocion === '3x2') return '3x2';
-                                                        if (productoPromo.tipo_promocion === 'porcentaje') {
-                                                            return `${productoPromo.bonificacion || contrato.presupuesto.tasa_bonificacion}%`;
-                                                        }
-                                                    }
-                                                    
-                                                    if (contrato.presupuesto.tasa_bonificacion > 0) {
-                                                        return `${contrato.presupuesto.tasa_bonificacion}%`;
-                                                    }
-                                                    
-                                                    return '-';
-                                                })()}
-                                            </td>
-                                            <td style={{ ...styles.serviceTableTd, ...styles.number }}>{formatMoney(contrato.presupuesto.subtotal_tasa)}</td>
-                                        </tr>
-                                    </>
-                                )}
+                                    </thead>
+                                    <tbody>
+                                        {/* Tasa de instalación */}
+                                        {contrato.presupuesto?.tasa && (
+                                            <>
+                                                <tr>
+                                                    <td colSpan={5} style={{ background: '#f2f2f2', fontWeight: 'bold', color: 'rgb(60,60,62)', fontSize: '9px', padding: '3px 4px' }}>
+                                                        SERVICIOS DE INSTALACIÓN
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style={styles.serviceTableTd}>{contrato.presupuesto.tasa.nombre}</td>
+                                                    <td style={styles.serviceTableTd}>{contrato.presupuesto_cantidad_vehiculos}</td>
+                                                    <td style={styles.serviceTableTd}>{formatMoney(contrato.presupuesto.valor_tasa)}</td>
+                                                    <td style={styles.serviceTableTd}>
+                                                        {(() => {
+                                                            const productoPromo = contrato.presupuesto.promocion?.productos?.find(
+                                                                (p: any) => p.producto_servicio_id === contrato.presupuesto.tasa.id
+                                                            );
+                                                            
+                                                            if (productoPromo) {
+                                                                if (productoPromo.tipo_promocion === '2x1') return '2x1';
+                                                                if (productoPromo.tipo_promocion === '3x2') return '3x2';
+                                                                if (productoPromo.tipo_promocion === 'porcentaje') {
+                                                                    return `${productoPromo.bonificacion || contrato.presupuesto.tasa_bonificacion}%`;
+                                                                }
+                                                            }
+                                                            
+                                                            if (contrato.presupuesto.tasa_bonificacion > 0) {
+                                                                return `${contrato.presupuesto.tasa_bonificacion}%`;
+                                                            }
+                                                            
+                                                            return '-';
+                                                        })()}
+                                                    </td>
+                                                    <td style={{ ...styles.serviceTableTd, ...styles.number }}>{formatMoney(contrato.presupuesto.subtotal_tasa)}</td>
+                                                </tr>
+                                            </>
+                                        )}
 
-                                {/* Accesorios */}
-                                {contrato.presupuesto?.agregados?.filter((a: any) => {
-                                    const tipoId = a.producto_servicio?.tipo?.id;
-                                    return tipoId === 5;
-                                }).length > 0 && (
-                                    <>
+                                        {/* Accesorios */}
+                                        {contrato.presupuesto?.agregados?.filter((a: any) => {
+                                            const tipoId = a.producto_servicio?.tipo?.id;
+                                            return tipoId === 5;
+                                        }).length > 0 && (
+                                            <>
+                                                <tr>
+                                                    <td colSpan={5} style={{ background: '#f2f2f2', fontWeight: 'bold', color: 'rgb(60,60,62)', fontSize: '9px', padding: '3px 4px' }}>
+                                                        ACCESORIOS
+                                                    </td>
+                                                </tr>
+                                                {contrato.presupuesto.agregados
+                                                    .filter((a: any) => a.producto_servicio?.tipo?.id === 5)
+                                                    .map((item: any, index: number) => {
+                                                        const productoPromo = contrato.presupuesto.promocion?.productos?.find(
+                                                            (p: any) => p.producto_servicio_id === item.prd_servicio_id
+                                                        );
+                                                        
+                                                        let descuentoTexto = '-';
+                                                        
+                                                        if (productoPromo) {
+                                                            if (productoPromo.tipo_promocion === '2x1') descuentoTexto = '2x1';
+                                                            else if (productoPromo.tipo_promocion === '3x2') descuentoTexto = '3x2';
+                                                            else if (productoPromo.tipo_promocion === 'porcentaje') {
+                                                                descuentoTexto = `${productoPromo.bonificacion || item.bonificacion}%`;
+                                                            }
+                                                        } else if (item.bonificacion > 0) {
+                                                            descuentoTexto = `${item.bonificacion}%`;
+                                                        }
+                                                        
+                                                        return (
+                                                            <tr key={`acc-${index}`}>
+                                                                <td style={styles.serviceTableTd}>{item.producto_servicio?.nombre}</td>
+                                                                <td style={styles.serviceTableTd}>{item.cantidad}</td>
+                                                                <td style={styles.serviceTableTd}>{formatMoney(item.valor)}</td>
+                                                                <td style={styles.serviceTableTd}>{descuentoTexto}</td>
+                                                                <td style={{ ...styles.serviceTableTd, ...styles.number }}>{formatMoney(item.subtotal)}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                            </>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            {/* Costo Mensual */}
+                            <div>
+                                <div style={styles.tableHeader}>COSTO MENSUAL</div>
+                                <table style={styles.serviceTable}>
+                                    <thead>
                                         <tr>
-                                            <td colSpan={5} style={{ background: '#f2f2f2', fontWeight: 'bold', color: 'rgb(60,60,62)', fontSize: '9px', padding: '3px 4px' }}>
-                                                ACCESORIOS
-                                            </td>
+                                            <th style={styles.serviceTableTh}>Descripción</th>
+                                            <th style={styles.serviceTableTh}>Cant.</th>
+                                            <th style={styles.serviceTableTh}>P.Unit.</th>
+                                            <th style={styles.serviceTableTh}>Desc.</th>
+                                            <th style={styles.serviceTableTh}>Subtotal</th>
                                         </tr>
-                                        {contrato.presupuesto.agregados
-                                            .filter((a: any) => a.producto_servicio?.tipo?.id === 5)
-                                            .map((item: any, index: number) => {
-                                                const productoPromo = contrato.presupuesto.promocion?.productos?.find(
-                                                    (p: any) => p.producto_servicio_id === item.prd_servicio_id
-                                                );
-                                                
-                                                let descuentoTexto = '-';
-                                                
-                                                if (productoPromo) {
-                                                    if (productoPromo.tipo_promocion === '2x1') descuentoTexto = '2x1';
-                                                    else if (productoPromo.tipo_promocion === '3x2') descuentoTexto = '3x2';
-                                                    else if (productoPromo.tipo_promocion === 'porcentaje') {
-                                                        descuentoTexto = `${productoPromo.bonificacion || item.bonificacion}%`;
-                                                    }
-                                                } else if (item.bonificacion > 0) {
-                                                    descuentoTexto = `${item.bonificacion}%`;
-                                                }
-                                                
-                                                return (
-                                                    <tr key={`acc-${index}`}>
-                                                        <td style={styles.serviceTableTd}>{item.producto_servicio?.nombre}</td>
-                                                        <td style={styles.serviceTableTd}>{item.cantidad}</td>
-                                                        <td style={styles.serviceTableTd}>{formatMoney(item.valor)}</td>
-                                                        <td style={styles.serviceTableTd}>{descuentoTexto}</td>
-                                                        <td style={{ ...styles.serviceTableTd, ...styles.number }}>{formatMoney(item.subtotal)}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                    </>
-                                )}
-                            </tbody>
-                        </table>
-                        
-                        {/* Inversión Inicial (Tasa + Accesorios) */}
+                                    </thead>
+                                    <tbody>
+                                        {/* Abono base */}
+                                        {contrato.presupuesto?.abono && (
+                                            <>
+                                                <tr>
+                                                    <td colSpan={5} style={{ background: '#f2f2f2', fontWeight: 'bold', color: 'rgb(60,60,62)', fontSize: '9px', padding: '3px 4px' }}>
+                                                        ABONO BASE
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style={styles.serviceTableTd}>{contrato.presupuesto.abono.nombre}</td>
+                                                    <td style={styles.serviceTableTd}>{contrato.presupuesto_cantidad_vehiculos}</td>
+                                                    <td style={styles.serviceTableTd}>{formatMoney(contrato.presupuesto.valor_abono)}</td>
+                                                    <td style={styles.serviceTableTd}>
+                                                        {(() => {
+                                                            const productoPromo = contrato.presupuesto.promocion?.productos?.find(
+                                                                (p: any) => p.producto_servicio_id === contrato.presupuesto.abono.id
+                                                            );
+                                                            
+                                                            if (productoPromo) {
+                                                                if (productoPromo.tipo_promocion === '2x1') return '2x1';
+                                                                if (productoPromo.tipo_promocion === '3x2') return '3x2';
+                                                                if (productoPromo.tipo_promocion === 'porcentaje') {
+                                                                    return `${productoPromo.bonificacion || contrato.presupuesto.abono_bonificacion}%`;
+                                                                }
+                                                            }
+                                                            
+                                                            if (contrato.presupuesto.abono_bonificacion > 0) {
+                                                                return `${contrato.presupuesto.abono_bonificacion}%`;
+                                                            }
+                                                            
+                                                            return '-';
+                                                        })()}
+                                                    </td>
+                                                    <td style={{ ...styles.serviceTableTd, ...styles.number }}>{formatMoney(contrato.presupuesto.subtotal_abono)}</td>
+                                                </tr>
+                                            </>
+                                        )}
+
+                                        {/* Servicios */}
+                                        {contrato.presupuesto?.agregados?.filter((a: any) => {
+                                            const tipoId = a.producto_servicio?.tipo?.id;
+                                            return tipoId === 3;
+                                        }).length > 0 && (
+                                            <>
+                                                <tr>
+                                                    <td colSpan={5} style={{ background: '#f2f2f2', fontWeight: 'bold', color: 'rgb(60,60,62)', fontSize: '9px', padding: '3px 4px' }}>
+                                                        SERVICIOS ADICIONALES
+                                                    </td>
+                                                </tr>
+                                                {contrato.presupuesto.agregados
+                                                    .filter((a: any) => a.producto_servicio?.tipo?.id === 3)
+                                                    .map((item: any, index: number) => {
+                                                        const productoPromo = contrato.presupuesto.promocion?.productos?.find(
+                                                            (p: any) => p.producto_servicio_id === item.prd_servicio_id
+                                                        );
+                                                        
+                                                        let descuentoTexto = '-';
+                                                        
+                                                        if (productoPromo) {
+                                                            if (productoPromo.tipo_promocion === '2x1') descuentoTexto = '2x1';
+                                                            else if (productoPromo.tipo_promocion === '3x2') descuentoTexto = '3x2';
+                                                            else if (productoPromo.tipo_promocion === 'porcentaje') {
+                                                                descuentoTexto = `${productoPromo.bonificacion || item.bonificacion}%`;
+                                                            }
+                                                        } else if (item.bonificacion > 0) {
+                                                            descuentoTexto = `${item.bonificacion}%`;
+                                                        }
+                                                        
+                                                        return (
+                                                            <tr key={`serv-${index}`}>
+                                                                <td style={styles.serviceTableTd}>{item.producto_servicio?.nombre}</td>
+                                                                <td style={styles.serviceTableTd}>{item.cantidad}</td>
+                                                                <td style={styles.serviceTableTd}>{formatMoney(item.valor)}</td>
+                                                                <td style={styles.serviceTableTd}>{descuentoTexto}</td>
+                                                                <td style={{ ...styles.serviceTableTd, ...styles.number }}>{formatMoney(item.subtotal)}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                            </>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Total Inversión Inicial */}
                         {(() => {
                             let totalInversion = 0;
                             if (contrato.presupuesto) {
-                                // Sumar tasa
                                 totalInversion += Number(contrato.presupuesto.subtotal_tasa) || 0;
-                                
-                                // Sumar accesorios
                                 if (contrato.presupuesto.agregados && contrato.presupuesto.agregados.length > 0) {
                                     contrato.presupuesto.agregados.forEach((item: any) => {
                                         if (item.producto_servicio?.tipo?.id === 5) {
@@ -699,119 +811,18 @@ console.log('Campos de tarjeta:', {
                                     });
                                 }
                             }
-                            return (
+                            return totalInversion > 0 ? (
                                 <div style={{ textAlign: 'right', marginTop: '5px', padding: '3px 4px', background: '#fff3e0', fontWeight: 'bold', borderTop: '1px solid rgb(247, 98, 0)', color: 'rgb(60, 60, 62)', fontSize: '9px' }}>
                                     Inversión Inicial: <span style={{ fontFamily: "'Courier New', monospace" }}>{formatMoney(totalInversion)}</span>
                                 </div>
-                            );
+                            ) : null;
                         })()}
-                    </div>
-                    
-                    {/* Costo Mensual */}
-                    <div>
-                        <div style={styles.tableHeader}>COSTO MENSUAL</div>
-                        <table style={styles.serviceTable}>
-                            <thead>
-                                <tr>
-                                    <th style={styles.serviceTableTh}>Descripción</th>
-                                    <th style={styles.serviceTableTh}>Cant.</th>
-                                    <th style={styles.serviceTableTh}>P.Unit.</th>
-                                    <th style={styles.serviceTableTh}>Desc.</th>
-                                    <th style={styles.serviceTableTh}>Subtotal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {/* Abono base */}
-                                {contrato.presupuesto?.abono && (
-                                    <>
-                                        <tr>
-                                            <td colSpan={5} style={{ background: '#f2f2f2', fontWeight: 'bold', color: 'rgb(60,60,62)', fontSize: '9px', padding: '3px 4px' }}>
-                                                ABONO BASE
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style={styles.serviceTableTd}>{contrato.presupuesto.abono.nombre}</td>
-                                            <td style={styles.serviceTableTd}>{contrato.presupuesto_cantidad_vehiculos}</td>
-                                            <td style={styles.serviceTableTd}>{formatMoney(contrato.presupuesto.valor_abono)}</td>
-                                            <td style={styles.serviceTableTd}>
-                                                {(() => {
-                                                    const productoPromo = contrato.presupuesto.promocion?.productos?.find(
-                                                        (p: any) => p.producto_servicio_id === contrato.presupuesto.abono.id
-                                                    );
-                                                    
-                                                    if (productoPromo) {
-                                                        if (productoPromo.tipo_promocion === '2x1') return '2x1';
-                                                        if (productoPromo.tipo_promocion === '3x2') return '3x2';
-                                                        if (productoPromo.tipo_promocion === 'porcentaje') {
-                                                            return `${productoPromo.bonificacion || contrato.presupuesto.abono_bonificacion}%`;
-                                                        }
-                                                    }
-                                                    
-                                                    if (contrato.presupuesto.abono_bonificacion > 0) {
-                                                        return `${contrato.presupuesto.abono_bonificacion}%`;
-                                                    }
-                                                    
-                                                    return '-';
-                                                })()}
-                                            </td>
-                                            <td style={{ ...styles.serviceTableTd, ...styles.number }}>{formatMoney(contrato.presupuesto.subtotal_abono)}</td>
-                                        </tr>
-                                    </>
-                                )}
 
-                                {/* Servicios */}
-                                {contrato.presupuesto?.agregados?.filter((a: any) => {
-                                    const tipoId = a.producto_servicio?.tipo?.id;
-                                    return tipoId === 3;
-                                }).length > 0 && (
-                                    <>
-                                        <tr>
-                                            <td colSpan={5} style={{ background: '#f2f2f2', fontWeight: 'bold', color: 'rgb(60,60,62)', fontSize: '9px', padding: '3px 4px' }}>
-                                                SERVICIOS ADICIONALES
-                                            </td>
-                                        </tr>
-                                        {contrato.presupuesto.agregados
-                                            .filter((a: any) => a.producto_servicio?.tipo?.id === 3)
-                                            .map((item: any, index: number) => {
-                                                const productoPromo = contrato.presupuesto.promocion?.productos?.find(
-                                                    (p: any) => p.producto_servicio_id === item.prd_servicio_id
-                                                );
-                                                
-                                                let descuentoTexto = '-';
-                                                
-                                                if (productoPromo) {
-                                                    if (productoPromo.tipo_promocion === '2x1') descuentoTexto = '2x1';
-                                                    else if (productoPromo.tipo_promocion === '3x2') descuentoTexto = '3x2';
-                                                    else if (productoPromo.tipo_promocion === 'porcentaje') {
-                                                        descuentoTexto = `${productoPromo.bonificacion || item.bonificacion}%`;
-                                                    }
-                                                } else if (item.bonificacion > 0) {
-                                                    descuentoTexto = `${item.bonificacion}%`;
-                                                }
-                                                
-                                                return (
-                                                    <tr key={`serv-${index}`}>
-                                                        <td style={styles.serviceTableTd}>{item.producto_servicio?.nombre}</td>
-                                                        <td style={styles.serviceTableTd}>{item.cantidad}</td>
-                                                        <td style={styles.serviceTableTd}>{formatMoney(item.valor)}</td>
-                                                        <td style={styles.serviceTableTd}>{descuentoTexto}</td>
-                                                        <td style={{ ...styles.serviceTableTd, ...styles.number }}>{formatMoney(item.subtotal)}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                    </>
-                                )}
-                            </tbody>
-                        </table>
-                        
-                        {/* Costo Mensual (Abono + Servicios) */}
+                        {/* Total Costo Mensual */}
                         {(() => {
                             let costoMensual = 0;
                             if (contrato.presupuesto) {
-                                // Sumar abono
                                 costoMensual += Number(contrato.presupuesto.subtotal_abono) || 0;
-                                
-                                // Sumar servicios
                                 if (contrato.presupuesto.agregados && contrato.presupuesto.agregados.length > 0) {
                                     contrato.presupuesto.agregados.forEach((item: any) => {
                                         if (item.producto_servicio?.tipo?.id === 3) {
@@ -820,155 +831,141 @@ console.log('Campos de tarjeta:', {
                                     });
                                 }
                             }
-                            return (
+                            return costoMensual > 0 ? (
                                 <div style={{ textAlign: 'right', marginTop: '5px', padding: '3px 4px', background: '#fff3e0', fontWeight: 'bold', borderTop: '1px solid rgb(247, 98, 0)', color: 'rgb(60, 60, 62)', fontSize: '9px' }}>
                                     Costo Mensual: <span style={{ fontFamily: "'Courier New', monospace" }}>{formatMoney(costoMensual)}</span>
                                 </div>
-                            );
+                            ) : null;
                         })()}
-                    </div>
-                </div>
-                
-                {/* TOTAL PRIMER MES */}
-                {(() => {
-                    let totalInversion = 0;
-                    let costoMensual = 0;
-                    
-                    if (contrato.presupuesto) {
-                        // Inversión Inicial
-                        totalInversion += Number(contrato.presupuesto.subtotal_tasa) || 0;
-                        
-                        // Costo Mensual
-                        costoMensual += Number(contrato.presupuesto.subtotal_abono) || 0;
-                        
-                        // Agregados
-                        if (contrato.presupuesto.agregados && contrato.presupuesto.agregados.length > 0) {
-                            contrato.presupuesto.agregados.forEach((item: any) => {
-                                const tipoId = item.producto_servicio?.tipo?.id;
-                                if (tipoId === 5) {
-                                    totalInversion += Number(item.subtotal) || 0;
-                                } else if (tipoId === 3) {
-                                    costoMensual += Number(item.subtotal) || 0;
-                                }
-                            });
-                        }
-                    }
-                    
-                    const totalPrimerMes = totalInversion + costoMensual;
-                    
-                    return (
-                        <div style={{ textAlign: 'right', marginTop: '10px', padding: '5px 8px', background: '#e6f0fa', fontWeight: 'bold', border: '1px solid rgb(60, 60, 62)', borderRadius: '3px', color: 'rgb(60, 60, 62)', fontSize: '11px' }}>
-                            TOTAL PRIMER MES: <span style={{ fontFamily: "'Courier New', monospace", fontSize: '12px' }}>{formatMoney(totalPrimerMes)}</span>
+                    </>
+                ) : (
+                    // Vista simplificada para contratos sin presupuesto (cambio de razón social)
+                    <div style={{ padding: '10px', background: '#f8f9fa', border: '1px solid #e9ecef', borderRadius: '3px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                            <div>
+                                <div style={styles.tableHeader}>COSTO MENSUAL</div>
+                                <div style={{ marginTop: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #eee' }}>
+                                        <span>Abonos de la flota ({contrato.presupuesto_cantidad_vehiculos || 0} vehículos)</span>
+                                        <span style={{ fontFamily: "'Courier New', monospace", fontWeight: 'bold' }}>{formatMoney(totales.costoMensual)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style={styles.tableHeader}>TOTAL</div>
+                                <div style={{ marginTop: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', background: '#fff3e0', fontWeight: 'bold', border: '1px solid rgb(247, 98, 0)', borderRadius: '3px', padding: '5px 8px' }}>
+                                        <span>Costo mensual total:</span>
+                                        <span style={{ fontFamily: "'Courier New', monospace" }}>{formatMoney(totales.costoMensual)}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    );
-                })()}
+                    </div>
+                )}
             </div>
 
-            {/* Método de Pago - Dinámico según el tipo */}
-            <div style={styles.paymentSection}>
-                <div style={styles.sectionTitle}>Método de Pago y Autorización</div>
-                
-                <div style={styles.paymentInfo}>
-                    <div style={styles.paymentHeader}>
-                        <div style={styles.paymentTitle}>Débito automático autorizado</div>
-                        <div style={styles.paymentStatus}>✓ Activo</div>
-                    </div>
+            {/* Método de Pago - Solo se muestra si hay método de pago registrado */}
+            {tieneMetodoPago && (
+                <div style={styles.paymentSection}>
+                    <div style={styles.sectionTitle}>Método de Pago y Autorización</div>
                     
-                    <div style={styles.paymentDetails}>
-                        {contrato.debito_cbu ? (
-                            // Datos de CBU
-                            <>
-                                <div style={styles.paymentField}>
-                                    <span style={styles.paymentLabel}>Banco:</span>
-                                    <span style={styles.paymentValue}>{contrato.debito_cbu.nombre_banco}</span>
+                    <div style={styles.paymentInfo}>
+                        <div style={styles.paymentHeader}>
+                            <div style={styles.paymentTitle}>Débito automático autorizado</div>
+                            <div style={styles.paymentStatus}>✓ Activo</div>
+                        </div>
+                        
+                        <div style={styles.paymentDetails}>
+                            {contrato.debito_cbu ? (
+                                // Datos de CBU
+                                <>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Banco:</span>
+                                        <span style={styles.paymentValue}>{contrato.debito_cbu.nombre_banco}</span>
+                                    </div>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>CBU:</span>
+                                        <span style={styles.paymentValue}>{contrato.debito_cbu.cbu}</span>
+                                    </div>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Alias:</span>
+                                        <span style={styles.paymentValue}>{contrato.debito_cbu.alias_cbu || '-'}</span>
+                                    </div>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Titular:</span>
+                                        <span style={styles.paymentValue}>{contrato.debito_cbu.titular_cuenta}</span>
+                                    </div>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Tipo cuenta:</span>
+                                        <span style={styles.paymentValue}>
+                                            {contrato.debito_cbu.tipo_cuenta === 'caja_ahorro' ? 'Caja de ahorro' : 'Cuenta corriente'}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : contrato.debito_tarjeta ? (
+                                // Datos de Tarjeta
+                                <>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Banco:</span>
+                                        <span style={styles.paymentValue}>{contrato.debito_tarjeta.tarjeta_banco}</span>
+                                    </div>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Tarjeta:</span>
+                                        <span style={styles.paymentValue}>{contrato.debito_tarjeta.tarjeta_emisor}</span>
+                                    </div>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Número:</span>
+                                        <span style={styles.paymentValue}>{enmascararTarjeta(contrato.debito_tarjeta.tarjeta_numero)}</span>
+                                    </div>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Vencimiento:</span>
+                                        <span style={styles.paymentValue}>{contrato.debito_tarjeta.tarjeta_expiracion}</span>
+                                    </div>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Titular:</span>
+                                        <span style={styles.paymentValue}>{contrato.debito_tarjeta.titular_tarjeta}</span>
+                                    </div>
+                                    <div style={styles.paymentField}>
+                                        <span style={styles.paymentLabel}>Tipo:</span>
+                                        <span style={styles.paymentValue}>
+                                            {contrato.debito_tarjeta.tipo_tarjeta === 'debito' ? 'Débito' : 'Crédito'}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : null}
+                        </div>
+                        
+                        {/* Declaración de Autorización - Solo se muestra si hay método de pago */}
+                        {metodoPago && (
+                            <div style={styles.authorizationBox}>
+                                <div style={styles.authorizationTitle}>Declaración de Autorización</div>
+                                <div style={styles.authorizationText}>
+                                    <p>Autorizo por la presente a que el pago correspondiente a las facturas mensuales por la contratación del servicio ofrecido por {compania.nombre} sean debitados en forma directa y automática en el resumen de mi {metodoPago}.</p>
+                                    <p>Dejo especialmente establecido que podrá dar por cumplida la presente autorización mediante la sola declaración fehaciente comunicada, sin perjuicio tal, de los importes que pudieran corresponderme en función de servicios ya recibidos con anterioridad.</p>
+                                    <p>La aprobación de esta solicitud será supeditada a la aceptación de la entidad emisora. Asimismo faculto a {compania.nombre} a presentar esta AUTORIZACIÓN donde sea requerida a efectos de cumplimentar la misma.</p>
+                                    <p><em>Nota: IVA (21%) no incluido.</em></p>
                                 </div>
-                                <div style={styles.paymentField}>
-                                    <span style={styles.paymentLabel}>CBU:</span>
-                                    <span style={styles.paymentValue}>{contrato.debito_cbu.cbu}</span>
+                                
+                                <div style={styles.signatureFieldsThree}>
+                                    <div style={styles.signatureField}>
+                                        <span style={styles.signatureLabel}>Firma:</span>
+                                        <div style={styles.signatureLine}></div>
+                                    </div>
+                                    <div style={styles.signatureField}>
+                                        <span style={styles.signatureLabel}>Aclaración:</span>
+                                        <div style={styles.signatureLine}></div>
+                                    </div>
+                                    <div style={styles.signatureField}>
+                                        <span style={styles.signatureLabel}>Tipo y Nro. documento:</span>
+                                        <div style={styles.signatureLine}></div>
+                                    </div>
                                 </div>
-                                <div style={styles.paymentField}>
-                                    <span style={styles.paymentLabel}>Alias:</span>
-                                    <span style={styles.paymentValue}>{contrato.debito_cbu.alias_cbu || '-'}</span>
-                                </div>
-                                <div style={styles.paymentField}>
-                                    <span style={styles.paymentLabel}>Titular:</span>
-                                    <span style={styles.paymentValue}>{contrato.debito_cbu.titular_cuenta}</span>
-                                </div>
-                                <div style={styles.paymentField}>
-                                    <span style={styles.paymentLabel}>Tipo cuenta:</span>
-                                    <span style={styles.paymentValue}>
-                                        {contrato.debito_cbu.tipo_cuenta === 'caja_ahorro' ? 'Caja de ahorro' : 'Cuenta corriente'}
-                                    </span>
-                                </div>
-                            </>
-                        ) : contrato.debito_tarjeta ? (
-                            // Datos de Tarjeta
-    <>
-        <div style={styles.paymentField}>
-            <span style={styles.paymentLabel}>Banco:</span>
-            <span style={styles.paymentValue}>{contrato.debito_tarjeta.tarjeta_banco}</span>
-        </div>
-        <div style={styles.paymentField}>
-            <span style={styles.paymentLabel}>Tarjeta:</span>
-            <span style={styles.paymentValue}>{contrato.debito_tarjeta.tarjeta_emisor}</span>
-        </div>
-        <div style={styles.paymentField}>
-            <span style={styles.paymentLabel}>Número:</span>
-            <span style={styles.paymentValue}>{contrato.debito_tarjeta.tarjeta_numero}</span>
-        </div>
-        <div style={styles.paymentField}>
-            <span style={styles.paymentLabel}>Vencimiento:</span>
-            <span style={styles.paymentValue}>{contrato.debito_tarjeta.tarjeta_expiracion}</span>
-        </div>
-        <div style={styles.paymentField}>
-            <span style={styles.paymentLabel}>CVV:</span>
-            <span style={styles.paymentValue}>{contrato.debito_tarjeta.tarjeta_codigo}</span>
-        </div>
-        <div style={styles.paymentField}>
-            <span style={styles.paymentLabel}>Titular:</span>
-            <span style={styles.paymentValue}>{contrato.debito_tarjeta.titular_tarjeta}</span>
-        </div>
-        <div style={styles.paymentField}>
-            <span style={styles.paymentLabel}>Tipo:</span>
-            <span style={styles.paymentValue}>
-                {contrato.debito_tarjeta.tipo_tarjeta === 'debito' ? 'Débito' : 'Crédito'}
-            </span>
-        </div>
-    </>
-                        ) : (
-                            // Sin datos de pago
-                            <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: '10px', color: '#999' }}>
-                                No se registró método de pago
                             </div>
                         )}
                     </div>
-                    
-                    <div style={styles.authorizationBox}>
-                        <div style={styles.authorizationTitle}>Declaración de Autorización</div>
-                        <div style={styles.authorizationText}>
-                            <p>Autorizo por la presente a que el pago correspondiente a las facturas mensuales por la contratación del servicio ofrecido por {compania.nombre} sean debitados en forma directa y automática en el resumen de mi {metodoPago}.</p>
-                            <p>Dejo especialmente establecido que podrá dar por cumplida la presente autorización mediante la sola declaración fehaciente comunicada, sin perjuicio tal, de los importes que pudieran corresponderme en función de servicios ya recibidos con anterioridad.</p>
-                            <p>La aprobación de esta solicitud será supeditada a la aceptación de la entidad emisora. Asimismo faculto a {compania.nombre} a presentar esta AUTORIZACIÓN donde sea requerida a efectos de cumplimentar la misma.</p>
-                            <p><em>Nota: IVA (21%) no incluido.</em></p>
-                        </div>
-                        
-                        <div style={styles.signatureFieldsThree}>
-                            <div style={styles.signatureField}>
-                                <span style={styles.signatureLabel}>Firma:</span>
-                                <div style={styles.signatureLine}></div>
-                            </div>
-                            <div style={styles.signatureField}>
-                                <span style={styles.signatureLabel}>Aclaración:</span>
-                                <div style={styles.signatureLine}></div>
-                            </div>
-                            <div style={styles.signatureField}>
-                                <span style={styles.signatureLabel}>Tipo y Nro. documento:</span>
-                                <div style={styles.signatureLine}></div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Datos de Instalación */}
             <div style={styles.section}>

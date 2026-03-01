@@ -12,11 +12,25 @@ export const formatWhatsAppMoney = (value: number): string => {
     return '$' + value.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 };
 
-export const formatDate = (date: string): string => {
+export const formatDate = (date: string | null | undefined): string => {
+    if (!date) return 'N/A';
     try {
         return new Date(date).toLocaleDateString('es-ES', {
             day: '2-digit',
             month: 'long',
+            year: 'numeric'
+        });
+    } catch {
+        return date;
+    }
+};
+
+export const formatShortDate = (date: string | null | undefined): string => {
+    if (!date) return 'N/A';
+    try {
+        return new Date(date).toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
             year: 'numeric'
         });
     } catch {

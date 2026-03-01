@@ -1,7 +1,8 @@
 // resources/js/components/layout/Header.tsx
-import React, { useState } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { Search, Plus, Bell, Menu, X, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+
 import CrearLeadModal from '@/components/leads/CrearLeadModal';
 import NotificacionesDropdown from '@/components/notificaciones/NotificacionesDropdown';
 

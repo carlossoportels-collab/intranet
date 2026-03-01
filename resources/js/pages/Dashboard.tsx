@@ -1,5 +1,6 @@
-import React from 'react';
 import { Head, usePage } from '@inertiajs/react';
+import React from 'react';
+
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 

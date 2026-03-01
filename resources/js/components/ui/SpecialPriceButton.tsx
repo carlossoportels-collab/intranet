@@ -1,6 +1,7 @@
 // resources/js/components/ui/SpecialPriceButton.tsx
-import React from 'react';
 import { MessageCircle } from 'lucide-react';
+import React from 'react';
+
 import { sendWhatsApp, createPriceQueryMessage } from '@/utils/whatsapp.utils';
 
 interface SpecialPriceButtonProps {

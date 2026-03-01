@@ -1,9 +1,10 @@
 // resources/js/components/leads/tabs/InfoTab.tsx
-import React from 'react';
 import {
   User, Mail, Phone, MapPin, Tag, Target, Briefcase,
   UserCheck, Hash, CheckCircle, X, FileText
 } from 'lucide-react';
+import React from 'react';
+
 import { Lead } from '@/types/leads';
 
 interface InfoTabProps {
@@ -36,38 +37,38 @@ const InfoTab: React.FC<InfoTabProps> = ({ lead }) => {
   };
 
   // Obtener nombre de la provincia desde el objeto Provincia
-const getProvinciaNombre = (): string | null => {
-  if (!lead.localidad?.provincia) return null;
-  
-  const provincia = lead.localidad.provincia;
-  
-  // Type guard: si es un string, devolverlo directamente
-  if (typeof provincia === 'string') {
-    return provincia;
-  }
-  
-  // Si es un objeto, acceder a su propiedad 'provincia'
-  if (typeof provincia === 'object' && provincia !== null) {
-    return (provincia as any).provincia || null;
-  }
-  
-  return null;
-};
+  const getProvinciaNombre = (): string | null => {
+    if (!lead.localidad?.provincia) return null;
+    
+    const provincia = lead.localidad.provincia;
+    
+    // Si es un string, devolverlo directamente
+    if (typeof provincia === 'string') {
+      return provincia;
+    }
+    
+    // Si es un objeto, acceder a su propiedad 'nombre'
+    if (typeof provincia === 'object' && provincia !== null) {
+      return (provincia as any).nombre || null;
+    }
+    
+    return null;
+  };
 
-// Formatear ubicación correctamente
-const getUbicacionTexto = (): string | null => {
-  if (!lead.localidad) return null;
-  
-  let texto = lead.localidad.localidad;
-  const provinciaNombre = getProvinciaNombre();
-  if (provinciaNombre) {
-    texto += `, ${provinciaNombre}`;
-  }
-  return texto;
-};
+  // Formatear ubicación correctamente
+  const getUbicacionTexto = (): string | null => {
+    if (!lead.localidad) return null;
+    
+    let texto = lead.localidad.nombre; // ← Cambiado de 'localidad' a 'nombre'
+    const provinciaNombre = getProvinciaNombre();
+    if (provinciaNombre) {
+      texto += `, ${provinciaNombre}`;
+    }
+    return texto;
+  };
 
   return (
-       <div className="p-3 sm:p-6">
+    <div className="p-3 sm:p-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Información personal */}
         <div>

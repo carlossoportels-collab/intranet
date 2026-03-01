@@ -1,6 +1,7 @@
 // resources/js/components/filters/ActiveFilters.tsx
-import React from 'react';
 import { X } from 'lucide-react';
+import React from 'react';
+
 import { EstadoLead, Origen } from '@/types/leads';
 
 interface PrefijoFiltro {

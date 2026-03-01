@@ -1,11 +1,12 @@
 // resources/js/Pages/Estadisticas/ComercialIndividual.tsx
-import React, { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { 
     BarChart3, LineChart, TrendingUp, TrendingDown, 
     User, Target, Award, DollarSign, Users, Star,
     Filter, Download, Calendar, Search
 } from 'lucide-react';
+import React, { useState } from 'react';
+
+import AppLayout from '@/layouts/app-layout';
 
 interface VendedorStats {
     id: number;

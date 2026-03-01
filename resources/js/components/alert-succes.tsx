@@ -1,5 +1,6 @@
 // resources/js/components/alert-success.tsx
 import { CheckCircleIcon } from 'lucide-react';
+
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AlertSuccess({

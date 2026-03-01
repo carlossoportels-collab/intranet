@@ -1,6 +1,6 @@
 // resources/js/components/leads/LeadStatsCards.tsx
-import React from 'react';
 import { MessageSquare, Bell, AlertCircle, FileText } from 'lucide-react';
+import React from 'react';
 
 interface LeadStatsCardsProps {
   estadisticas: {

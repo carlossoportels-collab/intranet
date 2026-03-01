@@ -1,5 +1,6 @@
 // resources/js/hooks/useToast.ts
 import { useState, useCallback } from 'react';
+
 import { ToastType } from '@/components/ui/toast';
 
 interface ToastConfig {

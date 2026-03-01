@@ -1,8 +1,9 @@
 // resources/js/components/Modals/VerNotaModal.tsx
-import React from 'react';
-import { X, FileText, Calendar, User, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { X, FileText, Calendar, User, AlertCircle } from 'lucide-react';
+import React from 'react';
+
 import { Lead, NotaLead } from '@/types/leads';
 
 interface VerNotaModalProps {

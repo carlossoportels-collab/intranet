@@ -1,17 +1,6 @@
 // resources/js/Pages/Comercial/Presupuestos/Show.tsx
 
-import React from 'react';
 import { router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { DataCard } from '@/components/ui/DataCard';
-import { InfoRow } from '@/components/ui/InfoRow';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Amount } from '@/components/ui/Amount';
-import ResponsiveGrid from '@/components/ui/responsiveGrid';
-import { PresupuestoActions } from '@/components/presupuestos/PresupuestoActions';
-import { usePresupuestoData } from '@/hooks/usePresupuestoData';
-import { useWhatsAppMessage } from '@/hooks/useWhatsAppMessage';
-import { formatDate, toNumber } from '@/utils/formatters';
 import { 
     ArrowLeft, 
     Calendar, 
@@ -22,6 +11,19 @@ import {
     Wrench,
     Gift
 } from 'lucide-react';
+import React from 'react';
+
+import { PresupuestoActions } from '@/components/presupuestos/PresupuestoActions';
+import { Amount } from '@/components/ui/Amount';
+import { DataCard } from '@/components/ui/DataCard';
+import { InfoRow } from '@/components/ui/InfoRow';
+import ResponsiveGrid from '@/components/ui/responsiveGrid';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { usePresupuestoData } from '@/hooks/usePresupuestoData';
+import { useWhatsAppMessage } from '@/hooks/useWhatsAppMessage';
+import AppLayout from '@/layouts/app-layout';
+import { formatDate, toNumber } from '@/utils/formatters';
+
 
 interface Props {
     presupuesto: any;

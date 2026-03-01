@@ -1,21 +1,22 @@
 // resources/js/Pages/Comercial/Leads/Show.tsx
-import React, { useState, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
+import { User, MessageSquare, Bell, TrendingUp, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+
+import AltaEmpresaModal from '@/components/empresa/AltaEmpresaModal';
 import LeadHeader from '@/components/leads/LeadHeader';
 import LeadStatsCards from '@/components/leads/LeadStatsCards';
 import LeadTabs, { Tab } from '@/components/leads/LeadTabs';
+import ComentariosTab from '@/components/leads/tabs/ComentariosTab';
 import InfoTab from '@/components/leads/tabs/InfoTab';
 import NotasTab from '@/components/leads/tabs/NotasTab';
-import ComentariosTab from '@/components/leads/tabs/ComentariosTab';
-import TiemposTab from '@/components/leads/tabs/TiemposTab';
 import NotificacionesTab from '@/components/leads/tabs/NotificacionesTab';
 import PresupuestosUnificadosTab from '@/components/leads/tabs/PresupuestosUnificadosTab';
-import NuevoComentarioModal from '@/components/Modals/NuevoComentarioModal';
-import AltaEmpresaModal from '@/components/empresa/AltaEmpresaModal';
+import TiemposTab from '@/components/leads/tabs/TiemposTab';
 import EditarLeadModal from '@/components/Modals/EditarLeadModal';
+import NuevoComentarioModal from '@/components/Modals/NuevoComentarioModal';
 import { useLeadModals } from '@/hooks/useLeadModal';
-import { User, MessageSquare, Bell, TrendingUp, FileText } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
 import {
   Lead,
   Origen,

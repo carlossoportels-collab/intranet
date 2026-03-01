@@ -1,11 +1,12 @@
 // resources/js/Pages/rrhh/Equipos/TecnicoForm.tsx
-import React, { useState, useEffect } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, Save, User, MapPin } from 'lucide-react';
-import MapaUbicacion from '@/components/MapaUbicacion';
+import React, { useState, useEffect } from 'react';
+
 import AlertError from '@/components/alert-error';
 import AlertSuccess from '@/components/alert-succes';
+import MapaUbicacion from '@/components/MapaUbicacion';
+import AppLayout from '@/layouts/app-layout';
 
 interface TecnicoFormProps {
     tecnico?: {

@@ -20,7 +20,12 @@ class Contrato extends Model
     const UPDATED_AT = 'modified';
     const DELETED_AT = 'deleted_at';
     
+    // Deshabilitar autoincrement para manejar IDs personalizados
+    public $incrementing = false;
+    protected $keyType = 'int';
+    
     protected $fillable = [
+        'id', // ← Agregado para permitir asignación manual
         'presupuesto_id',
         'lead_id',
         'empresa_id',
@@ -84,7 +89,6 @@ class Contrato extends Model
         'modified' => 'datetime'
     ];
     
-    
     /**
      * Relación con el presupuesto original
      */
@@ -146,7 +150,7 @@ class Contrato extends Model
      */
     public function creadoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(Usuario::class, 'created_by');
     }
 
     /**
@@ -154,7 +158,7 @@ class Contrato extends Model
      */
     public function modificadoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'modified_by');
+        return $this->belongsTo(Usuario::class, 'modified_by');
     }
 
     /**
@@ -162,7 +166,7 @@ class Contrato extends Model
      */
     public function eliminadoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'deleted_by');
+        return $this->belongsTo(Usuario::class, 'deleted_by');
     }
 
     /**

@@ -1,12 +1,13 @@
 // resources/js/Pages/Comercial/Contratos/Index.tsx
-import React, { useState } from 'react';
 import { Link, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import Pagination from '@/components/ui/Pagination';
-import { ContratoFilterBar } from '@/components/contratos/ContratoFilterBar';
 import { FileText, Calendar, User, Building, Truck, Eye, Download, Edit, ChevronDown, ChevronUp, Filter } from 'lucide-react';
-import { StatusBadge } from '@/components/ui/StatusBadge';
+import React, { useState } from 'react';
+
+import { ContratoFilterBar } from '@/components/contratos/ContratoFilterBar';
 import { Amount } from '@/components/ui/Amount';
+import Pagination from '@/components/ui/Pagination';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/utils/formatters';
 
 interface Contrato {

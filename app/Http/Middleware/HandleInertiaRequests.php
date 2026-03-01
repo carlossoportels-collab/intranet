@@ -92,8 +92,8 @@ class HandleInertiaRequests extends Middleware
             // Provincias para el autocomplete de localidades
             $shared['provincias'] = DB::table('provincias')
                 ->where('activo', 1)
-                ->select('id', 'provincia as nombre')
-                ->orderBy('provincia')
+                ->select('id', 'nombre')
+                ->orderBy('nombre')
                 ->get();
             
             // Obtener lista de TODOS los comerciales activos (sin filtrar por compañía)
