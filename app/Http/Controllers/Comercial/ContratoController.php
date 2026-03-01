@@ -24,7 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
-use Spatie\Browsershot\Browsershot;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Inertia\Inertia;
 
 class ContratoController extends Controller
@@ -446,117 +446,107 @@ public function store(Request $request)
         ]);
     }
 
-    /**
-     * Descargar PDF del contrato
-     */
-    public function descargarPdf($id)
-    {
-        $contrato = Contrato::with([
-            'vehiculos',
-            'debitoCbu',
-            'debitoTarjeta',
-            'estado',
-            'empresa',
-            'presupuesto' => function($query) {
-                $query->with([
-                    'tasa',
-                    'abono',
-                    'promocion.productos',
-                    'agregados'
-                ]);
-            }
-        ])->findOrFail($id);
-
-        // HIDRATAR MANUALMENTE LOS AGREGADOS CON NOMBRES DE PRODUCTOS
-        if ($contrato->presupuesto && $contrato->presupuesto->agregados) {
-            foreach ($contrato->presupuesto->agregados as $agregado) {
-                $producto = \App\Models\ProductoServicio::with('tipo')->find($agregado->prd_servicio_id);
-                $agregado->producto_nombre = $producto ? $producto->nombre : 'Producto #' . $agregado->prd_servicio_id;
-                $agregado->tipo_id = $producto?->tipo_id;
-                $agregado->tipo_nombre = $producto?->tipo?->nombre_tipo_abono ?? '';
-                
-                // Guardar el objeto producto completo para acceso a más propiedades
-                $agregado->producto_data = $producto;
-            }
-        }
-
-        // HIDRATAR TASA SI ES NECESARIO
-        if ($contrato->presupuesto && $contrato->presupuesto->tasa_id) {
-            if (!$contrato->presupuesto->tasa) {
-                $tasa = \App\Models\ProductoServicio::find($contrato->presupuesto->tasa_id);
-                $contrato->presupuesto->tasa = $tasa;
-            }
-        }
-
-        // HIDRATAR ABONO SI ES NECESARIO
-        if ($contrato->presupuesto && $contrato->presupuesto->abono_id) {
-            if (!$contrato->presupuesto->abono) {
-                $abono = \App\Models\ProductoServicio::find($contrato->presupuesto->abono_id);
-                $contrato->presupuesto->abono = $abono;
-            }
-        }
-
-        $compania = [
-            'id' => 1,
-            'nombre' => 'LOCALSAT',
-            'logo' => public_path('images/logos/logo.png')
-        ];
-        
-        if ($contrato->presupuesto && $contrato->presupuesto->prefijo) {
-            $comercial = $contrato->presupuesto->prefijo->comercial;
-            if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
-                $comercial = $comercial->first();
-            }
-            if ($comercial && $comercial->compania_id) {
-                $companiaId = $comercial->compania_id;
-                $compania = [
-                    'id' => $companiaId,
-                    'nombre' => match($companiaId) {
-                        1 => 'LOCALSAT',
-                        2 => 'SMARTSAT',
-                        3 => '360 SAT',
-                        default => 'LOCALSAT'
-                    },
-                    'logo' => public_path(match($companiaId) {
-                        1 => 'images/logos/logo.png',
-                        2 => 'images/logos/logosmart.png',
-                        3 => 'images/logos/360-logo.webp',
-                        default => 'images/logos/logo.png'
-                    })
-                ];
-            }
-        }
-
-        $html = view('pdf.contrato', [
-            'contrato' => $contrato,
-            'compania' => $compania
-        ])->render();
-
-        try {
-            $pdf = Browsershot::html($html)
-                ->setOption('args', ['--no-sandbox', '--disable-setuid-sandbox'])
-                ->setOption('disable-gpu', true)
-                ->format('A4')
-                ->margins(10, 10, 10, 10)
-                ->showBackground()
-                ->showBrowserHeaderAndFooter()
-                ->hideHeader()
-                ->footerHtml('<div style="text-align: right; font-size: 8pt; width: 100%; padding-right: 20px; font-family: Arial, sans-serif; color: #666;">Página <span class="pageNumber"></span> de <span class="totalPages"></span></div>')
-                ->pdf();
-
-            return response($pdf)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'attachment; filename="contrato-' . str_pad($contrato->id, 8, '0', STR_PAD_LEFT) . '.pdf"');
-
-        } catch (\Exception $e) {
-            \Log::error('Error generando PDF:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+/**
+ * Descargar PDF del contrato
+ */
+public function descargarPdf($id)
+{
+    $contrato = Contrato::with([
+        'vehiculos',
+        'debitoCbu',
+        'debitoTarjeta',
+        'estado',
+        'empresa',
+        'presupuesto' => function($query) {
+            $query->with([
+                'tasa',
+                'abono',
+                'promocion.productos',
+                'agregados'
             ]);
-            
-            return response()->json(['error' => 'Error al generar PDF: ' . $e->getMessage()], 500);
+        }
+    ])->findOrFail($id);
+
+    // HIDRATAR MANUALMENTE LOS AGREGADOS CON NOMBRES DE PRODUCTOS
+    if ($contrato->presupuesto && $contrato->presupuesto->agregados) {
+        foreach ($contrato->presupuesto->agregados as $agregado) {
+            $producto = \App\Models\ProductoServicio::with('tipo')->find($agregado->prd_servicio_id);
+            $agregado->producto_nombre = $producto ? $producto->nombre : 'Producto #' . $agregado->prd_servicio_id;
+            $agregado->tipo_id = $producto?->tipo_id;
+            $agregado->tipo_nombre = $producto?->tipo?->nombre_tipo_abono ?? '';
+            $agregado->producto_data = $producto;
         }
     }
+
+    // HIDRATAR TASA SI ES NECESARIO
+    if ($contrato->presupuesto && $contrato->presupuesto->tasa_id && !$contrato->presupuesto->tasa) {
+        $tasa = \App\Models\ProductoServicio::find($contrato->presupuesto->tasa_id);
+        $contrato->presupuesto->tasa = $tasa;
+    }
+
+    // HIDRATAR ABONO SI ES NECESARIO
+    if ($contrato->presupuesto && $contrato->presupuesto->abono_id && !$contrato->presupuesto->abono) {
+        $abono = \App\Models\ProductoServicio::find($contrato->presupuesto->abono_id);
+        $contrato->presupuesto->abono = $abono;
+    }
+
+    $compania = [
+        'id' => 1,
+        'nombre' => 'LOCALSAT',
+        'logo' => public_path('images/logos/logo.png')
+    ];
+
+    if ($contrato->presupuesto && $contrato->presupuesto->prefijo) {
+        $comercial = $contrato->presupuesto->prefijo->comercial;
+        if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
+            $comercial = $comercial->first();
+        }
+        if ($comercial && $comercial->compania_id) {
+            $companiaId = $comercial->compania_id;
+            $compania = [
+                'id' => $companiaId,
+                'nombre' => match($companiaId) {
+                    1 => 'LOCALSAT',
+                    2 => 'SMARTSAT',
+                    3 => '360 SAT',
+                    default => 'LOCALSAT'
+                },
+                'logo' => public_path(match($companiaId) {
+                    1 => 'images/logos/logo.png',
+                    2 => 'images/logos/logosmart.png',
+                    3 => 'images/logos/360-logo.webp',
+                    default => 'images/logos/logo.png'
+                })
+            ];
+        }
+    }
+
+    try {
+        // 🔁 Reemplazamos Browsershot por Dompdf
+        $pdf = Pdf::loadView('pdf.contrato', [
+            'contrato' => $contrato,
+            'compania' => $compania
+        ])
+        ->setPaper('A4')
+        ->setOptions([
+            'defaultFont' => 'sans-serif',
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true, // Para que funcionen las imágenes desde public_path
+            'chroot' => public_path(), // Seguridad para rutas absolutas
+        ]);
+
+        // 📄 Descargar PDF
+        return $pdf->download('contrato-' . str_pad($contrato->id, 8, '0', STR_PAD_LEFT) . '.pdf');
+
+    } catch (\Exception $e) {
+        \Log::error('Error generando PDF con Dompdf:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json(['error' => 'Error al generar PDF: ' . $e->getMessage()], 500);
+    }
+}
 
 /**
  * Crear contrato desde una empresa existente (sin presupuesto)

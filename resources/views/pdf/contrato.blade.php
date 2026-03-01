@@ -6,11 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contrato #{{ str_pad($contrato->id, 8, '0', STR_PAD_LEFT) }}</title>
     <style>
-        /* MANTENEMOS TODOS LOS ESTILOS EXISTENTES */
         :root {
             --local-dark: rgb(60, 60, 62);
             --sat-orange: rgb(247, 98, 0);
             --border-color: #e0e0e0;
+            --table-header-bg: #e0e0e0;
+            --table-header-text: #333333;
         }
         
         * {
@@ -34,7 +35,6 @@
             background: white;
         }
         
-        /* Header */
         .contract-header {
             padding: 5px 0 8px 0;
             border-bottom: 2px solid var(--local-dark);
@@ -42,17 +42,23 @@
         }
 
         .header-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            align-items: center;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             margin-bottom: 4px;
         }
 
+        .header-row {
+            display: table-row;
+        }
+
+        .left-column, .center-column, .right-column {
+            display: table-cell;
+            vertical-align: middle;
+        }
+
         .left-column {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
+            text-align: left;
         }
 
         .center-column {
@@ -63,14 +69,6 @@
             text-align: right;
         }
 
-        /* Ajuste de espaciado interno del header */
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 0px;
-        }
-                
         .company-logo {
             font-size: 16px;
             font-weight: 800;
@@ -92,10 +90,7 @@
             line-height: 1.3;
             margin-top: 2px;
         }
-        .contract-center {
-            text-align: center;
-        }
-        
+
         .contract-title {
             font-size: 14px;
             font-weight: 600;
@@ -111,9 +106,8 @@
 
         .contract-details {
             font-size: 8px;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+            display: inline-block;
+            text-align: right;
         }
 
         .detail-item {
@@ -121,6 +115,7 @@
             justify-content: flex-end;
             align-items: center;
             gap: 5px;
+            margin-bottom: 2px;
         }
 
         .detail-label {
@@ -151,36 +146,56 @@
             border-bottom: 1px solid var(--sat-orange);
         }
         
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 4px;
+        /* Tabla de 2 columnas */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
             margin-bottom: 6px;
         }
         
-        .data-row {
+        .data-table td {
+            padding: 2px 4px;
+            vertical-align: middle;
+        }
+/* Celda contenedora - fondo gris suave */
+        .data-cell {
             display: flex;
             align-items: center;
-            min-height: 18px;
-        }
-        
-        .data-label {
-            font-weight: 600;
-            color: var(--local-dark);
-            font-size: 9px;
-            min-width: 100px;
-            white-space: nowrap;
-        }
-        
-        .data-value {
-            flex: 1;
-            padding: 3px 5px;
+            width: 100%;
             background: #f8f9fa;
             border: 1px solid #e9ecef;
             border-radius: 2px;
-            font-size: 9px;
+            padding: 3px 5px;
+            min-height: 20px;
         }
-        
+
+        /* Label con ancho fijo */
+        .data-label {
+            font-weight: 600;
+            color: #333333;
+            font-size: 9px;
+            width: 150px;
+            white-space: nowrap;
+            text-align: left;
+            background: transparent;
+        }
+
+        /* Contenedor del valor - SIN overflow hidden para textos largos */
+        .data-value {
+            flex: 1;
+            font-size: 9px;
+            color: #000000;
+            white-space: normal; /* Cambiado de nowrap a normal */
+            word-wrap: break-word; /* Permite que las palabras largas se corten */
+            overflow: visible; /* Cambiado de hidden a visible */
+            text-align: left;
+            background: transparent;
+            border: none;
+            padding: 0;
+            margin-left: 5px;
+            line-height: 1.4; /* Mejor altura de línea */
+        }
+
         .fiscal-section {
             margin-top: 6px;
             padding-top: 5px;
@@ -188,10 +203,26 @@
         }
         
         .tables-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
             margin-bottom: 6px;
+        }
+
+        .tables-row {
+            display: table-row;
+        }
+
+        .tables-cell {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+            padding-right: 4px;
+        }
+
+        .tables-cell:last-child {
+            padding-right: 0;
         }
         
         .table-header {
@@ -208,18 +239,20 @@
         }
         
         .service-table th {
-            background: var(--local-dark);
-            color: white;
+            background: var(--table-header-bg) !important;
+            color: var(--table-header-text) !important;
             padding: 4px;
             text-align: left;
             font-weight: 600;
-            border: none;
+            border: 1px solid #ccc;
             font-size: 8.5px;
         }
         
         .service-table td {
             padding: 3px 4px;
             border-bottom: 1px solid #eee;
+            border-left: 1px solid #eee;
+            border-right: 1px solid #eee;
         }
         
         .service-table .number {
@@ -277,16 +310,32 @@
         }
         
         .payment-details {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 5px;
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
             margin-bottom: 8px;
+        }
+
+        .payment-row {
+            display: table-row;
+        }
+
+        .payment-cell {
+            display: table-cell;
+            width: 50%;
+            padding-right: 5px;
+            vertical-align: top;
+        }
+
+        .payment-cell:last-child {
+            padding-right: 0;
         }
         
         .payment-field {
             display: flex;
             flex-direction: column;
             gap: 1px;
+            margin-bottom: 5px;
         }
         
         .payment-label {
@@ -298,9 +347,6 @@
         .payment-value {
             font-size: 9px;
             padding: 3px 4px;
-            background: white;
-            border: 1px solid #e9ecef;
-            border-radius: 2px;
         }
         
         .authorization-box {
@@ -330,10 +376,25 @@
         }
         
         .signature-fields-three {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            font-size: 8px;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+        }
+
+        .signature-row-three {
+            display: table-row;
+        }
+
+        .signature-cell-three {
+            display: table-cell;
+            width: 33.33%;
+            vertical-align: top;
+            padding-right: 5px;
+        }
+
+        .signature-cell-three:last-child {
+            padding-right: 0;
         }
         
         .signature-field {
@@ -355,30 +416,32 @@
         }
         
         .installation-line {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
             margin-bottom: 6px;
             padding: 5px 8px;
             background: #f8f9fa;
             border: 1px solid #e9ecef;
             border-radius: 2px;
         }
-        
+
+        .installation-row {
+            display: table-row;
+        }
+
         .installation-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            flex: 1;
-            justify-content: center;
+            display: table-cell;
+            vertical-align: middle;
+            text-align: center;
         }
-        
+
         .installation-item:first-child {
-            justify-content: flex-start;
+            text-align: left;
         }
-        
+
         .installation-item:last-child {
-            justify-content: flex-end;
+            text-align: right;
         }
         
         .installation-label {
@@ -400,18 +463,20 @@
         }
         
         .vehicles-table th {
-            background: var(--local-dark);
-            color: white;
+            background: var(--table-header-bg) !important;
+            color: var(--table-header-text) !important;
             padding: 4px;
             text-align: left;
             font-weight: 600;
-            border: none;
+            border: 1px solid #ccc;
             font-size: 9px;
         }
         
         .vehicles-table td {
             padding: 3px 4px;
             border-bottom: 1px solid #eee;
+            border-left: 1px solid #eee;
+            border-right: 1px solid #eee;
             font-size: 9px;
         }
         
@@ -422,14 +487,27 @@
         }
         
         .signature-fields-final {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
             margin-top: 15px;
         }
-        
-        .signature-field-final {
+
+        .signature-row-final {
+            display: table-row;
+        }
+
+        .signature-cell-final {
+            display: table-cell;
+            width: 50%;
             text-align: center;
+            vertical-align: bottom;
+            padding-right: 10px;
+        }
+
+        .signature-cell-final:last-child {
+            padding-right: 0;
         }
         
         .signature-line-final {
@@ -461,34 +539,22 @@
             return '$ ' . number_format($value, 2, ',', '.');
         };
         
-        // Verificar si el contrato tiene presupuesto (viene de cambio de razón social o de presupuesto)
         $tienePresupuesto = !empty($contrato->presupuesto);
         
-        // FUNCIÓN ACTUALIZADA PARA MÉTODO DE PAGO (usa camelCase)
         $getMetodoPagoTexto = function() use ($contrato) {
             if (!empty($contrato->debitoCbu)) return "CBU";
             if (!empty($contrato->debitoTarjeta)) return "TARJETA DE CRÉDITO/DÉBITO";
             return null;
         };
         
-        // Verificar si tiene método de pago
         $tieneMetodoPago = !empty($contrato->debitoCbu) || !empty($contrato->debitoTarjeta);
-        
-        // Función para enmascarar tarjeta
-        $enmascararTarjeta = function($numero) {
-            if (!$numero) return '';
-            $ultimos4 = substr($numero, -4);
-            return "**** **** **** {$ultimos4}";
-        };
         
         $metodoPago = $getMetodoPagoTexto();
         
-        // Calcular totales para contratos sin presupuesto
         $totalInversion = 0;
         $costoMensual = 0;
         
         if ($tienePresupuesto) {
-            // Contrato con presupuesto
             $totalInversion = ($contrato->presupuesto->subtotal_tasa ?? 0);
             $costoMensual = ($contrato->presupuesto->subtotal_abono ?? 0);
             
@@ -502,7 +568,6 @@
                 }
             }
         } else {
-            // Contrato desde cambio de razón social (sin presupuesto)
             $costoMensual = $contrato->presupuesto_total_mensual ?? 0;
         }
         
@@ -510,136 +575,177 @@
     @endphp
 
     <div class="contract-container">
-        <!-- Header en 3 columnas -->
+        <!-- Header -->
         <div class="contract-header">
             <div class="header-grid">
-                <!-- Columna izquierda - Logo y sello -->
-                <div class="left-column">
-                    @if(!empty($compania['logo']) && file_exists($compania['logo']))
-                        <img src="{{ $compania['logo'] }}" alt="{{ $compania['nombre'] }}" style="height: 35px; margin-bottom: 2px;">
-                    @else
-                        <div class="company-logo">
-                            @if(str_contains($compania['nombre'], 'SAT'))
-                                <span class="local">{{ str_replace('SAT', '', $compania['nombre']) }}</span>
-                                <span class="sat">SAT</span>
-                            @else
-                                <span class="local">{{ $compania['nombre'] }}</span>
-                            @endif
+                <div class="header-row">
+                    <div class="left-column">
+                        @if(!empty($compania['logo']) && file_exists($compania['logo']))
+                            <img src="{{ $compania['logo'] }}" alt="{{ $compania['nombre'] }}" style="height: 35px; margin-bottom: 2px;">
+                        @else
+                            <div class="company-logo">
+                                @if(str_contains($compania['nombre'], 'SAT'))
+                                    <span class="local">{{ str_replace('SAT', '', $compania['nombre']) }}</span>
+                                    <span class="sat">SAT</span>
+                                @else
+                                    <span class="local">{{ $compania['nombre'] }}</span>
+                                @endif
+                            </div>
+                        @endif
+                        
+                        <div class="company-info">
+                            <strong>LogSat S.A.</strong><br />
+                            Av. Alvear 1881 piso 7 depto. E, Ciudad Autónoma<br />
+                            de Buenos Aires (1129) - Tel: 0810 888 8205<br />
+                            email: info@localsat.com.ar - www.localsat.com.ar<br />
+                            CUIT: 30-71168696-3
                         </div>
-                    @endif
-                    
-                    <div class="company-info">
-                        <strong>LogSat S.A.</strong><br />
-                        Av. Alvear 1881 piso 7 depto. E, Ciudad Autónoma<br />
-                        de Buenos Aires (1129) - Tel: 0810 888 8205<br />
-                        email: info@localsat.com.ar - www.localsat.com.ar<br />
-                        CUIT: 30-71168696-3
                     </div>
-                </div>
-                
-                <!-- Columna central - Título -->
-                <div class="center-column">
-                    <div class="contract-title">CONTRATO DE SERVICIO</div>
-                    <div class="contract-subtitle">Sistema de Rastreo Satelital</div>
-                </div>
-                
-                <!-- Columna derecha - Fecha, Contrato, Vendedor -->
-                <div class="right-column">
-                    <div class="contract-details">
-                        <div class="detail-item">
-                            <span class="detail-label">Fecha:</span>
-                            <span class="detail-value">{{ \Carbon\Carbon::parse($contrato->fecha_emision)->format('d/m/Y') }}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Contrato:</span>
-                            <span class="detail-value">{{ str_pad($contrato->id, 8, '0', STR_PAD_LEFT) }}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Vendedor:</span>
-                            <span class="detail-value">{{ explode(' ', $contrato->vendedor_nombre)[0] ?? 'G. MOYANO' }}</span>
+                    
+                    <div class="center-column">
+                        <div class="contract-title">CONTRATO DE SERVICIO</div>
+                        <div class="contract-subtitle">Sistema de Rastreo Satelital</div>
+                    </div>
+                    
+                    <div class="right-column">
+                        <div class="contract-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Fecha:</span>
+                                <span class="detail-value">{{ \Carbon\Carbon::parse($contrato->fecha_emision)->format('d/m/Y') }}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Contrato:</span>
+                                <span class="detail-value">{{ str_pad($contrato->id, 8, '0', STR_PAD_LEFT) }}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Vendedor:</span>
+                                <span class="detail-value">{{ explode(' ', $contrato->vendedor_nombre)[0] ?? 'G. MOYANO' }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Datos del Cliente -->
+        <!-- Datos del Cliente - TABLA DE 2 COLUMNAS CON ANCHOS FIJOS Y ALINEACIÓN DERECHA -->
         <div class="section">
             <div class="section-title">Datos del Cliente</div>
             
-            <div class="data-grid">
-                <div class="data-row">
-                    <span class="data-label">Nombre completo:</span>
-                    <span class="data-value">{{ $contrato->cliente_nombre_completo }}</span>
-                </div>
-                <div class="data-row">
-                    <span class="data-label">DNI:</span>
-                    <span class="data-value">{{ $contrato->contacto_nro_documento ?? '-' }}</span>
-                </div>
-                <div class="data-row">
-                    <span class="data-label">Teléfono:</span>
-                    <span class="data-value">{{ $contrato->cliente_telefono ?? '-' }}</span>
-                </div>
-                <div class="data-row">
-                    <span class="data-label">Email:</span>
-                    <span class="data-value">{{ $contrato->cliente_email ?? '-' }}</span>
-                </div>
-                <div class="data-row">
-                    <span class="data-label">Domicilio:</span>
-                    <span class="data-value">{{ $contrato->contacto_direccion_personal ?? '-' }}</span>
-                </div>
-                <div class="data-row">
-                    <span class="data-label">Localidad:</span>
-                    <span class="data-value">{{ $contrato->cliente_localidad ?? '' }}{{ $contrato->cliente_provincia ? ', ' . $contrato->cliente_provincia : '' }}</span>
-                </div>
-            </div>
+            <table class="data-table">
+                <tr>
+                    <td width="50%">
+                        <div class="data-cell">
+                            <span class="data-label">Nombre completo:</span>
+                            <span class="data-value">{{ $contrato->cliente_nombre_completo }}</span>
+                        </div>
+                    </td>
+                    <td width="50%">
+                        <div class="data-cell">
+                            <span class="data-label">DNI:</span>
+                            <span class="data-value">{{ $contrato->contacto_nro_documento ?? '-' }}</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="50%">
+                        <div class="data-cell">
+                            <span class="data-label">Teléfono:</span>
+                            <span class="data-value">{{ $contrato->cliente_telefono ?? '-' }}</span>
+                        </div>
+                    </td>
+                    <td width="50%">
+                        <div class="data-cell">
+                            <span class="data-label">Email:</span>
+                            <span class="data-value">{{ $contrato->cliente_email ?? '-' }}</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="50%">
+                        <div class="data-cell">
+                            <span class="data-label">Domicilio:</span>
+                            <span class="data-value">{{ $contrato->contacto_direccion_personal ?? '-' }}</span>
+                        </div>
+                    </td>
+                    <td width="50%">
+                        <div class="data-cell">
+                            <span class="data-label">Localidad:</span>
+                            <span class="data-value">{{ $contrato->cliente_localidad ?? '' }}{{ $contrato->cliente_provincia ? ', ' . $contrato->cliente_provincia : '' }}</span>
+                        </div>
+                    </td>
+                </tr>
+            </table>
             
-            <!-- Datos Fiscales y Responsables -->
+            <!-- Datos Fiscales y Responsables - TABLA DE 2 COLUMNAS CON ANCHOS FIJOS Y ALINEACIÓN DERECHA -->
             <div class="fiscal-section">
                 <div class="section-title">Datos Fiscales y Responsables</div>
                 
-                <div class="data-grid">
-                    <div class="data-row">
-                        <span class="data-label">Razón social:</span>
-                        <span class="data-value">{{ $contrato->empresa_razon_social }}</span>
-                    </div>
-                    <div class="data-row">
-                        <span class="data-label">CUIT:</span>
-                        <span class="data-value">{{ $contrato->empresa_cuit }}</span>
-                    </div>
-                    <div class="data-row">
-                        <span class="data-label">Domicilio fiscal:</span>
-                        <span class="data-value">{{ $contrato->empresa_domicilio_fiscal ?? '-' }}</span>
-                    </div>
-                    <div class="data-row">
-                        <span class="data-label">Actividad:</span>
-                        <span class="data-value">{{ $contrato->empresa_actividad ?? '-' }}</span>
-                    </div>
-                    <div class="data-row">
-                        <span class="data-label">Situación AFIP:</span>
-                        <span class="data-value">{{ $contrato->empresa_situacion_afip ?? '-' }}</span>
-                    </div>
-                    <div class="data-row">
-                        <span class="data-label">Email empresa:</span>
-                        <span class="data-value">{{ $contrato->empresa_email_fiscal ?? '-' }}</span>
-                    </div>
-                    <div class="data-row">
-                        <span class="data-label">Responsable flota:</span>
-                        <span class="data-value">
-                            {{ $contrato->responsable_flota_nombre ?? '-' }}
-                            @if($contrato->responsable_flota_telefono) - {{ $contrato->responsable_flota_telefono }}@endif
-                            @if($contrato->responsable_flota_email) - {{ $contrato->responsable_flota_email }}@endif
-                        </span>
-                    </div>
-                    <div class="data-row">
-                        <span class="data-label">Responsable pagos:</span>
-                        <span class="data-value">
-                            {{ $contrato->responsable_pagos_nombre ?? '-' }}
-                            @if($contrato->responsable_pagos_telefono) - {{ $contrato->responsable_pagos_telefono }}@endif
-                            @if($contrato->responsable_pagos_email) - {{ $contrato->responsable_pagos_email }}@endif
-                        </span>
-                    </div>
-                </div>
+                <table class="data-table">
+                    <tr>
+                        <td width="50%">
+                            <div class="data-cell">
+                                <span class="data-label">Razón social:</span>
+                                <span class="data-value">{{ $contrato->empresa_razon_social }}</span>
+                            </div>
+                        </td>
+                        <td width="50%">
+                            <div class="data-cell">
+                                <span class="data-label">CUIT:</span>
+                                <span class="data-value">{{ $contrato->empresa_cuit }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td width="50%">
+                            <div class="data-cell">
+                                <span class="data-label">Domicilio fiscal:</span>
+                                <span class="data-value">{{ $contrato->empresa_domicilio_fiscal ?? '-' }}</span>
+                            </div>
+                        </td>
+                        <td width="50%">
+                            <div class="data-cell">
+                                <span class="data-label">Actividad:</span>
+                                <span class="data-value">{{ $contrato->empresa_actividad ?? '-' }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td width="50%">
+                            <div class="data-cell">
+                                <span class="data-label">Situación AFIP:</span>
+                                <span class="data-value">{{ $contrato->empresa_situacion_afip ?? '-' }}</span>
+                            </div>
+                        </td>
+                        <td width="50%">
+                            <div class="data-cell">
+                                <span class="data-label">Email empresa:</span>
+                                <span class="data-value">{{ $contrato->empresa_email_fiscal ?? '-' }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td width="50%">
+                            <div class="data-cell">
+                                <span class="data-label">Responsable flota:</span>
+                                <span class="data-value">
+                                    {{ $contrato->responsable_flota_nombre ?? '-' }}
+                                    @if($contrato->responsable_flota_telefono) - {{ $contrato->responsable_flota_telefono }}@endif
+                                    @if($contrato->responsable_flota_email) - {{ $contrato->responsable_flota_email }}@endif
+                                </span>
+                            </div>
+                        </td>
+                        <td width="50%">
+                            <div class="data-cell">
+                                <span class="data-label">Responsable pagos:</span>
+                                <span class="data-value">
+                                    {{ $contrato->responsable_pagos_nombre ?? '-' }}
+                                    @if($contrato->responsable_pagos_telefono) - {{ $contrato->responsable_pagos_telefono }}@endif
+                                    @if($contrato->responsable_pagos_email) - {{ $contrato->responsable_pagos_email }}@endif
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </div>
 
@@ -648,219 +754,214 @@
             <div class="section-title">Servicios Contratados</div>
             
             @if($tienePresupuesto)
-                <!-- Vista para contratos con presupuesto -->
                 <div class="tables-container">
-                    <!-- Inversión Inicial -->
-                    <div>
-                        <div class="table-header">INVERSIÓN INICIAL</div>
-                        <table class="service-table">
-                            <thead>
-                                <tr>
-                                    <th>Descripción</th>
-                                    <th>Cant.</th>
-                                    <th>P.Unit.</th>
-                                    <th>Desc.</th>
-                                    <th>Subtotal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Tasa de instalación -->
-                                @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->tasa))
-                                    <tr class="category-row">
-                                        <td colspan="5">SERVICIOS DE INSTALACIÓN</td>
-                                    </tr>
+                    <div class="tables-row">
+                        <div class="tables-cell">
+                            <div class="table-header">INVERSIÓN INICIAL</div>
+                            <table class="service-table">
+                                <thead>
                                     <tr>
-                                        <td>{{ $contrato->presupuesto->tasa->nombre }}</td>
-                                        <td class="number">{{ $contrato->presupuesto_cantidad_vehiculos }}</td>
-                                        <td class="number">{{ $formatMoney($contrato->presupuesto->valor_tasa) }}</td>
-                                        <td class="number">
-                                            @php
-                                                $tasaPromo = null;
-                                                if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
-                                                    $tasaPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $contrato->presupuesto->tasa->id);
-                                                }
-                                                
-                                                $descuentoTexto = '-';
-                                                if ($tasaPromo) {
-                                                    if ($tasaPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
-                                                    elseif ($tasaPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
-                                                    elseif ($tasaPromo->tipo_promocion === 'porcentaje') {
-                                                        $bonificacion = $tasaPromo->bonificacion ?? $contrato->presupuesto->tasa_bonificacion;
-                                                        $descuentoTexto = $bonificacion . '%';
-                                                    }
-                                                } elseif (!empty($contrato->presupuesto->tasa_bonificacion) && $contrato->presupuesto->tasa_bonificacion > 0) {
-                                                    $descuentoTexto = $contrato->presupuesto->tasa_bonificacion . '%';
-                                                }
-                                            @endphp
-                                            {{ $descuentoTexto }}
-                                        </td>
-                                        <td class="number">{{ $formatMoney($contrato->presupuesto->subtotal_tasa) }}</td>
+                                        <th>Descripción</th>
+                                        <th>Cant.</th>
+                                        <th>P.Unit.</th>
+                                        <th>Desc.</th>
+                                        <th>Subtotal</th>
                                     </tr>
-                                @endif
-
-                                <!-- Accesorios -->
-                                @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->agregados))
-                                    @php
-                                        $accesorios = collect($contrato->presupuesto->agregados)->filter(function($item) {
-                                            return $item->tipo_id == 5;
-                                        });
-                                    @endphp
-                                    @if($accesorios->count() > 0)
+                                </thead>
+                                <tbody>
+                                    @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->tasa))
                                         <tr class="category-row">
-                                            <td colspan="5">ACCESORIOS</td>
+                                            <td colspan="5">SERVICIOS DE INSTALACIÓN</td>
                                         </tr>
-                                        @foreach($accesorios as $item)
-                                            @php
-                                                $itemPromo = null;
-                                                if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
-                                                    $itemPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $item->prd_servicio_id);
-                                                }
-                                                
-                                                $descuentoTexto = '-';
-                                                if ($itemPromo) {
-                                                    if ($itemPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
-                                                    elseif ($itemPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
-                                                    elseif ($itemPromo->tipo_promocion === 'porcentaje') {
-                                                        $bonificacion = $itemPromo->bonificacion ?? $item->bonificacion;
-                                                        $descuentoTexto = $bonificacion . '%';
+                                        <tr>
+                                            <td>{{ $contrato->presupuesto->tasa->nombre }}</td>
+                                            <td class="number">{{ $contrato->presupuesto_cantidad_vehiculos }}</td>
+                                            <td class="number">{{ $formatMoney($contrato->presupuesto->valor_tasa) }}</td>
+                                            <td class="number">
+                                                @php
+                                                    $tasaPromo = null;
+                                                    if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
+                                                        $tasaPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $contrato->presupuesto->tasa->id);
                                                     }
-                                                } elseif (!empty($item->bonificacion) && $item->bonificacion > 0) {
-                                                    $descuentoTexto = $item->bonificacion . '%';
-                                                }
-                                            @endphp
-                                            <tr>
-                                                <td>{{ $item->producto_nombre ?? 'Producto' }}</td>
-                                                <td class="number">{{ $item->cantidad }}</td>
-                                                <td class="number">{{ $formatMoney($item->valor) }}</td>
-                                                <td class="number">{{ $descuentoTexto }}</td>
-                                                <td class="number">{{ $formatMoney($item->subtotal) }}</td>
-                                            </tr>
-                                        @endforeach
+                                                    
+                                                    $descuentoTexto = '-';
+                                                    if ($tasaPromo) {
+                                                        if ($tasaPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
+                                                        elseif ($tasaPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
+                                                        elseif ($tasaPromo->tipo_promocion === 'porcentaje') {
+                                                            $bonificacion = $tasaPromo->bonificacion ?? $contrato->presupuesto->tasa_bonificacion;
+                                                            $descuentoTexto = $bonificacion . '%';
+                                                        }
+                                                    } elseif (!empty($contrato->presupuesto->tasa_bonificacion) && $contrato->presupuesto->tasa_bonificacion > 0) {
+                                                        $descuentoTexto = $contrato->presupuesto->tasa_bonificacion . '%';
+                                                    }
+                                                @endphp
+                                                {{ $descuentoTexto }}
+                                            </td>
+                                            <td class="number">{{ $formatMoney($contrato->presupuesto->subtotal_tasa) }}</td>
+                                        </tr>
                                     @endif
-                                @endif
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Abonos Mensuales -->
-                    <div>
-                        <div class="table-header">COSTO MENSUAL</div>
-                        <table class="service-table">
-                            <thead>
-                                <tr>
-                                    <th>Descripción</th>
-                                    <th>Cant.</th>
-                                    <th>P.Unit.</th>
-                                    <th>Desc.</th>
-                                    <th>Subtotal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Abono base -->
-                                @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->abono))
-                                    <tr class="category-row">
-                                        <td colspan="5">ABONO BASE</td>
-                                    </tr>
+
+                                    @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->agregados))
+                                        @php
+                                            $accesorios = collect($contrato->presupuesto->agregados)->filter(function($item) {
+                                                return $item->tipo_id == 5;
+                                            });
+                                        @endphp
+                                        @if($accesorios->count() > 0)
+                                            <tr class="category-row">
+                                                <td colspan="5">ACCESORIOS</td>
+                                            </tr>
+                                            @foreach($accesorios as $item)
+                                                @php
+                                                    $itemPromo = null;
+                                                    if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
+                                                        $itemPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $item->prd_servicio_id);
+                                                    }
+                                                    
+                                                    $descuentoTexto = '-';
+                                                    if ($itemPromo) {
+                                                        if ($itemPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
+                                                        elseif ($itemPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
+                                                        elseif ($itemPromo->tipo_promocion === 'porcentaje') {
+                                                            $bonificacion = $itemPromo->bonificacion ?? $item->bonificacion;
+                                                            $descuentoTexto = $bonificacion . '%';
+                                                        }
+                                                    } elseif (!empty($item->bonificacion) && $item->bonificacion > 0) {
+                                                        $descuentoTexto = $item->bonificacion . '%';
+                                                    }
+                                                @endphp
+                                                <tr>
+                                                    <td>{{ $item->producto_nombre ?? 'Producto' }}</td>
+                                                    <td class="number">{{ $item->cantidad }}</td>
+                                                    <td class="number">{{ $formatMoney($item->valor) }}</td>
+                                                    <td class="number">{{ $descuentoTexto }}</td>
+                                                    <td class="number">{{ $formatMoney($item->subtotal) }}</td>
+                                                </tr>
+                                            @endforeach
+                                        @endif
+                                    @endif
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="tables-cell">
+                            <div class="table-header">COSTO MENSUAL</div>
+                            <table class="service-table">
+                                <thead>
                                     <tr>
-                                        <td>{{ $contrato->presupuesto->abono->nombre }}</td>
-                                        <td class="number">{{ $contrato->presupuesto_cantidad_vehiculos }}</td>
-                                        <td class="number">{{ $formatMoney($contrato->presupuesto->valor_abono) }}</td>
-                                        <td class="number">
-                                            @php
-                                                $abonoPromo = null;
-                                                if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
-                                                    $abonoPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $contrato->presupuesto->abono->id);
-                                                }
-                                                
-                                                $descuentoTexto = '-';
-                                                if ($abonoPromo) {
-                                                    if ($abonoPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
-                                                    elseif ($abonoPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
-                                                    elseif ($abonoPromo->tipo_promocion === 'porcentaje') {
-                                                        $bonificacion = $abonoPromo->bonificacion ?? $contrato->presupuesto->abono_bonificacion;
-                                                        $descuentoTexto = $bonificacion . '%';
-                                                    }
-                                                } elseif (!empty($contrato->presupuesto->abono_bonificacion) && $contrato->presupuesto->abono_bonificacion > 0) {
-                                                    $descuentoTexto = $contrato->presupuesto->abono_bonificacion . '%';
-                                                }
-                                            @endphp
-                                            {{ $descuentoTexto }}
-                                        </td>
-                                        <td class="number">{{ $formatMoney($contrato->presupuesto->subtotal_abono) }}</td>
+                                        <th>Descripción</th>
+                                        <th>Cant.</th>
+                                        <th>P.Unit.</th>
+                                        <th>Desc.</th>
+                                        <th>Subtotal</th>
                                     </tr>
-                                @endif
-
-                                <!-- Servicios -->
-                                @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->agregados))
-                                    @php
-                                        $servicios = collect($contrato->presupuesto->agregados)->filter(function($item) {
-                                            return $item->tipo_id == 3;
-                                        });
-                                    @endphp
-                                    @if($servicios->count() > 0)
+                                </thead>
+                                <tbody>
+                                    @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->abono))
                                         <tr class="category-row">
-                                            <td colspan="5">SERVICIOS ADICIONALES</td>
+                                            <td colspan="5">ABONO BASE</td>
                                         </tr>
-                                        @foreach($servicios as $item)
-                                            @php
-                                                $itemPromo = null;
-                                                if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
-                                                    $itemPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $item->prd_servicio_id);
-                                                }
-                                                
-                                                $descuentoTexto = '-';
-                                                if ($itemPromo) {
-                                                    if ($itemPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
-                                                    elseif ($itemPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
-                                                    elseif ($itemPromo->tipo_promocion === 'porcentaje') {
-                                                        $bonificacion = $itemPromo->bonificacion ?? $item->bonificacion;
-                                                        $descuentoTexto = $bonificacion . '%';
+                                        <tr>
+                                            <td>{{ $contrato->presupuesto->abono->nombre }}</td>
+                                            <td class="number">{{ $contrato->presupuesto_cantidad_vehiculos }}</td>
+                                            <td class="number">{{ $formatMoney($contrato->presupuesto->valor_abono) }}</td>
+                                            <td class="number">
+                                                @php
+                                                    $abonoPromo = null;
+                                                    if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
+                                                        $abonoPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $contrato->presupuesto->abono->id);
                                                     }
-                                                } elseif (!empty($item->bonificacion) && $item->bonificacion > 0) {
-                                                    $descuentoTexto = $item->bonificacion . '%';
-                                                }
-                                            @endphp
-                                            <tr>
-                                                <td>{{ $item->producto_nombre ?? 'Servicio' }}</td>
-                                                <td class="number">{{ $item->cantidad }}</td>
-                                                <td class="number">{{ $formatMoney($item->valor) }}</td>
-                                                <td class="number">{{ $descuentoTexto }}</td>
-                                                <td class="number">{{ $formatMoney($item->subtotal) }}</td>
-                                            </tr>
-                                        @endforeach
+                                                    
+                                                    $descuentoTexto = '-';
+                                                    if ($abonoPromo) {
+                                                        if ($abonoPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
+                                                        elseif ($abonoPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
+                                                        elseif ($abonoPromo->tipo_promocion === 'porcentaje') {
+                                                            $bonificacion = $abonoPromo->bonificacion ?? $contrato->presupuesto->abono_bonificacion;
+                                                            $descuentoTexto = $bonificacion . '%';
+                                                        }
+                                                    } elseif (!empty($contrato->presupuesto->abono_bonificacion) && $contrato->presupuesto->abono_bonificacion > 0) {
+                                                        $descuentoTexto = $contrato->presupuesto->abono_bonificacion . '%';
+                                                    }
+                                                @endphp
+                                                {{ $descuentoTexto }}
+                                            </td>
+                                            <td class="number">{{ $formatMoney($contrato->presupuesto->subtotal_abono) }}</td>
+                                        </tr>
                                     @endif
-                                @endif
-                            </tbody>
-                        </table>
+
+                                    @if(!empty($contrato->presupuesto) && !empty($contrato->presupuesto->agregados))
+                                        @php
+                                            $servicios = collect($contrato->presupuesto->agregados)->filter(function($item) {
+                                                return $item->tipo_id == 3;
+                                            });
+                                        @endphp
+                                        @if($servicios->count() > 0)
+                                            <tr class="category-row">
+                                                <td colspan="5">SERVICIOS ADICIONALES</td>
+                                            </tr>
+                                            @foreach($servicios as $item)
+                                                @php
+                                                    $itemPromo = null;
+                                                    if (!empty($contrato->presupuesto->promocion) && !empty($contrato->presupuesto->promocion->productos)) {
+                                                        $itemPromo = $contrato->presupuesto->promocion->productos->firstWhere('producto_servicio_id', $item->prd_servicio_id);
+                                                    }
+                                                    
+                                                    $descuentoTexto = '-';
+                                                    if ($itemPromo) {
+                                                        if ($itemPromo->tipo_promocion === '2x1') $descuentoTexto = '2x1';
+                                                        elseif ($itemPromo->tipo_promocion === '3x2') $descuentoTexto = '3x2';
+                                                        elseif ($itemPromo->tipo_promocion === 'porcentaje') {
+                                                            $bonificacion = $itemPromo->bonificacion ?? $item->bonificacion;
+                                                            $descuentoTexto = $bonificacion . '%';
+                                                        }
+                                                    } elseif (!empty($item->bonificacion) && $item->bonificacion > 0) {
+                                                        $descuentoTexto = $item->bonificacion . '%';
+                                                    }
+                                                @endphp
+                                                <tr>
+                                                    <td>{{ $item->producto_nombre ?? 'Servicio' }}</td>
+                                                    <td class="number">{{ $item->cantidad }}</td>
+                                                    <td class="number">{{ $formatMoney($item->valor) }}</td>
+                                                    <td class="number">{{ $descuentoTexto }}</td>
+                                                    <td class="number">{{ $formatMoney($item->subtotal) }}</td>
+                                                </tr>
+                                            @endforeach
+                                        @endif
+                                    @endif
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             @else
-                <!-- Vista simplificada para contratos sin presupuesto (cambio de razón social) -->
                 <div style="padding: 10px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 3px; margin-bottom: 10px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div>
-                            <div class="table-header">COSTO MENSUAL</div>
-                            <div style="margin-top: 10px;">
-                                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
-                                    <span>Abonos de la flota ({{ $contrato->presupuesto_cantidad_vehiculos ?? 0 }} vehículos)</span>
-                                    <span style="font-family: 'Courier New', monospace; font-weight: bold;">{{ $formatMoney($costoMensual) }}</span>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 50%; vertical-align: top; padding-right: 10px;">
+                                <div class="table-header">COSTO MENSUAL</div>
+                                <div style="margin-top: 10px;">
+                                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
+                                        <span>Abonos de la flota ({{ $contrato->presupuesto_cantidad_vehiculos ?? 0 }} vehículos)</span>
+                                        <span style="font-family: 'Courier New', monospace; font-weight: bold;">{{ $formatMoney($costoMensual) }}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="table-header">TOTAL</div>
-                            <div style="margin-top: 10px;">
-                                <div style="display: flex; justify-content: space-between; padding: 8px; background: #fff3e0; font-weight: bold; border: 1px solid rgb(247, 98, 0); border-radius: 3px;">
-                                    <span>Costo mensual total:</span>
-                                    <span style="font-family: 'Courier New', monospace;">{{ $formatMoney($costoMensual) }}</span>
+                            </td>
+                            <td style="width: 50%; vertical-align: top;">
+                                <div class="table-header">TOTAL</div>
+                                <div style="margin-top: 10px;">
+                                    <div style="display: flex; justify-content: space-between; padding: 8px; background: #fff3e0; font-weight: bold; border: 1px solid rgb(247, 98, 0); border-radius: 3px;">
+                                        <span>Costo mensual total:</span>
+                                        <span style="font-family: 'Courier New', monospace;">{{ $formatMoney($costoMensual) }}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
             @endif
             
-            <!-- TOTAL PRIMER MES (solo se muestra si hay inversión inicial) -->
             @if($tienePresupuesto && $totalInversion > 0)
                 <div style="text-align: right; margin-top: 10px; padding: 5px 8px; background: #e6f0fa; font-weight: bold; border: 1px solid rgb(60, 60, 62); border-radius: 3px; color: rgb(60, 60, 62); font-size: 11px;">
                     TOTAL PRIMER MES: <span style="font-family: 'Courier New', monospace; font-size: 12px;">{{ $formatMoney($totalPrimerMes) }}</span>
@@ -868,7 +969,7 @@
             @endif
         </div>
 
-        <!-- Método de Pago - Solo se muestra si hay método de pago registrado -->
+        <!-- Método de Pago -->
         @if($tieneMetodoPago)
             <div class="payment-section">
                 <div class="section-title">Método de Pago y Autorización</div>
@@ -880,57 +981,100 @@
                     
                     <div class="payment-details">
                         @if(!empty($contrato->debitoCbu))
-                            <!-- Datos de CBU -->
-                            <div class="payment-field">
-                                <span class="payment-label">Banco:</span>
-                                <span class="payment-value">{{ $contrato->debitoCbu->nombre_banco ?? '-' }}</span>
+                            <div class="payment-row">
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Banco:</span>
+                                        <span class="payment-value">{{ $contrato->debitoCbu->nombre_banco ?? '-' }}</span>
+                                    </div>
+                                </div>
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">CBU:</span>
+                                        <span class="payment-value">{{ $contrato->debitoCbu->cbu ?? '-' }}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="payment-field">
-                                <span class="payment-label">CBU:</span>
-                                <span class="payment-value">{{ $contrato->debitoCbu->cbu ?? '-' }}</span>
+                            <div class="payment-row">
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Alias:</span>
+                                        <span class="payment-value">{{ $contrato->debitoCbu->alias_cbu ?? '-' }}</span>
+                                    </div>
+                                </div>
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Titular:</span>
+                                        <span class="payment-value">{{ $contrato->debitoCbu->titular_cuenta ?? '-' }}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="payment-field">
-                                <span class="payment-label">Alias:</span>
-                                <span class="payment-value">{{ $contrato->debitoCbu->alias_cbu ?? '-' }}</span>
-                            </div>
-                            <div class="payment-field">
-                                <span class="payment-label">Titular:</span>
-                                <span class="payment-value">{{ $contrato->debitoCbu->titular_cuenta ?? '-' }}</span>
-                            </div>
-                            <div class="payment-field">
-                                <span class="payment-label">Tipo cuenta:</span>
-                                <span class="payment-value">{{ ($contrato->debitoCbu->tipo_cuenta ?? '') === 'caja_ahorro' ? 'Caja de ahorro' : 'Cuenta corriente' }}</span>
+                            <div class="payment-row">
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Tipo cuenta:</span>
+                                        <span class="payment-value">{{ ($contrato->debitoCbu->tipo_cuenta ?? '') === 'caja_ahorro' ? 'Caja de ahorro' : 'Cuenta corriente' }}</span>
+                                    </div>
+                                </div>
+                                <div class="payment-cell">
+                                </div>
                             </div>
                         @elseif(!empty($contrato->debitoTarjeta))
-                            <!-- Datos de Tarjeta -->
-                            <div class="payment-field">
-                                <span class="payment-label">Banco:</span>
-                                <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_banco ?? '-' }}</span>
+                            <div class="payment-row">
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Banco:</span>
+                                        <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_banco ?? '-' }}</span>
+                                    </div>
+                                </div>
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Tarjeta:</span>
+                                        <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_emisor ?? '-' }}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="payment-field">
-                                <span class="payment-label">Tarjeta:</span>
-                                <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_emisor ?? '-' }}</span>
+                            <div class="payment-row">
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Número:</span>
+                                        <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_numero ?? '-' }}</span>
+                                    </div>
+                                </div>
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Vencimiento:</span>
+                                        <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_expiracion ?? '-' }}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="payment-field">
-                                <span class="payment-label">Número:</span>
-                                <span class="payment-value">{{ $enmascararTarjeta($contrato->debitoTarjeta->tarjeta_numero ?? '') }}</span>
+                            <div class="payment-row">
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Titular:</span>
+                                        <span class="payment-value">{{ $contrato->debitoTarjeta->titular_tarjeta ?? '-' }}</span>
+                                    </div>
+                                </div>
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">CCV:</span>
+                                        <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_ccv ?? '-' }}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="payment-field">
-                                <span class="payment-label">Vencimiento:</span>
-                                <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_expiracion ?? '-' }}</span>
-                            </div>
-                            <div class="payment-field">
-                                <span class="payment-label">Titular:</span>
-                                <span class="payment-value">{{ $contrato->debitoTarjeta->titular_tarjeta ?? '-' }}</span>
-                            </div>
-                            <div class="payment-field">
-                                <span class="payment-label">Tipo:</span>
-                                <span class="payment-value">{{ ($contrato->debitoTarjeta->tipo_tarjeta ?? '') === 'debito' ? 'Débito' : 'Crédito' }}</span>
+                            <div class="payment-row">
+                                <div class="payment-cell">
+                                    <div class="payment-field">
+                                        <span class="payment-label">Tipo:</span>
+                                        <span class="payment-value">{{ ($contrato->debitoTarjeta->tipo_tarjeta ?? '') === 'debito' ? 'Débito' : 'Crédito' }}</span>
+                                    </div>
+                                </div>
+                                <div class="payment-cell">
+                                </div>
                             </div>
                         @endif
                     </div>
                     
-                    <!-- Declaración de Autorización - Solo se muestra si hay método de pago -->
                     @if($metodoPago)
                         <div class="authorization-box">
                             <div class="authorization-title">Declaración de Autorización</div>
@@ -942,17 +1086,25 @@
                             </div>
                             
                             <div class="signature-fields-three">
-                                <div class="signature-field">
-                                    <span class="signature-label">Firma:</span>
-                                    <div class="signature-line"></div>
-                                </div>
-                                <div class="signature-field">
-                                    <span class="signature-label">Aclaración:</span>
-                                    <div class="signature-line"></div>
-                                </div>
-                                <div class="signature-field">
-                                    <span class="signature-label">Tipo y Nro. documento:</span>
-                                    <div class="signature-line"></div>
+                                <div class="signature-row-three">
+                                    <div class="signature-cell-three">
+                                        <div class="signature-field">
+                                            <span class="signature-label">Firma:</span>
+                                            <div class="signature-line"></div>
+                                        </div>
+                                    </div>
+                                    <div class="signature-cell-three">
+                                        <div class="signature-field">
+                                            <span class="signature-label">Aclaración:</span>
+                                            <div class="signature-line"></div>
+                                        </div>
+                                    </div>
+                                    <div class="signature-cell-three">
+                                        <div class="signature-field">
+                                            <span class="signature-label">Tipo y Nro. documento:</span>
+                                            <div class="signature-line"></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -966,17 +1118,19 @@
             <div class="section-title">Datos de Instalación</div>
             
             <div class="installation-line">
-                <div class="installation-item">
-                    <span class="installation-label">Plataforma:</span>
-                    <span class="installation-value">{{ $contrato->empresa_plataforma ?? '-' }}</span>
-                </div>
-                <div class="installation-item">
-                    <span class="installation-label">Nombre de flota:</span>
-                    <span class="installation-value">{{ $contrato->empresa_nombre_flota ?? '-' }}</span>
-                </div>
-                <div class="installation-item">
-                    <span class="installation-label">Unidades a equipar:</span>
-                    <span class="installation-value">{{ $contrato->presupuesto_cantidad_vehiculos ?? 0 }} vehículos</span>
+                <div class="installation-row">
+                    <div class="installation-item">
+                        <span class="installation-label">Plataforma:</span>
+                        <span class="installation-value">{{ $contrato->empresa_plataforma ?? '-' }}</span>
+                    </div>
+                    <div class="installation-item">
+                        <span class="installation-label">Nombre de flota:</span>
+                        <span class="installation-value">{{ $contrato->empresa_nombre_flota ?? '-' }}</span>
+                    </div>
+                    <div class="installation-item">
+                        <span class="installation-label">Unidades a equipar:</span>
+                        <span class="installation-value">{{ $contrato->presupuesto_cantidad_vehiculos ?? 0 }} vehículos</span>
+                    </div>
                 </div>
             </div>
             
@@ -1013,24 +1167,25 @@
             <div class="section-title">Firma y Aceptación del Contrato</div>
             
             <div class="signature-fields-final">
-                <div class="signature-field-final">
-                    <div class="signature-line-final"></div>
-                    <div class="signature-label-final">Firma del Cliente</div>
-                </div>
-                <div class="signature-field-final">
-                    <div class="signature-line-final"></div>
-                    <div class="signature-label-final">Aclaración de Firma</div>
+                <div class="signature-row-final">
+                    <div class="signature-cell-final">
+                        <div class="signature-line-final"></div>
+                        <div class="signature-label-final">Firma del Cliente</div>
+                    </div>
+                    <div class="signature-cell-final">
+                        <div class="signature-line-final"></div>
+                        <div class="signature-label-final">Aclaración de Firma</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-<!-- Condiciones del Contrato -->
+ <!-- Condiciones del Contrato -->
 <div style="page-break-before: always; margin-top: 20px;">
     <div class="section-title">CONDICIONES GENERALES DEL SERVICIO</div>
     
     <div style="font-family: Arial, sans-serif; font-size: 7pt; line-height: 1.3; text-align: justify;">
-        <!-- ... resto del contenido de condiciones ... -->
         <p style="margin-bottom: 8px;">
             <u><strong>GLOSARIO:</strong></u><br />
             <strong>a) Modem GPS:</strong> consiste en un equipo informático propiedad exclusiva de la EMPRESA que se instala en el vehículo del CLIENTE. Este equipo informático emite señales que por medio de satélites se logra determinar la ubicación geográfica del vehículo en un mapa digitalizado.<br />
@@ -1080,9 +1235,37 @@
             </li>
 
             <li style="margin-bottom: 8px;">
-                EL CLIENTE declara haber leído y estar de acuerdo con las cláusulas ubicadas al frente y al dorso de este contrato. EL CLIENTE declara haber sido instruido y tener pleno conocimiento del servicio que contrata y que LA EMPRESA le ha informado acerca del alcance del servicio, sus limitaciones y sus consecuencias y/o efectos.
+                <strong>EL CLIENTE</strong> declara haber leído y estar de acuerdo con las cláusulas ubicadas al frente y al dorso de este contrato. EL CLIENTE declara haber sido instruido y tener pleno conocimiento del servicio que contrata y que LA EMPRESA le ha informado acerca del alcance del servicio, sus limitaciones y sus consecuencias y/o efectos.
             </li>
+        </ol>
+    </div>
+</div>
 
+<!-- PRIMERA FIRMA - después de cláusula 10 (sin salto de página forzado) -->
+<div style="margin-top: 30px;">
+    <div class="signature-section">
+        <div class="section-title">Firma y Aceptación del Contrato</div>
+        <div class="signature-fields-final">
+            <div class="signature-row-final">
+                <div class="signature-cell-final">
+                    <div class="signature-line-final"></div>
+                    <div class="signature-label-final">Firma del Cliente</div>
+                </div>
+                <div class="signature-cell-final">
+                    <div class="signature-line-final"></div>
+                    <div class="signature-label-final">Aclaración de Firma</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Continuación de condiciones - cláusulas 11 a 22 -->
+<div style="page-break-before: always; margin-top: 20px;">
+    <div class="section-title">CONDICIONES GENERALES DEL SERVICIO (CONTINUACIÓN)</div>
+    
+    <div style="font-family: Arial, sans-serif; font-size: 7pt; line-height: 1.3; text-align: justify;">
+        <ol start="11" style="margin-left: 15px; padding-left: 0; list-style-position: outside; font-size: 7pt;">
             <li style="margin-bottom: 8px;">
                 <strong>RESPONSABILIDAD</strong> – El CLIENTE declara conocer que la EMPRESA no es una compañía de seguros, de vigilancia o custodia o sistema de alarma, por ende la misma no es responsable por la seguridad, vigilancia o custodia del vehículo, ni por los daños, robos, etc. que pudieran acaecer en el mismo, ni sobre sus bienes ni personas, ni sobre terceros o bienes de terceros que pudieran estar en el mismo, tanto en caso de que el sistema de rastreo haya funcionado o no. LA EMPRESA brindará los servicios aquí convenidos siendo cargo de la misma los gastos de comunicación entre el vehículo y el software servidor de la EMPRESA. EL CLIENTE deberá poseer una computadora con las exigencias mínimas requeridas para el acceso WEB "{{ $compania['nombre'] }}", como así también deberá suministrar y mantener una conexión de Internet, la cual permitirá la comunicación entre el CLIENTE (Navegador WEB instalado en la computadora del CLIENTE) y el software servidor. LA EMPRESA no será responsable en ningún caso por interrupciones temporales o permanentes o efectos en la presentación de la ubicación vehicular.<br />
                 La EMPRESA no será responsable por los eventuales daños que se ocasionen con motivo o relación a las tareas del servicio de recupero que presenten terceras personas, firmas, servicios de seguridad privados o fuerzas policiales estatales. La EMPRESA se limitará a dar aviso de la alarma comunicada por el CLIENTE de la existencia de un VEHICULO siniestrado a las fuerzas de seguridad privadas (contratadas al efecto) o seguridad pública (fuerzas policiales) para que éstas tomen las medidas necesarias a fin de recuperar el VEHÍCULO por parte del CLIENTE. Serán por cuenta del CLIENTE las gestiones policiales, administrativas y judiciales que deba realizar a fin de obtener la tenencia del VEHÍCULO recuperado. El CLIENTE deberá cumplir con las denuncias policiales o judiciales que correspondan conforme los procedimientos usuales y suministrar toda la documentación necesaria que acredite la titularidad del VEHÍCULO siniestrado.
@@ -1136,6 +1319,25 @@
         <p style="margin-top: 15px; margin-bottom: 10px; text-align: center;">
             <strong>En prueba de conformidad, se suscribe el presente, recibiendo el CLIENTE copia del mismo.</strong>
         </p>
+    </div>
+</div>
+
+<!-- SEGUNDA FIRMA - final después de todas las condiciones -->
+<div style="margin-top: 30px;">
+    <div class="signature-section">
+        <div class="section-title">Firma y Aceptación del Contrato</div>
+        <div class="signature-fields-final">
+            <div class="signature-row-final">
+                <div class="signature-cell-final">
+                    <div class="signature-line-final"></div>
+                    <div class="signature-label-final">Firma del Cliente</div>
+                </div>
+                <div class="signature-cell-final">
+                    <div class="signature-line-final"></div>
+                    <div class="signature-label-final">Aclaración de Firma</div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
