@@ -1,7 +1,7 @@
 <?php
 // app/Http/Controllers/RRHH/Equipos/EquipoTecnicoController.php
 
-namespace App\Http\Controllers\RRHH\Equipos;
+namespace App\Http\Controllers\rrhh\Equipos;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;

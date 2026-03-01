@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Provincia;
 use Illuminate\Support\Facades\Log;
 
-class ProvinciaController extends Controller
+class ProvinciasController extends Controller
 {
     /**
      * Obtener todas las provincias activas

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\RRHH\Personal;
+namespace App\Http\Controllers\rrhh\Personal;
 
 use App\Http\Controllers\Controller;
 use Inertia\Inertia;
