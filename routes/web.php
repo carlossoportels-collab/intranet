@@ -139,18 +139,27 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
                 
         // ========== CUENTAS ==========
         Route::prefix('cuentas')->group(function () {
+            // Rutas GET (vistas)
             Route::get('/', [DetallesController::class, 'index'])->name('comercial.cuentas.detalles');
             Route::get('/certificados', [CertificadosFlotaController::class, 'index'])->name('comercial.cuentas.certificados');
             Route::get('/cambio-titularidad', [CambioTitularidadController::class, 'index'])->name('comercial.cuentas.cambio-titularidad');
             Route::get('/cambio-razon-social', [CambioRazonSocialController::class, 'index'])->name('comercial.cuentas.cambio-razon-social');
+            
+            // Rutas POST para cambio de razón social
             Route::post('/cambio-razon-social', [CambioRazonSocialController::class, 'store'])->name('comercial.cuentas.cambio-razon-social.store');
-            
-            // Rutas nuevas
             Route::post('/actualizar-contacto', [CambioRazonSocialController::class, 'actualizarContacto'])->name('comercial.cuentas.actualizar-contacto');
-            Route::post('/cambio-razon-social/completo', [CambioRazonSocialController::class, 'updateCompleto'])->name('comercial.cuentas.cambio-razon-social.completo'); // <-- FALTA ESTA
+            Route::post('/cambio-razon-social/completo', [CambioRazonSocialController::class, 'updateCompleto'])->name('comercial.cuentas.cambio-razon-social.completo');
             
+            // Rutas POST para cambio de titularidad
+            Route::post('/cambio-titularidad', [CambioTitularidadController::class, 'store'])->name('comercial.cuentas.cambio-titularidad.store');
+            
+            // Rutas GET para datos (API)
             Route::get('/cambio-razon-social/empresa/{id}/completa', [CambioRazonSocialController::class, 'getEmpresaDataCompleta'])->name('comercial.cuentas.cambio-razon-social.empresa-completa');
             Route::get('/cambio-razon-social/{id}', [CambioRazonSocialController::class, 'show'])->name('comercial.cuentas.cambio-razon-social.show');
+            
+            // Rutas GET para datos de titularidad (si las necesitas)
+            Route::get('/cambio-titularidad/empresa/{id}/vehiculos', [CambioTitularidadController::class, 'getVehiculosEmpresa'])->name('comercial.cuentas.cambio-titularidad.vehiculos');
+            Route::get('/cambio-titularidad/{id}', [CambioTitularidadController::class, 'show'])->name('comercial.cuentas.cambio-titularidad.show');
         });
         // ========== RUTAS CON PARÁMETROS LEAD (AL FINAL) ==========
         Route::prefix('leads/{lead}')->group(function () {
@@ -198,6 +207,7 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::post('/', [TarifasController::class, 'store'])->name('store');
             Route::put('/{id}', [TarifasController::class, 'update'])->name('update');
             Route::put('/{id}/toggle-activo', [TarifasController::class, 'toggleActivo'])->name('toggle-activo');
+            Route::put('/{id}/toggle-presupuestable', [TarifasController::class, 'togglePresupuestable'])->name('tarifas.toggle-presupuestable');
             Route::delete('/{id}', [TarifasController::class, 'destroy'])->name('destroy');
             Route::get('/export', [TarifasController::class, 'export'])->name('export');
             Route::post('/procesar-archivo', [TarifasController::class, 'procesarArchivo'])->name('procesar-archivo');

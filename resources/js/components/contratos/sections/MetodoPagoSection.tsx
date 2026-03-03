@@ -1,5 +1,5 @@
 // resources/js/components/contratos/sections/MetodoPagoSection.tsx
-import { CreditCard, Landmark } from 'lucide-react';
+import { CreditCard, Landmark, XCircle } from 'lucide-react';
 import React from 'react';
 
 interface Props {
@@ -25,6 +25,25 @@ interface Props {
     setDatosTarjeta: (datos: any) => void;
 }
 
+// Valores iniciales para reset
+const INITIAL_CBU = {
+    nombre_banco: '',
+    cbu: '',
+    alias_cbu: '',
+    titular_cuenta: '',
+    tipo_cuenta: 'caja_ahorro'
+};
+
+const INITIAL_TARJETA = {
+    tarjeta_emisor: '',
+    tarjeta_expiracion: '',
+    tarjeta_numero: '',
+    tarjeta_codigo: '',
+    tarjeta_banco: '',
+    titular_tarjeta: '',
+    tipo_tarjeta: 'debito'
+};
+
 export default function MetodoPagoSection({
     metodoPago,
     setMetodoPago,
@@ -33,6 +52,25 @@ export default function MetodoPagoSection({
     datosTarjeta,
     setDatosTarjeta,
 }: Props) {
+    
+    const handleMetodoClick = (metodo: 'cbu' | 'tarjeta') => {
+        if (metodoPago === metodo) {
+            // Si ya está seleccionado, lo deseleccionamos y reseteamos los datos
+            setMetodoPago(null);
+            setDatosCbu(INITIAL_CBU);
+            setDatosTarjeta(INITIAL_TARJETA);
+        } else {
+            // Seleccionamos el nuevo método
+            setMetodoPago(metodo);
+            // Opcional: resetear el otro método para mantener limpieza
+            if (metodo === 'cbu') {
+                setDatosTarjeta(INITIAL_TARJETA);
+            } else {
+                setDatosCbu(INITIAL_CBU);
+            }
+        }
+    };
+
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
@@ -47,43 +85,74 @@ export default function MetodoPagoSection({
                 <div className="grid grid-cols-2 gap-3 mb-4">
                     <button
                         type="button"
-                        onClick={() => setMetodoPago('cbu')}
+                        onClick={() => handleMetodoClick('cbu')}
                         className={`p-3 border rounded-lg flex items-center gap-3 transition-colors ${
                             metodoPago === 'cbu' 
-                                ? 'border-green-500 bg-green-50' 
-                                : 'border-gray-200 hover:border-gray-300'
+                                ? 'border-green-500 bg-green-50 ring-2 ring-green-200' 
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                         }`}
                     >
                         <Landmark className={`h-5 w-5 ${metodoPago === 'cbu' ? 'text-green-600' : 'text-gray-400'}`} />
-                        <div className="text-left">
+                        <div className="text-left flex-1">
                             <p className="text-sm font-medium">CBU</p>
                             <p className="text-xs text-gray-500">Débito automático por CBU</p>
                         </div>
+                        {metodoPago === 'cbu' && (
+                            <XCircle className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                        )}
                     </button>
                     
                     <button
                         type="button"
-                        onClick={() => setMetodoPago('tarjeta')}
+                        onClick={() => handleMetodoClick('tarjeta')}
                         className={`p-3 border rounded-lg flex items-center gap-3 transition-colors ${
                             metodoPago === 'tarjeta' 
-                                ? 'border-green-500 bg-green-50' 
-                                : 'border-gray-200 hover:border-gray-300'
+                                ? 'border-green-500 bg-green-50 ring-2 ring-green-200' 
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                         }`}
                     >
                         <CreditCard className={`h-5 w-5 ${metodoPago === 'tarjeta' ? 'text-green-600' : 'text-gray-400'}`} />
-                        <div className="text-left">
+                        <div className="text-left flex-1">
                             <p className="text-sm font-medium">Tarjeta</p>
                             <p className="text-xs text-gray-500">Débito o crédito</p>
                         </div>
+                        {metodoPago === 'tarjeta' && (
+                            <XCircle className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                        )}
                     </button>
                 </div>
 
+                {/* Mensaje cuando no hay método seleccionado */}
+                {!metodoPago && (
+                    <div className="text-center py-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <CreditCard className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500 mb-1">No hay método de pago seleccionado</p>
+                        <p className="text-xs text-gray-400">
+                            Seleccione CBU o Tarjeta para agregar datos de pago
+                        </p>
+                    </div>
+                )}
+
                 {/* Formulario CBU */}
                 {metodoPago === 'cbu' && (
-                    <div className="space-y-3 border-t pt-4">
-                        <h4 className="text-sm font-medium mb-3">Datos de la cuenta</h4>
+                    <div className="space-y-3 border-t pt-4 animate-fadeIn">
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-medium">Datos de la cuenta</h4>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setMetodoPago(null);
+                                    setDatosCbu(INITIAL_CBU);
+                                }}
+                                className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"
+                            >
+                                <XCircle className="h-3 w-3" />
+                                Cancelar
+                            </button>
+                        </div>
                         
                         <div className="grid grid-cols-2 gap-3">
+                            {/* ... resto del formulario CBU igual ... */}
                             <div className="col-span-2">
                                 <label className="block text-xs text-gray-600 mb-1">
                                     Banco <span className="text-red-500">*</span>
@@ -93,7 +162,7 @@ export default function MetodoPagoSection({
                                     value={datosCbu.nombre_banco}
                                     onChange={(e) => setDatosCbu({...datosCbu, nombre_banco: e.target.value})}
                                     maxLength={100}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="Ej: Banco Galicia, Mercado Pago, Ualá, etc."
                                     required
                                 />
@@ -113,7 +182,7 @@ export default function MetodoPagoSection({
                                         }
                                     }}
                                     maxLength={22}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="00000000000000000000"
                                     required
                                 />
@@ -128,7 +197,7 @@ export default function MetodoPagoSection({
                                     value={datosCbu.alias_cbu}
                                     onChange={(e) => setDatosCbu({...datosCbu, alias_cbu: e.target.value})}
                                     maxLength={50}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="ALIAS.CBU.BANCO"
                                 />
                             </div>
@@ -142,7 +211,7 @@ export default function MetodoPagoSection({
                                     value={datosCbu.titular_cuenta}
                                     onChange={(e) => setDatosCbu({...datosCbu, titular_cuenta: e.target.value})}
                                     maxLength={200}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="Nombre completo del titular"
                                     required
                                 />
@@ -155,7 +224,7 @@ export default function MetodoPagoSection({
                                 <select
                                     value={datosCbu.tipo_cuenta}
                                     onChange={(e) => setDatosCbu({...datosCbu, tipo_cuenta: e.target.value})}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     required
                                 >
                                     <option value="caja_ahorro">Caja de ahorro</option>
@@ -168,10 +237,24 @@ export default function MetodoPagoSection({
 
                 {/* Formulario Tarjeta */}
                 {metodoPago === 'tarjeta' && (
-                    <div className="space-y-3 border-t pt-4">
-                        <h4 className="text-sm font-medium mb-3">Datos de la tarjeta</h4>
+                    <div className="space-y-3 border-t pt-4 animate-fadeIn">
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-medium">Datos de la tarjeta</h4>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setMetodoPago(null);
+                                    setDatosTarjeta(INITIAL_TARJETA);
+                                }}
+                                className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"
+                            >
+                                <XCircle className="h-3 w-3" />
+                                Cancelar
+                            </button>
+                        </div>
                         
                         <div className="grid grid-cols-2 gap-3">
+                            {/* ... resto del formulario Tarjeta igual ... */}
                             <div className="col-span-2">
                                 <label className="block text-xs text-gray-600 mb-1">
                                     Banco emisor <span className="text-red-500">*</span>
@@ -181,7 +264,7 @@ export default function MetodoPagoSection({
                                     value={datosTarjeta.tarjeta_banco}
                                     onChange={(e) => setDatosTarjeta({...datosTarjeta, tarjeta_banco: e.target.value})}
                                     maxLength={100}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="Ej: Banco Galicia, Brubank, etc."
                                     required
                                 />
@@ -202,7 +285,7 @@ export default function MetodoPagoSection({
                                         }
                                     }}
                                     maxLength={19}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="**** **** **** 1234"
                                     required
                                 />
@@ -215,7 +298,7 @@ export default function MetodoPagoSection({
                                 <select
                                     value={datosTarjeta.tarjeta_emisor}
                                     onChange={(e) => setDatosTarjeta({...datosTarjeta, tarjeta_emisor: e.target.value})}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     required
                                 >
                                     <option value="">Seleccionar</option>
@@ -234,7 +317,7 @@ export default function MetodoPagoSection({
                                 <select
                                     value={datosTarjeta.tipo_tarjeta}
                                     onChange={(e) => setDatosTarjeta({...datosTarjeta, tipo_tarjeta: e.target.value})}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     required
                                 >
                                     <option value="debito">Débito</option>
@@ -259,7 +342,7 @@ export default function MetodoPagoSection({
                                         }
                                     }}
                                     maxLength={5}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="MM/AA"
                                     required
                                 />
@@ -279,7 +362,7 @@ export default function MetodoPagoSection({
                                         }
                                     }}
                                     maxLength={4}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="***"
                                     required
                                 />
@@ -294,7 +377,7 @@ export default function MetodoPagoSection({
                                     value={datosTarjeta.titular_tarjeta}
                                     onChange={(e) => setDatosTarjeta({...datosTarjeta, titular_tarjeta: e.target.value})}
                                     maxLength={200}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="Nombre como figura en la tarjeta"
                                     required
                                 />

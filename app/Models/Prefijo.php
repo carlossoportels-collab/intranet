@@ -97,4 +97,13 @@ class Prefijo extends Model
             'clientes' => $this->leads()->where('es_cliente', true)->count(),
         ];
     }
+
+    /**
+     * Obtener el ID de compañía del prefijo
+     */
+    public function getCompaniaIdAttribute()
+    {
+        $comercial = $this->comercial()->where('activo', true)->first();
+        return $comercial ? $comercial->compania_id : 1;
+    }
 }

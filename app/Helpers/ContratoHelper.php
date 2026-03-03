@@ -5,7 +5,6 @@ namespace App\Helpers;
 
 use App\Models\Contrato;
 use App\Models\Prefijo;
-use App\Models\Comercial;
 use Illuminate\Support\Facades\DB;
 
 class ContratoHelper
@@ -15,15 +14,24 @@ class ContratoHelper
      */
     public static function generarNumeroContrato($prefijoId)
     {
-        // Obtener el prefijo para determinar la compañía
+        // Obtener el prefijo con su comercial y compañía
         $prefijo = Prefijo::with('comercial.compania')->find($prefijoId);
         
-        // Determinar la compañía (por defecto Localsat)
+        if (!$prefijo) {
+            throw new \Exception("Prefijo no encontrado");
+        }
+
+        // Obtener el comercial asociado al prefijo
+        $comercial = $prefijo->comercial->first(); // Es una relación hasMany
+        
+        // Determinar compañía
         $companiaId = 1; // Localsat por defecto
         
-        if ($prefijo && $prefijo->comercial) {
-            $comercial = $prefijo->comercial->first();
-            $companiaId = $comercial?->compania_id ?? 1;
+        if ($comercial && $comercial->compania) {
+            $companiaId = $comercial->compania->id;
+        } elseif ($comercial && $comercial->compania_id) {
+            // Si no tiene la relación cargada pero tiene el ID
+            $companiaId = $comercial->compania_id;
         }
         
         // Rango según compañía
@@ -40,7 +48,7 @@ class ContratoHelper
             // Buscar el último contrato en ese rango
             $ultimoContrato = Contrato::whereBetween('id', [$min, $max])
                 ->orderBy('id', 'desc')
-                ->lockForUpdate() // Bloquear para evitar duplicados
+                ->lockForUpdate()
                 ->first();
             
             if ($ultimoContrato) {
@@ -56,6 +64,45 @@ class ContratoHelper
             
             return $nuevoId;
         });
+    }
+    
+    /**
+     * Versión simplificada sin transacción (útil para pruebas o si hay problemas de bloqueo)
+     */
+    public static function generarNumeroContratoSimple($prefijoId)
+    {
+        // Obtener el prefijo
+        $prefijo = Prefijo::find($prefijoId);
+        
+        // Obtener el ID de compañía usando el nuevo método del modelo
+        $companiaId = $prefijo ? $prefijo->compania_id : 1; // 1 = Localsat por defecto
+        
+        // Rango según compañía
+        if ($companiaId == 2) { // Smartsat
+            $min = 800000;
+            $max = 899999;
+        } else { // Localsat (1) u otros
+            $min = 500000;
+            $max = 599999;
+        }
+        
+        // Buscar el último contrato (sin lock)
+        $ultimoContrato = Contrato::whereBetween('id', [$min, $max])
+            ->orderBy('id', 'desc')
+            ->first();
+        
+        if ($ultimoContrato) {
+            $nuevoId = $ultimoContrato->id + 1;
+        } else {
+            $nuevoId = $min;
+        }
+        
+        // Verificar que no exceda el máximo
+        if ($nuevoId > $max) {
+            throw new \Exception("No hay más números de contrato disponibles para esta compañía");
+        }
+        
+        return $nuevoId;
     }
     
     /**
@@ -77,5 +124,16 @@ class ContratoHelper
             return 'LOCALSAT';
         }
         return 'LOCALSAT'; // Por defecto
+    }
+    
+    /**
+     * Obtener el rango de números según compañía
+     */
+    public static function getRangoPorCompania($companiaId)
+    {
+        return match($companiaId) {
+            2 => ['min' => 800000, 'max' => 899999], // Smartsat
+            default => ['min' => 500000, 'max' => 599999], // Localsat
+        };
     }
 }

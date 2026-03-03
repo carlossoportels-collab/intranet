@@ -64,12 +64,15 @@ export interface Contacto {
 export interface Responsable {
     id: number;
     empresa_id: number;
-    tipo_responsabilidad_id: number | null;
-    nombre: string;
-    apellido: string;
+    nombre_completo: string;  // ← Campo unificado
+    cargo: string | null;
     telefono: string | null;
     email: string | null;
+    tipo_responsabilidad_id: number | null;
+    tipo_responsabilidad?: TipoResponsabilidad;
     es_activo: boolean;
+    created: string;
+    created_by: number;
 }
 
 export interface EmpresaCompleta {

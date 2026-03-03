@@ -123,6 +123,24 @@ export default function CreateContrato({
     };
 
     const handleSubmit = () => {
+                // Validar vehículos
+        if (vehiculos.length === 0) {
+            toast.error('Debe cargar al menos un vehículo');
+            return;
+        }
+
+        // Validar que estén todos los vehículos requeridos
+        if (vehiculos.length < presupuesto.cantidad_vehiculos) {
+            toast.error(`Debe completar los ${presupuesto.cantidad_vehiculos} vehículos presupuestados. Faltan ${presupuesto.cantidad_vehiculos - vehiculos.length}.`);
+            return;
+        }
+
+        // Validar campos requeridos de cada vehículo (patente)
+        const vehiculosSinPatente = vehiculos.filter(v => !v.patente || v.patente.trim() === '');
+        if (vehiculosSinPatente.length > 0) {
+            toast.error('Todos los vehículos deben tener patente');
+            return;
+        }
         setIsSubmitting(true);
 
         router.post('/comercial/contratos', {

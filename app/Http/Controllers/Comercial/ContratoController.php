@@ -4,6 +4,7 @@
 namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\ContratoHelper;
 use App\Models\Presupuesto;
 use App\Models\Lead;
 use App\Models\Empresa;
@@ -346,7 +347,69 @@ public function store(Request $request)
         // Actualizar empresa con número de contrato
         $empresa->update(['numeroalfa' => $contratoId]);
 
-        // ... resto del código (responsables, vehículos, método de pago) igual ...
+                // Responsables
+            $responsableFlota = EmpresaResponsable::where('empresa_id', $empresa->id)
+                ->where('es_activo', true)
+                ->whereIn('tipo_responsabilidad_id', [3, 5])
+                ->first();
+
+            $responsablePagos = EmpresaResponsable::where('empresa_id', $empresa->id)
+                ->where('es_activo', true)
+                ->whereIn('tipo_responsabilidad_id', [4, 5])
+                ->first();
+
+            $contrato->update([
+                'responsable_flota_nombre' => $responsableFlota?->nombre_completo,
+                'responsable_flota_telefono' => $responsableFlota?->telefono,
+                'responsable_flota_email' => $responsableFlota?->email,
+                'responsable_pagos_nombre' => $responsablePagos?->nombre_completo,
+                'responsable_pagos_telefono' => $responsablePagos?->telefono,
+                'responsable_pagos_email' => $responsablePagos?->email,
+            ]);
+
+            // Guardar vehículos
+            foreach ($request->vehiculos as $index => $vehiculo) {
+                if (!empty($vehiculo['patente'])) {
+                    ContratoVehiculo::create([
+                        'contrato_id' => $contrato->id,
+                        'patente' => $vehiculo['patente'],
+                        'marca' => $vehiculo['marca'] ?? null,
+                        'modelo' => $vehiculo['modelo'] ?? null,
+                        'anio' => $vehiculo['anio'] ?? null,
+                        'color' => $vehiculo['color'] ?? null,
+                        'identificador' => $vehiculo['identificador'] ?? null,
+                        'orden' => $index + 1,
+                        'created' => now(),
+                    ]);
+                }
+            }
+
+            // Método de pago
+            if ($request->metodo_pago === 'cbu' && $request->datos_cbu) {
+                DebitoCbu::create([
+                    'contrato_id' => $contrato->id,
+                    'nombre_banco' => $request->datos_cbu['nombre_banco'],
+                    'cbu' => $request->datos_cbu['cbu'],
+                    'alias_cbu' => $request->datos_cbu['alias_cbu'] ?? null,
+                    'titular_cuenta' => $request->datos_cbu['titular_cuenta'],
+                    'tipo_cuenta' => $request->datos_cbu['tipo_cuenta'],
+                    'es_activo' => true,
+                    'created_by' => auth()->id(),
+                ]);
+            } elseif ($request->metodo_pago === 'tarjeta' && $request->datos_tarjeta) {
+                DebitoTarjeta::create([
+                    'contrato_id' => $contrato->id,
+                    'tarjeta_emisor' => $request->datos_tarjeta['tarjeta_emisor'],
+                    'tarjeta_expiracion' => $request->datos_tarjeta['tarjeta_expiracion'],
+                    'tarjeta_numero' => $request->datos_tarjeta['tarjeta_numero'],
+                    'tarjeta_codigo' => $request->datos_tarjeta['tarjeta_codigo'] ?? null,
+                    'tarjeta_banco' => $request->datos_tarjeta['tarjeta_banco'],
+                    'titular_tarjeta' => $request->datos_tarjeta['titular_tarjeta'],
+                    'tipo_tarjeta' => $request->datos_tarjeta['tipo_tarjeta'],
+                    'es_activo' => true,
+                    'created_by' => auth()->id(),
+                ]);
+            }
 
         DB::commit();
 
@@ -694,31 +757,112 @@ public function storeFromEmpresa(Request $request)
     DB::beginTransaction();
     
     try {
+        // ============================================
+        // CARGAR DATOS COMPLETOS
+        // ============================================
         $empresa = Empresa::with([
-            'vehiculos',
             'localidadFiscal.provincia',
             'rubro',
             'categoriaFiscal',
             'plataforma',
-            'prefijo' // ← Necesario para determinar compañía
+            'prefijo'
         ])->findOrFail($request->empresa_id);
         
-        $contacto = $request->contacto_id ? EmpresaContacto::with('lead.localidad.provincia', 'lead.rubro', 'lead.origen', 'tipoResponsabilidad', 'tipoDocumento', 'nacionalidad')->find($request->contacto_id) : null;
+        $contacto = null;
+        $lead = null;
+        
+        if ($request->contacto_id) {
+            $contacto = EmpresaContacto::with([
+                'lead.localidad.provincia',
+                'lead.rubro',
+                'lead.origen',
+                'tipoResponsabilidad',
+                'tipoDocumento',
+                'nacionalidad'
+            ])->find($request->contacto_id);
+            
+            if ($contacto && $contacto->lead) {
+                $lead = $contacto->lead;
+            }
+        }
+        
+        // Si no hay contacto, intentar obtener el contacto principal
+        if (!$contacto) {
+            $contacto = EmpresaContacto::where('empresa_id', $empresa->id)
+                ->where('es_contacto_principal', true)
+                ->with(['lead', 'tipoResponsabilidad', 'tipoDocumento', 'nacionalidad'])
+                ->first();
+                
+            if ($contacto && $contacto->lead) {
+                $lead = $contacto->lead;
+            }
+        }
         
         // Generar ID según compañía
         $contratoId = ContratoHelper::generarNumeroContrato($empresa->prefijo_id);
         
-        // Crear contrato con TODOS los campos necesarios
+        // ============================================
+        // CREAR CONTRATO CON TODOS LOS DATOS
+        // ============================================
         $contrato = new Contrato();
-        $contrato->id = $contratoId; // ← Asignar ID manualmente
+        $contrato->id = $contratoId;
         $contrato->presupuesto_id = null;
         $contrato->empresa_id = $empresa->id;
-        $contrato->lead_id = $contacto?->lead_id ?? null;
-        
+        $contrato->lead_id = $lead?->id ?? null;
         $contrato->fecha_emision = now();
-        $contrato->estado_id = 1; // Activo
+        $contrato->estado_id = 1;
         
-        // ... resto del código (asignaciones de datos) igual ...
+        // DATOS DEL CLIENTE (desde el lead)
+        $contrato->cliente_nombre_completo = $lead?->nombre_completo ?? $empresa->nombre_fantasia;
+        $contrato->cliente_genero = $lead?->genero ?? 'no_especifica';
+        $contrato->cliente_telefono = $lead?->telefono ?? $empresa->telefono_fiscal;
+        $contrato->cliente_email = $lead?->email ?? $empresa->email_fiscal;
+        
+        if ($lead && $lead->localidad) {
+            $contrato->cliente_localidad = $lead->localidad->nombre;
+            if ($lead->localidad->provincia) {
+                $contrato->cliente_provincia = $lead->localidad->provincia->nombre;
+            }
+        }
+        
+        $contrato->cliente_rubro = $lead?->rubro?->nombre;
+        $contrato->cliente_origen = $lead?->origen?->nombre;
+        
+        // DATOS DEL CONTACTO
+        if ($contacto) {
+            $contrato->contacto_tipo_responsabilidad = $contacto->tipoResponsabilidad?->nombre;
+            $contrato->contacto_tipo_documento = $contacto->tipoDocumento?->nombre;
+            $contrato->contacto_nro_documento = $contacto->nro_documento;
+            $contrato->contacto_nacionalidad = $contacto->nacionalidad?->pais;
+            $contrato->contacto_fecha_nacimiento = $contacto->fecha_nacimiento;
+            $contrato->contacto_direccion_personal = $contacto->direccion_personal;
+            $contrato->contacto_codigo_postal_personal = $contacto->codigo_postal_personal;
+        }
+        
+        // DATOS DE LA EMPRESA
+        $contrato->empresa_nombre_fantasia = $empresa->nombre_fantasia;
+        $contrato->empresa_razon_social = $empresa->razon_social;
+        $contrato->empresa_cuit = $empresa->cuit;
+        $contrato->empresa_domicilio_fiscal = $empresa->direccion_fiscal;
+        $contrato->empresa_codigo_postal_fiscal = $empresa->codigo_postal_fiscal;
+        
+        if ($empresa->localidadFiscal) {
+            $contrato->empresa_localidad_fiscal = $empresa->localidadFiscal->nombre;
+            if ($empresa->localidadFiscal->provincia) {
+                $contrato->empresa_provincia_fiscal = $empresa->localidadFiscal->provincia->nombre;
+            }
+        }
+        
+        $contrato->empresa_telefono_fiscal = $empresa->telefono_fiscal;
+        $contrato->empresa_email_fiscal = $empresa->email_fiscal;
+        $contrato->empresa_actividad = $empresa->rubro?->nombre;
+        $contrato->empresa_situacion_afip = $empresa->categoriaFiscal?->nombre;
+        $contrato->empresa_plataforma = $empresa->plataforma?->nombre;
+        $contrato->empresa_nombre_flota = $empresa->nombre_flota;
+        
+        // DATOS DEL CONTRATO
+        $contrato->presupuesto_cantidad_vehiculos = $empresa->vehiculos->count();
+        $contrato->presupuesto_total_mensual = $request->total_mensual_abonos ?? 0;
         
         $contrato->created_by = $usuario->id;
         $contrato->created = now();
@@ -726,10 +870,74 @@ public function storeFromEmpresa(Request $request)
         $contrato->activo = true;
         $contrato->save();
         
-        // Actualizar empresa con número de contrato
-        $empresa->update(['numeroalfa' => $contratoId]);
+        // ============================================
+        // ASOCIAR VEHÍCULOS AL CONTRATO
+        // ============================================
+        foreach ($empresa->vehiculos as $index => $vehiculo) {
+            ContratoVehiculo::create([
+                'contrato_id' => $contrato->id,
+                'patente' => $vehiculo->avl_patente,
+                'marca' => $vehiculo->avl_marca,
+                'modelo' => $vehiculo->avl_modelo,
+                'anio' => $vehiculo->avl_anio,
+                'color' => $vehiculo->avl_color,
+                'identificador' => $vehiculo->avl_identificador,
+                'orden' => $index + 1,
+                'created' => now(),
+            ]);
+        }
         
-        // ... resto del código (vehículos, responsables, método de pago) igual ...
+        // ============================================
+        // GUARDAR RESPONSABLES ADICIONALES
+        // ============================================
+        if ($request->has('responsables') && is_array($request->responsables)) {
+            foreach ($request->responsables as $responsableData) {
+                if (isset($responsableData['nombre_completo']) && !empty($responsableData['nombre_completo'])) {
+                    EmpresaResponsable::create([
+                        'empresa_id' => $empresa->id,
+                        'nombre_completo' => $responsableData['nombre_completo'],
+                        'cargo' => $responsableData['cargo'] ?? null,
+                        'telefono' => $responsableData['telefono'] ?? null,
+                        'email' => $responsableData['email'] ?? null,
+                        'tipo_responsabilidad_id' => $responsableData['tipo_responsabilidad_id'] ?? null,
+                        'es_activo' => true,
+                        'created_by' => $usuario->id,
+                        'created' => now(),
+                    ]);
+                }
+            }
+        }
+        
+        // ============================================
+        // GUARDAR MÉTODO DE PAGO
+        // ============================================
+        if ($request->metodo_pago === 'cbu' && $request->datos_cbu) {
+            DebitoCbu::create([
+                'contrato_id' => $contrato->id,
+                'nombre_banco' => $request->datos_cbu['nombre_banco'],
+                'cbu' => $request->datos_cbu['cbu'],
+                'alias_cbu' => $request->datos_cbu['alias_cbu'] ?? null,
+                'titular_cuenta' => $request->datos_cbu['titular_cuenta'],
+                'tipo_cuenta' => $request->datos_cbu['tipo_cuenta'],
+                'es_activo' => true,
+                'created_by' => $usuario->id,
+                'created' => now(),
+            ]);
+        } elseif ($request->metodo_pago === 'tarjeta' && $request->datos_tarjeta) {
+            DebitoTarjeta::create([
+                'contrato_id' => $contrato->id,
+                'tarjeta_emisor' => $request->datos_tarjeta['tarjeta_emisor'],
+                'tarjeta_expiracion' => $request->datos_tarjeta['tarjeta_expiracion'],
+                'tarjeta_numero' => $request->datos_tarjeta['tarjeta_numero'],
+                'tarjeta_codigo' => $request->datos_tarjeta['tarjeta_codigo'] ?? null,
+                'tarjeta_banco' => $request->datos_tarjeta['tarjeta_banco'],
+                'titular_tarjeta' => $request->datos_tarjeta['titular_tarjeta'],
+                'tipo_tarjeta' => $request->datos_tarjeta['tipo_tarjeta'],
+                'es_activo' => true,
+                'created_by' => $usuario->id,
+                'created' => now(),
+            ]);
+        }
 
         DB::commit();
 
@@ -739,7 +947,9 @@ public function storeFromEmpresa(Request $request)
     } catch (\Exception $e) {
         DB::rollBack();
         Log::error('Error al generar contrato desde empresa: ' . $e->getMessage(), [
-            'trace' => $e->getTraceAsString()
+            'trace' => $e->getTraceAsString(),
+            'empresa_id' => $request->empresa_id ?? null,
+            'usuario_id' => $usuario->id ?? null
         ]);
         return back()->withErrors(['error' => 'Error al generar contrato: ' . $e->getMessage()]);
     }

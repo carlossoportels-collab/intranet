@@ -854,7 +854,7 @@ export default function ContratoHTML({ contrato, compania }: Props) {
                             <div>
                                 <div style={styles.tableHeader}>TOTAL</div>
                                 <div style={{ marginTop: '10px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', background: '#fff3e0', fontWeight: 'bold', border: '1px solid rgb(247, 98, 0)', borderRadius: '3px', padding: '5px 8px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', background: '#fff3e0', fontWeight: 'bold', border: '1px solid rgb(247, 98, 0)', borderRadius: '3px', padding: '5px 8px' }}>
                                         <span>Costo mensual total:</span>
                                         <span style={{ fontFamily: "'Courier New', monospace" }}>{formatMoney(totales.costoMensual)}</span>
                                     </div>

@@ -11,6 +11,8 @@ interface PaginationProps {
   preserveState?: boolean;
   preserveScroll?: boolean;
   only?: string[]; // Para actualizar solo ciertos datos
+  onPageChange?: (page: number) => void; // Para paginación en memoria
+  useLinks?: boolean; // Para elegir entre links de Inertia o callbacks
 }
 
 const Pagination: React.FC<PaginationProps> = ({
@@ -22,6 +24,8 @@ const Pagination: React.FC<PaginationProps> = ({
   preserveState = true,
   preserveScroll = true,
   only,
+  onPageChange,
+  useLinks = true, // Por defecto usa links de Inertia
 }) => {
   const startItem = (currentPage - 1) * perPage + 1;
   const endItem = Math.min(currentPage * perPage, total);
@@ -53,6 +57,84 @@ const Pagination: React.FC<PaginationProps> = ({
     }
     return undefined;
   };
+
+  const handlePageChange = (page: number) => {
+    if (onPageChange) {
+      onPageChange(page);
+    }
+  };
+
+  const renderPreviousButton = () => {
+    const disabled = currentPage === 1;
+    const className = `px-3 py-1 border rounded text-sm ${
+      disabled 
+        ? 'text-gray-400 border-gray-300 cursor-not-allowed pointer-events-none' 
+        : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+    }`;
+
+    if (useLinks) {
+      return (
+        <Link
+          key="prev-link"
+          href={getPageUrl(currentPage - 1)}
+          className={className}
+          preserveState={preserveState}
+          preserveScroll={preserveScroll}
+          only={getOnly()}
+          disabled={disabled}
+        >
+          ← Anterior
+        </Link>
+      );
+    } else {
+      return (
+        <button
+          key="prev-button"
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={disabled}
+          className={className}
+        >
+          ← Anterior
+        </button>
+      );
+    }
+  };
+
+  const renderNextButton = () => {
+    const disabled = currentPage === lastPage;
+    const className = `px-3 py-1 border rounded text-sm ${
+      disabled 
+        ? 'text-gray-400 border-gray-300 cursor-not-allowed pointer-events-none' 
+        : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+    }`;
+
+    if (useLinks) {
+      return (
+        <Link
+          key="next-link"
+          href={getPageUrl(currentPage + 1)}
+          className={className}
+          preserveState={preserveState}
+          preserveScroll={preserveScroll}
+          only={getOnly()}
+          disabled={disabled}
+        >
+          Siguiente →
+        </Link>
+      );
+    } else {
+      return (
+        <button
+          key="next-button"
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={disabled}
+          className={className}
+        >
+          Siguiente →
+        </button>
+      );
+    }
+  };
   
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between mt-6 gap-4">
@@ -62,20 +144,7 @@ const Pagination: React.FC<PaginationProps> = ({
         de <span className="font-medium">{total}</span> totales
       </div>
       <div className="flex items-center space-x-2">
-        <Link
-          href={getPageUrl(currentPage - 1)}
-          className={`px-3 py-1 border rounded text-sm ${
-            currentPage === 1 
-              ? 'text-gray-400 border-gray-300 cursor-not-allowed pointer-events-none' 
-              : 'text-gray-700 border-gray-300 hover:bg-gray-50'
-          }`}
-          preserveState={preserveState}
-          preserveScroll={preserveScroll}
-          only={getOnly()}
-          disabled={currentPage === 1}
-        >
-          ← Anterior
-        </Link>
+        {renderPreviousButton()}
         
         <span className="px-3 py-1 text-sm text-gray-700 hidden sm:inline">
           Página {currentPage} de {lastPage}
@@ -87,20 +156,7 @@ const Pagination: React.FC<PaginationProps> = ({
           <span className="text-sm text-gray-700">{lastPage}</span>
         </div>
         
-        <Link
-          href={getPageUrl(currentPage + 1)}
-          className={`px-3 py-1 border rounded text-sm ${
-            currentPage === lastPage 
-              ? 'text-gray-400 border-gray-300 cursor-not-allowed pointer-events-none' 
-              : 'text-gray-700 border-gray-300 hover:bg-gray-50'
-          }`}
-          preserveState={preserveState}
-          preserveScroll={preserveScroll}
-          only={getOnly()}
-          disabled={currentPage === lastPage}
-        >
-          Siguiente →
-        </Link>
+        {renderNextButton()}
       </div>
     </div>
   );

@@ -517,17 +517,11 @@ const handleFinalizar = () => {
                                         </p>
                                         <div className="flex justify-center gap-4">
                                             <button
-                                                onClick={() => window.location.href = `/comercial/contratos/desde-empresa/${selectedEmpresa.id}`}
-                                                className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                                            >
-                                                Generar Contrato
-                                            </button>
-                                            <button
                                                 onClick={handleFinalizar}
                                                 disabled={loading}
                                                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                                             >
-                                                {loading ? 'Guardando...' : 'Solo Guardar Cambios'}
+                                                {loading ? 'Guardando...' : 'Guardar y completar contrato'}
                                             </button>
                                         </div>
                                     </div>

@@ -114,7 +114,8 @@ export default function PresupuestosUnificadosTab({
         if (presupuesto.tipo === 'nuevo') {
             window.open(`/comercial/presupuestos/${presupuesto.id}/pdf`, '_blank');
         } else {
-            window.open(`/presupuestos-legacy/${presupuesto.id}/pdf`, '_blank');
+            // Para archivos legacy: usamos la ruta pública de storage
+            window.open(`/storage/presupuestos_legacy/${presupuesto.id}.pdf`, '_blank');
         }
     };
 

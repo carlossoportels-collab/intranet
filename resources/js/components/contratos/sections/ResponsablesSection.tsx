@@ -1,10 +1,9 @@
 // resources/js/components/contratos/sections/ResponsablesSection.tsx
 import { router } from '@inertiajs/react';
-import { Plus, Trash2, User, Info, AlertCircle, Save, X } from 'lucide-react';
+import { Plus, Trash2, User, AlertCircle, Save, X } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { useToast } from '@/contexts/ToastContext';
-
 
 interface Props {
     responsables: any[];
@@ -24,8 +23,8 @@ export default function ResponsablesSection({
     const [showForm, setShowForm] = useState(false);
     const [nuevoResponsable, setNuevoResponsable] = useState({
         tipo_responsabilidad_id: '',
-        nombre: '',
-        apellido: '',
+        nombre_completo: '',  // ← Cambiado de nombre/apellido a nombre_completo
+        cargo: '',
         telefono: '',
         email: ''
     });
@@ -110,8 +109,8 @@ export default function ResponsablesSection({
             toast.error('Debe seleccionar un tipo de responsable');
             return;
         }
-        if (!nuevoResponsable.nombre || !nuevoResponsable.apellido) {
-            toast.error('Nombre y apellido son requeridos');
+        if (!nuevoResponsable.nombre_completo) {
+            toast.error('Nombre completo es requerido');
             return;
         }
 
@@ -120,8 +119,8 @@ export default function ResponsablesSection({
         router.post('/comercial/empresa/responsables', {
             empresa_id: empresaId,
             tipo_responsabilidad_id: nuevoResponsable.tipo_responsabilidad_id,
-            nombre: nuevoResponsable.nombre,
-            apellido: nuevoResponsable.apellido,
+            nombre_completo: nuevoResponsable.nombre_completo,  // ← Cambiado
+            cargo: nuevoResponsable.cargo,
             telefono: nuevoResponsable.telefono || null,
             email: nuevoResponsable.email || null
         }, {
@@ -138,8 +137,8 @@ export default function ResponsablesSection({
                         }
                         setNuevoResponsable({
                             tipo_responsabilidad_id: '',
-                            nombre: '',
-                            apellido: '',
+                            nombre_completo: '',
+                            cargo: '',
                             telefono: '',
                             email: ''
                         });
@@ -179,8 +178,8 @@ export default function ResponsablesSection({
     const cancelar = () => {
         setNuevoResponsable({
             tipo_responsabilidad_id: '',
-            nombre: '',
-            apellido: '',
+            nombre_completo: '',
+            cargo: '',
             telefono: '',
             email: ''
         });
@@ -233,30 +232,31 @@ export default function ResponsablesSection({
                                     ))}
                                 </select>
                             </div>
-                            <div>
+                            <div className="col-span-2">
                                 <label className="block text-xs text-gray-600 mb-1">
-                                    Nombre <span className="text-red-500">*</span>
+                                    Nombre Completo <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
-                                    value={nuevoResponsable.nombre}
-                                    onChange={(e) => handleInputChange('nombre', e.target.value)}
-                                    maxLength={100}
+                                    value={nuevoResponsable.nombre_completo}
+                                    onChange={(e) => handleInputChange('nombre_completo', e.target.value)}
+                                    maxLength={200}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                    placeholder="Nombre y apellido"
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="col-span-2">
                                 <label className="block text-xs text-gray-600 mb-1">
-                                    Apellido <span className="text-red-500">*</span>
+                                    Cargo
                                 </label>
                                 <input
                                     type="text"
-                                    value={nuevoResponsable.apellido}
-                                    onChange={(e) => handleInputChange('apellido', e.target.value)}
+                                    value={nuevoResponsable.cargo}
+                                    onChange={(e) => handleInputChange('cargo', e.target.value)}
                                     maxLength={100}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
-                                    required
+                                    placeholder="Ej: Gerente de flota"
                                 />
                             </div>
                             <div>
@@ -272,7 +272,7 @@ export default function ResponsablesSection({
                                     placeholder="Ej: 1144170730"
                                 />
                             </div>
-                            <div className="col-span-2">
+                            <div>
                                 <label className="block text-xs text-gray-600 mb-1">
                                     Email <span className="text-gray-400 text-[10px]">(opcional)</span>
                                 </label>
@@ -326,10 +326,16 @@ export default function ResponsablesSection({
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div>
+                                    <div className="col-span-2">
                                         <p className="text-xs text-gray-500">Nombre completo</p>
-                                        <p className="text-sm font-medium">{resp.nombre} {resp.apellido}</p>
+                                        <p className="text-sm font-medium">{resp.nombre_completo}</p>
                                     </div>
+                                    {resp.cargo && (
+                                        <div className="col-span-2">
+                                            <p className="text-xs text-gray-500">Cargo</p>
+                                            <p className="text-sm">{resp.cargo}</p>
+                                        </div>
+                                    )}
                                     {resp.telefono && (
                                         <div>
                                             <p className="text-xs text-gray-500">Teléfono</p>
@@ -337,7 +343,7 @@ export default function ResponsablesSection({
                                         </div>
                                     )}
                                     {resp.email && (
-                                        <div className="col-span-2">
+                                        <div>
                                             <p className="text-xs text-gray-500">Email</p>
                                             <p className="text-sm break-all">{resp.email}</p>
                                         </div>

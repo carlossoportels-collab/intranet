@@ -4,14 +4,15 @@ import {
     Search, Plus, Edit2, Trash2, Save, X, 
     Filter, Upload, Tag, Package, FileCheck, 
     Truck, DollarSign, AlertCircle, XCircle,
-    ChevronDown, ChevronUp
+    ChevronDown, ChevronUp, CheckCircle, XCircle as XIcon
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import CargarPreciosModal from '@/components/Modals/CargarPreciosModal';
 import CrearProductoModal from '@/components/Modals/CrearProductoModal';
 import Pagination from '@/components/ui/Pagination';
 import AppLayout from '@/layouts/app-layout';
+import { usePagination } from '@/hooks/usePagination';
 
 interface ProductoServicio {
     id: number;
@@ -22,6 +23,7 @@ interface ProductoServicio {
     tipo_id: number;
     compania_id: number;
     es_activo: boolean;
+    es_presupuestable: boolean;
     created: string;
     modified: string;
     tipo?: {
@@ -66,37 +68,37 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
     const [isCargarModalOpen, setIsCargarModalOpen] = useState(false);
     const [isCrearModalOpen, setIsCrearModalOpen] = useState(false);
 
-    // Paginación
-    const [currentPage, setCurrentPage] = useState(1);
-    const [perPage] = useState(10);
+
+
+    useEffect(() => {
+        pagination.goToPage(1);
+    }, [searchTerm, selectedTipo, selectedCompania]);
 
     // Filtrar productos
-    const productosFiltrados = productos_servicios.filter(p => {
-        if (selectedCompania !== 'todos' && p.compania_id !== parseInt(selectedCompania)) return false;
-        if (selectedTipo !== 'todos' && p.tipo_id !== parseInt(selectedTipo)) return false;
-        
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            return p.nombre.toLowerCase().includes(term) || 
-                   p.codigopro.toLowerCase().includes(term) ||
-                   (p.descripcion && p.descripcion.toLowerCase().includes(term));
-        }
-        
-        return true;
-    });
+    const productosFiltrados = React.useMemo(() => {
+        return productos_servicios.filter(p => {
+            if (selectedCompania !== 'todos' && p.compania_id !== parseInt(selectedCompania)) return false;
+            if (selectedTipo !== 'todos' && p.tipo_id !== parseInt(selectedTipo)) return false;
+            
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                return p.nombre.toLowerCase().includes(term) || 
+                       p.codigopro.toLowerCase().includes(term) ||
+                       (p.descripcion && p.descripcion.toLowerCase().includes(term));
+            }
+            
+            return true;
+        }).map(p => ({
+            ...p,
+            tipoNombre: tipos.find(t => t.id === p.tipo_id)?.nombre_tipo_abono || 'Sin tipo'
+        }));
+    }, [productos_servicios, searchTerm, selectedTipo, selectedCompania, tipos]);
 
-    // Aplanar productos para paginación
-    const todosProductos = productosFiltrados.map(p => ({
-        ...p,
-        tipoNombre: tipos.find(t => t.id === p.tipo_id)?.nombre_tipo_abono || 'Sin tipo'
-    }));
-    
-    // Paginación
-    const totalProductos = todosProductos.length;
-    const lastPage = Math.ceil(totalProductos / perPage);
-    const startIndex = (currentPage - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    const productosPaginados = todosProductos.slice(startIndex, endIndex);
+        // Resetear a página 1 cuando cambian los filtros
+    const pagination = usePagination({
+        items: productosFiltrados,
+        initialItemsPerPage: 10
+    });
 
     const toggleMobileExpand = (id: number) => {
         setMobileExpanded(prev => ({
@@ -111,7 +113,8 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
             nombre: producto.nombre,
             descripcion: producto.descripcion,
             precio: producto.precio,
-            es_activo: producto.es_activo
+            es_activo: producto.es_activo,
+            es_presupuestable: producto.es_presupuestable
         });
     };
 
@@ -136,13 +139,18 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
         });
     };
 
+    const togglePresupuestable = (producto: ProductoServicio) => {
+        router.put(`/config/tarifas/${producto.id}/toggle-presupuestable`, {}, {
+            preserveScroll: true
+        });
+    };
+
     const limpiarFiltros = () => {
         setSearchTerm('');
         setSelectedTipo('todos');
         if (permisos.puede_ver_todas) {
             setSelectedCompania('todos');
         }
-        setCurrentPage(1);
     };
 
     const hayFiltrosActivos = () => {
@@ -182,7 +190,7 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                     </p>
                 </div>
 
-                {/* Filtros - Totalmente responsive */}
+                {/* Filtros */}
                 <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                     <div className="space-y-3">
                         {/* Primera fila de filtros */}
@@ -222,7 +230,7 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                                 </select>
                             )}
 
-                            {/* Botones de acción - Móvil: 2 columnas, Desktop: flex */}
+                            {/* Botones de acción */}
                             <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2">
                                 <button
                                     onClick={() => setIsCrearModalOpen(true)}
@@ -256,7 +264,7 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                         {hayFiltrosActivos() && (
                             <div className="flex flex-wrap items-center gap-2 pt-2 text-xs sm:text-sm text-gray-600 border-t border-gray-100">
                                 <Filter className="h-4 w-4" />
-                                <span>{totalProductos} productos</span>
+                                <span>{pagination.totalItems} productos</span>
                                 {selectedCompania !== 'todos' && (
                                     <span className="px-2 py-1 bg-gray-100 rounded-full">
                                         {companias.find(c => c.id === parseInt(selectedCompania))?.nombre}
@@ -288,12 +296,13 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
+                                    {/*<th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>*/}
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Presupuestable</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {productosPaginados.map((producto) => (
+                                {pagination.paginatedItems.map((producto) => (
                                     <tr key={producto.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center gap-2">
@@ -345,7 +354,7 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                                      {/*  <td className="px-6 py-4 whitespace-nowrap text-center">
                                             <button
                                                 onClick={() => toggleActivo(producto)}
                                                 className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -355,6 +364,28 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                                                 }`}
                                             >
                                                 {producto.es_activo ? 'Activo' : 'Inactivo'}
+                                            </button>
+                                        </td>*/}
+                                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <button
+                                                onClick={() => togglePresupuestable(producto)}
+                                                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                    producto.es_presupuestable
+                                                        ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {producto.es_presupuestable ? (
+                                                    <span className="flex items-center gap-1">
+                                                        <CheckCircle className="h-3 w-3" />
+                                                        Sí
+                                                    </span>
+                                                ) : (
+                                                    <span className="flex items-center gap-1">
+                                                        <XIcon className="h-3 w-3" />
+                                                        No
+                                                    </span>
+                                                )}
                                             </button>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -394,9 +425,9 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
 
                 {/* Vista Móvil: Cards */}
                 <div className="md:hidden space-y-3">
-                    {productosPaginados.map((producto) => (
+                    {pagination.paginatedItems.map((producto) => (
                         <div key={producto.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                            {/* Cabecera de la card - Siempre visible */}
+                            {/* Cabecera de la card */}
                             <div 
                                 className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
                                 onClick={() => toggleMobileExpand(producto.id)}
@@ -425,13 +456,11 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                             {/* Contenido expandible */}
                             {mobileExpanded[producto.id] && (
                                 <div className="p-4 border-t border-gray-100 bg-gray-50 space-y-3">
-                                    {/* Tipo */}
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-600">Tipo:</span>
                                         <span className="font-medium text-gray-900">{producto.tipoNombre}</span>
                                     </div>
 
-                                    {/* Descripción */}
                                     <div className="text-sm">
                                         <span className="text-gray-600 block mb-1">Descripción:</span>
                                         <p className="text-gray-900 bg-white p-2 rounded border border-gray-200">
@@ -439,10 +468,16 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                                         </p>
                                     </div>
 
-                                    {/* Precio */}
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-600">Precio:</span>
                                         <span className="font-bold text-local">{formatCurrency(producto.precio)}</span>
+                                    </div>
+
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">Presupuestable:</span>
+                                        <span className={`font-medium ${producto.es_presupuestable ? 'text-blue-600' : 'text-gray-500'}`}>
+                                            {producto.es_presupuestable ? 'Sí' : 'No'}
+                                        </span>
                                     </div>
 
                                     {/* Acciones */}
@@ -474,6 +509,16 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                                                     Editar
                                                 </button>
                                                 <button
+                                                    onClick={() => togglePresupuestable(producto)}
+                                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm ${
+                                                        producto.es_presupuestable
+                                                            ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    {producto.es_presupuestable ? 'Quitar de presupuestos' : 'Agregar a presupuestos'}
+                                                </button>
+                                                <button
                                                     onClick={() => {
                                                         if (confirm('¿Eliminar este producto?')) {
                                                             router.delete(`/config/tarifas/${producto.id}`, { preserveScroll: true });
@@ -494,20 +539,21 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                 </div>
 
                 {/* Paginación */}
-                {totalProductos > 0 && (
+                {pagination.totalItems > 0 && (
                     <div className="mt-6">
                         <Pagination
-                            currentPage={currentPage}
-                            lastPage={lastPage}
-                            total={totalProductos}
-                            perPage={perPage}
-                            onPageChange={setCurrentPage}
+                            currentPage={pagination.currentPage}
+                            lastPage={pagination.totalPages}
+                            total={pagination.totalItems}
+                            perPage={pagination.itemsPerPage}
+                            onPageChange={pagination.goToPage}
+                            useLinks={false}
                         />
                     </div>
                 )}
 
                 {/* Empty state */}
-                {totalProductos === 0 && (
+                {pagination.totalItems === 0 && (
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
                         <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 mb-2">No hay resultados</h3>
@@ -525,19 +571,19 @@ export default function TarifasIndex({ productos_servicios, tipos, companias, pe
                     </div>
                 )}
             </div>
+
             <CargarPreciosModal
                 isOpen={isCargarModalOpen}
                 onClose={() => setIsCargarModalOpen(false)}
                 onSuccess={() => {
-                    // Recargar la página para mostrar los nuevos precios
                     window.location.reload();
                 }}
             />
+            
             <CrearProductoModal
                 isOpen={isCrearModalOpen}
                 onClose={() => setIsCrearModalOpen(false)}
                 onSuccess={() => {
-                    // Recargar la página o actualizar la lista
                     window.location.reload();
                 }}
                 tipos={tipos}

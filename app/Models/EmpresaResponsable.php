@@ -1,5 +1,4 @@
 <?php
-// app/Models/EmpresaResponsable.php
 
 namespace App\Models;
 
@@ -10,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EmpresaResponsable extends Model
 {
     use SoftDeletes;
-
+    
     protected $table = 'empresa_responsables';
     
     const CREATED_AT = 'created';
@@ -19,77 +18,63 @@ class EmpresaResponsable extends Model
     
     protected $fillable = [
         'empresa_id',
-        'tipo_responsabilidad_id',
-        'nombre',
-        'apellido',
+        'nombre_completo',  // Cambiado de nombre/apellido a nombre_completo
+        'cargo',
         'telefono',
         'email',
+        'tipo_responsabilidad_id',
         'es_activo',
         'created_by',
         'modified_by',
         'deleted_by'
     ];
-
+    
     protected $casts = [
         'es_activo' => 'boolean',
         'created' => 'datetime',
-        'modified' => 'datetime',
-        'deleted_at' => 'datetime'
+        'modified' => 'datetime'
     ];
-
-    /**
-     * Relación con la empresa
-     */
-    public function empresa(): BelongsTo
+    
+    // Relaciones
+    public function empresa()
     {
         return $this->belongsTo(Empresa::class, 'empresa_id');
     }
-
-    /**
-     * Relación con el tipo de responsabilidad
-     */
-    public function tipoResponsabilidad(): BelongsTo
+    
+    public function tipoResponsabilidad()
     {
         return $this->belongsTo(TipoResponsabilidad::class, 'tipo_responsabilidad_id');
     }
-
-    /**
-     * Usuario que creó el registro
-     */
-    public function creadoPor(): BelongsTo
+    
+    public function creadoPor()
     {
-        return $this->belongsTo(Usuario::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by');
     }
-
-    /**
-     * Usuario que modificó el registro
-     */
-    public function modificadoPor(): BelongsTo
+    
+    public function modificadoPor()
     {
-        return $this->belongsTo(Usuario::class, 'modified_by');
+        return $this->belongsTo(User::class, 'modified_by');
     }
-
-    /**
-     * Usuario que eliminó el registro
-     */
-    public function eliminadoPor(): BelongsTo
+    
+    public function eliminadoPor()
     {
-        return $this->belongsTo(Usuario::class, 'deleted_by');
+        return $this->belongsTo(User::class, 'deleted_by');
     }
-
-    /**
-     * Scope para responsables activos
-     */
+    
+    // Scopes
     public function scopeActivo($query)
     {
         return $query->where('es_activo', true);
     }
-
-    /**
-     * Accessor para nombre completo
-     */
-    public function getNombreCompletoAttribute(): string
+    
+    public function scopeDeEmpresa($query, $empresaId)
     {
-        return trim($this->nombre . ' ' . $this->apellido);
+        return $query->where('empresa_id', $empresaId);
+    }
+    
+    // Accessors
+    public function getEstadoAttribute(): string
+    {
+        return $this->es_activo ? 'Activo' : 'Inactivo';
     }
 }

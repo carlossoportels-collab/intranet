@@ -10,7 +10,9 @@ interface PrevisualizacionItem {
     precio_nuevo: number;
     diferencia: number;
     diferencia_porcentaje: number;
+    total_instancias: number;
 }
+
 
 interface CargarPreciosModalProps {
     isOpen: boolean;
@@ -268,6 +270,11 @@ export default function CargarPreciosModal({ isOpen, onClose, onSuccess }: Carga
                                                     <div className="flex-1">
                                                         <div className="font-medium text-sm">{item.codigopro}</div>
                                                         <div className="text-xs text-gray-500 truncate">{item.nombre}</div>
+                                                        {item.total_instancias > 1 && (
+                                                            <div className="text-xs text-blue-600 mt-1">
+                                                                {item.total_instancias} productos con este código
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div className="text-right">
                                                         <div className="text-sm line-through text-gray-400">

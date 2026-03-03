@@ -72,4 +72,10 @@ class Comercial extends Model
         }
         return 'Comercial #' . $this->id;
     }
+
+    public function compania(): BelongsTo
+    {
+    return $this->belongsTo(Compania::class, 'compania_id');
+    }
+
 }

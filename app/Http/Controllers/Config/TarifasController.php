@@ -101,6 +101,7 @@ class TarifasController extends Controller
                 },
             ],
             'es_activo' => 'boolean',
+            'es_presupuestable' => 'boolean',
         ]);
 
         // Agregar timestamps
@@ -141,6 +142,7 @@ class TarifasController extends Controller
             'descripcion' => 'nullable|string',
             'precio' => 'required|numeric|min:0',
             'es_activo' => 'boolean',
+            'es_presupuestable' => 'boolean',
         ]);
 
         // Actualizar modified
@@ -169,7 +171,7 @@ class TarifasController extends Controller
             }
         }
 
-        // Toggle estado
+        // Toggle estado activo
         $producto->es_activo = !$producto->es_activo;
         $producto->modified = now();
         $producto->modified_by = $usuario->id;
@@ -177,6 +179,32 @@ class TarifasController extends Controller
 
         $estado = $producto->es_activo ? 'activado' : 'desactivado';
         return redirect()->back()->with('success', "Producto {$estado} correctamente.");
+    }
+
+    /**
+     * Toggle presupuestable status.
+     */
+    public function togglePresupuestable($id)
+    {
+        $usuario = Auth::user();
+        $producto = ProductoServicio::findOrFail($id);
+        
+        // Verificar permisos de compañía
+        if (!$usuario->ve_todas_cuentas) {
+            $companiasPermitidas = PermissionHelper::getCompaniasPermitidas();
+            if (!in_array($producto->compania_id, $companiasPermitidas)) {
+                abort(403, 'No tiene permisos para modificar este producto.');
+            }
+        }
+
+        // Toggle estado presupuestable
+        $producto->es_presupuestable = !$producto->es_presupuestable;
+        $producto->modified = now();
+        $producto->modified_by = $usuario->id;
+        $producto->save();
+
+        $estado = $producto->es_presupuestable ? 'habilitado' : 'deshabilitado';
+        return redirect()->back()->with('success', "Producto {$estado} para presupuestos correctamente.");
     }
 
     /**
@@ -247,8 +275,8 @@ public function procesarArchivo(Request $request)
     try {
         // Obtener TODOS los productos activos de la base de datos
         $productosDB = ProductoServicio::where('es_activo', 1)
-            ->get(['id', 'codigopro', 'nombre', 'precio'])
-            ->keyBy('codigopro');
+            ->with('compania:id,nombre')
+            ->get(['id', 'codigopro', 'nombre', 'precio', 'compania_id']);
         
         if ($productosDB->isEmpty()) {
             return response()->json([
@@ -272,7 +300,7 @@ public function procesarArchivo(Request $request)
             ], 422);
         }
         
-        // Crear un mapa de precios del archivo
+        // Crear un mapa de precios del archivo (por código)
         $preciosArchivo = [];
         for ($i = 1; $i < count($rows); $i++) {
             $row = $rows[$i];
@@ -289,12 +317,19 @@ public function procesarArchivo(Request $request)
             }
         }
         
-        // SOLO procesar productos que existen en la BD
+        // Procesar TODOS los productos de la BD (incluyendo duplicados por código)
         $productosParaActualizar = [];
         $preciosSinCambio = [];
-        $productosNoEnArchivo = []; // Productos en BD pero no en el archivo
+        $productosPorCodigo = [];
         
-        foreach ($productosDB as $codigopro => $producto) {
+        // Agrupar productos por código para mejor visualización
+        foreach ($productosDB as $producto) {
+            $productosPorCodigo[$producto->codigopro][] = $producto;
+        }
+        
+        foreach ($productosDB as $producto) {
+            $codigopro = $producto->codigopro;
+            
             if (isset($preciosArchivo[$codigopro])) {
                 $precioNuevo = $preciosArchivo[$codigopro];
                 $precioActual = floatval($producto->precio);
@@ -308,6 +343,7 @@ public function procesarArchivo(Request $request)
                         'id' => $producto->id,
                         'codigopro' => $codigopro,
                         'nombre' => $producto->nombre,
+                        'compania_id' => $producto->compania_id,
                         'precio_actual' => $precioActual,
                         'precio_nuevo' => $precioNuevo,
                         'diferencia' => $precioNuevo - $precioActual,
@@ -318,9 +354,22 @@ public function procesarArchivo(Request $request)
                 } else {
                     $preciosSinCambio[] = $codigopro;
                 }
-            } else {
-                $productosNoEnArchivo[] = $codigopro;
             }
+        }
+        
+        // Agrupar por código para mostrar mejor la información
+        $productosAgrupados = [];
+        foreach ($productosParaActualizar as $item) {
+            $codigo = $item['codigopro'];
+            if (!isset($productosAgrupados[$codigo])) {
+                $productosAgrupados[$codigo] = [
+                    'codigopro' => $codigo,
+                    'nombre' => $item['nombre'],
+                    'precio_nuevo' => $item['precio_nuevo'],
+                    'instancias' => []
+                ];
+            }
+            $productosAgrupados[$codigo]['instancias'][] = $item;
         }
         
         // Guardar datos en sesión para confirmación
@@ -328,13 +377,30 @@ public function procesarArchivo(Request $request)
             session(['precios_a_actualizar' => $productosParaActualizar]);
         }
         
+        // Preparar previews agrupados
+        $previews = [];
+        foreach ($productosAgrupados as $codigo => $grupo) {
+            $primerItem = $grupo['instancias'][0];
+            $totalInstancias = count($grupo['instancias']);
+            
+            $previews[] = [
+                'codigopro' => $codigo,
+                'nombre' => $grupo['nombre'] . ($totalInstancias > 1 ? " ({$totalInstancias} productos)" : ''),
+                'precio_actual' => $primerItem['precio_actual'],
+                'precio_nuevo' => $grupo['precio_nuevo'],
+                'diferencia' => $primerItem['diferencia'],
+                'diferencia_porcentaje' => $primerItem['diferencia_porcentaje'],
+                'total_instancias' => $totalInstancias
+            ];
+        }
+        
         return response()->json([
             'total_en_bd' => $productosDB->count(),
             'productos_en_archivo' => count($preciosArchivo),
             'productos_a_actualizar' => count($productosParaActualizar),
             'productos_sin_cambio' => count($preciosSinCambio),
-            'productos_no_en_archivo' => count($productosNoEnArchivo),
-            'previews' => array_slice($productosParaActualizar, 0, 10), // Mostrar primeros 10
+            'codigos_unicos_a_actualizar' => count($productosAgrupados),
+            'previews' => array_slice($previews, 0, 10),
             'requiere_confirmacion' => count($productosParaActualizar) > 0,
         ]);
         
@@ -358,45 +424,30 @@ private function convertirFormatoArgentino($valor)
     
     $valor = trim(strval($valor));
     
-    // Si está vacío o es nulo, retornar 0
     if (empty($valor)) {
         return 0;
     }
     
-    // 1. Primero, quitamos los puntos que son separadores de miles (si tienen coma decimal)
     if (strpos($valor, ',') !== false) {
-        // Formato argentino: tiene coma como decimal
-        // Quitar todos los puntos (separadores de miles)
         $valor = str_replace('.', '', $valor);
-        // Reemplazar coma por punto
         $valor = str_replace(',', '.', $valor);
     } else {
-        // No tiene coma, podría tener puntos como decimales o como separadores
-        // Contar puntos
         $puntos = substr_count($valor, '.');
         
         if ($puntos === 1) {
-            // Un solo punto: probablemente es decimal, dejar como está
             // No hacer nada
         } elseif ($puntos > 1) {
-            // Múltiples puntos: son separadores de miles, quitarlos
             $valor = str_replace('.', '', $valor);
         }
     }
     
-    // 2. Quitar espacios (separadores de miles)
     $valor = str_replace(' ', '', $valor);
-    
-    // 3. Convertir a float
     $resultado = floatval($valor);
-    
-    // Log para debug (opcional)
-    // \Log::info('Conversión de precio', ['original' => $original, 'convertido' => $resultado]);
     
     return $resultado;
 }
 
-/**
+    /**
  * Confirmar y ejecutar la actualización de precios
  */
 public function confirmarActualizacion(Request $request)
@@ -431,7 +482,6 @@ public function confirmarActualizacion(Request $request)
         
         DB::commit();
         
-        // Limpiar sesión
         session()->forget('precios_a_actualizar');
         
         return response()->json([
@@ -447,5 +497,5 @@ public function confirmarActualizacion(Request $request)
             'error' => 'Error al actualizar: ' . $e->getMessage()
         ], 500);
     }
-    }
+}
 }

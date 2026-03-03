@@ -37,16 +37,47 @@ export const PDFGenerator: React.FC<Props> = ({
                 const margin = 15;
                 let yPos = 20;
 
-                // ===== HEADER =====
-                // Logo
-                if (presupuesto.compania?.logo) {
-                    try {
-                        const logo = new Image();
-                        logo.src = presupuesto.compania.logo;
-                        doc.addImage(logo, 'JPEG', margin, yPos - 5, 45, 18, undefined, 'FAST');
-                    } catch (e) {
+            // ===== HEADER =====
+            if (presupuesto.compania?.logo) {
+                try {
+                    const logo = new Image();
+                    logo.src = presupuesto.compania.logo;
+                    await new Promise((resolve, reject) => {
+                        logo.onload = resolve;
+                        logo.onerror = reject;
+                    });
+                    
+                    const maxHeight = 25; // Altura máxima en mm
+                    const maxWidth = 58; // Ancho máximo en mm
+                    
+                    // Calcular ratio de aspecto
+                    const aspectRatio = logo.width / logo.height;
+                    
+                    let finalWidth = maxWidth;
+                    let finalHeight = maxHeight;
+                    
+                    // Ajustar según la orientación del logo
+                    if (aspectRatio > 1) {
+                        // Logo más ancho que alto
+                        finalHeight = maxWidth / aspectRatio;
+                        if (finalHeight > maxHeight) {
+                            finalHeight = maxHeight;
+                            finalWidth = maxHeight * aspectRatio;
+                        }
+                    } else {
+                        // Logo más alto que ancho
+                        finalWidth = maxHeight * aspectRatio;
+                        if (finalWidth > maxWidth) {
+                            finalWidth = maxWidth;
+                            finalHeight = maxWidth / aspectRatio;
+                        }
                     }
+                    
+                    doc.addImage(logo, 'JPEG', margin, yPos - 5, finalWidth, finalHeight, undefined, 'FAST');
+                } catch (e) {
+                    console.error('Error cargando logo:', e);
                 }
+            }
 
                 // Título
                 doc.setFontSize(20);
