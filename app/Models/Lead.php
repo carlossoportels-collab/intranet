@@ -160,13 +160,24 @@ class Lead extends Model
     
     public function presupuestosLegacy()
     {
-    return $this->hasMany(PresupuestoLegacy::class, 'lead_id');
+        return $this->hasMany(PresupuestoLegacy::class, 'lead_id');
+    }
+
+    public function contratoLegacy()
+    {
+        return $this->hasMany(ContratoLegacy::class, 'lead_id');
     }
 
     public function empresaContacto(): HasOne
-{
-    return $this->hasOne(EmpresaContacto::class, 'lead_id')
-                ->where('es_activo', true);
-}
+    {
+        return $this->hasOne(EmpresaContacto::class, 'lead_id')
+                    ->where('es_activo', true);
+    }
+
+    // Y este accessor para obtener la empresa directamente
+    public function getEmpresaAttribute()
+    {
+        return $this->empresaContacto?->empresa;
+    }
 
 }

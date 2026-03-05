@@ -954,4 +954,159 @@ public function storeFromEmpresa(Request $request)
         return back()->withErrors(['error' => 'Error al generar contrato: ' . $e->getMessage()]);
     }
 }
+
+/**
+ * Crear contrato desde lead - Redirige al formulario de creación
+ */
+public function createFromLead($presupuestoId)
+{
+    try {
+        $presupuesto = Presupuesto::with([
+            'lead.localidad.provincia',
+            'lead.rubro',
+            'lead.origen',
+            'prefijo.comercial.personal',
+            'promocion.productos',
+            'agregados' => function($query) {
+                $query->with('productoServicio.tipo');
+            },
+            'tasa',
+            'abono',
+            'tasaMetodoPago',
+            'abonoMetodoPago'
+        ])->findOrFail($presupuestoId);
+
+        // Buscar la empresa a través del lead - IGUAL QUE EN EL CREATE ORIGINAL
+        $empresa = Empresa::with([
+            'localidadFiscal.provincia',
+            'rubro',
+            'categoriaFiscal',
+            'plataforma'
+        ])->whereHas('contactos', function($q) use ($presupuesto) {
+            $q->where('lead_id', $presupuesto->lead_id);
+        })->first();
+
+        // Buscar el contacto principal - IGUAL QUE EN EL CREATE ORIGINAL
+        $contacto = EmpresaContacto::with([
+            'tipoResponsabilidad',
+            'tipoDocumento',
+            'nacionalidad'
+        ])->where('lead_id', $presupuesto->lead_id)
+            ->where('es_contacto_principal', true)
+            ->first();
+
+        // Si no hay contacto principal, tomar el primer contacto
+        if (!$contacto) {
+            $contacto = EmpresaContacto::with([
+                'tipoResponsabilidad',
+                'tipoDocumento',
+                'nacionalidad'
+            ])->where('lead_id', $presupuesto->lead_id)
+                ->first();
+        }
+
+        if (!$empresa || !$contacto) {
+            return redirect()->back()->with('error', 'La empresa o contacto no están correctamente configurados');
+        }
+
+        // Forzar la carga de los nombres de localidad y provincia
+        if ($presupuesto->lead && $presupuesto->lead->localidad) {
+            $presupuesto->lead->localidad_nombre = $presupuesto->lead->localidad->nombre;
+            if ($presupuesto->lead->localidad->provincia) {
+                $presupuesto->lead->provincia_nombre = $presupuesto->lead->localidad->provincia->nombre;
+            }
+        }
+
+        if ($empresa->localidadFiscal) {
+            $empresa->localidad_fiscal_nombre = $empresa->localidadFiscal->nombre;
+            if ($empresa->localidadFiscal->provincia) {
+                $empresa->provincia_fiscal_nombre = $empresa->localidadFiscal->provincia->nombre;
+            }
+        }
+
+        // Obtener responsables activos
+        $responsables = EmpresaResponsable::where('empresa_id', $empresa->id)
+            ->where('es_activo', true)
+            ->with('tipoResponsabilidad')
+            ->get();
+
+        // Datos para los selects
+        $tiposResponsabilidad = TipoResponsabilidad::where('es_activo', true)->get();
+        $tiposDocumento = TipoDocumento::where('es_activo', true)->get();
+        $nacionalidades = Nacionalidad::where('activo', true)
+            ->orderBy('pais')
+            ->get(['id', 'pais', 'gentilicio']);
+        $categoriasFiscales = CategoriaFiscal::where('es_activo', true)->get();
+        $plataformas = Plataforma::where('es_activo', true)->get();
+        $rubros = Rubro::where('activo', true)->get();
+        $provincias = Provincia::where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
+        return Inertia::render('Comercial/Contratos/Create', [
+            'presupuesto' => $presupuesto,
+            'empresa' => $empresa,
+            'contacto' => $contacto,
+            'responsables' => $responsables,
+            'tiposResponsabilidad' => $tiposResponsabilidad,
+            'tiposDocumento' => $tiposDocumento,
+            'nacionalidades' => $nacionalidades,
+            'categoriasFiscales' => $categoriasFiscales,
+            'plataformas' => $plataformas,
+            'rubros' => $rubros,
+            'provincias' => $provincias,
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Error al preparar creación de contrato desde lead:', [
+            'error' => $e->getMessage(),
+            'presupuesto_id' => $presupuestoId,
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return redirect()->back()->with('error', 'Error al preparar el contrato: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Método auxiliar para verificar que todos los datos necesarios están completos
+ */
+private function verificarDatosCompletos($empresa, $contacto, $lead)
+{
+    $camposRequeridos = [
+        'empresa' => ['nombre_fantasia', 'razon_social', 'cuit', 'direccion_fiscal', 
+                     'codigo_postal_fiscal', 'localidad_fiscal_id', 'telefono_fiscal', 
+                     'email_fiscal', 'rubro_id', 'cat_fiscal_id', 'plataforma_id', 'nombre_flota'],
+        'contacto' => ['tipo_responsabilidad_id', 'tipo_documento_id', 'nro_documento', 
+                      'nacionalidad_id', 'fecha_nacimiento', 'direccion_personal', 'codigo_postal_personal'],
+        'lead' => ['nombre_completo', 'genero', 'telefono', 'email', 'localidad_id', 'rubro_id', 'origen_id']
+    ];
+
+    $faltantes = [];
+
+    foreach ($camposRequeridos['empresa'] as $campo) {
+        if (empty($empresa->$campo)) {
+            $faltantes[] = "empresa.{$campo}";
+        }
+    }
+
+    foreach ($camposRequeridos['contacto'] as $campo) {
+        if (empty($contacto->$campo)) {
+            $faltantes[] = "contacto.{$campo}";
+        }
+    }
+
+    foreach ($camposRequeridos['lead'] as $campo) {
+        if (empty($lead->$campo)) {
+            $faltantes[] = "lead.{$campo}";
+        }
+    }
+
+    if (!empty($faltantes)) {
+        throw new \Exception('Faltan datos requeridos: ' . implode(', ', $faltantes));
+    }
+
+    return true;
+}
+
 }

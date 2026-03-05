@@ -41,6 +41,8 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\RRHH\Equipos\TecnicoController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\PresupuestoLegacyController;
+use App\Http\Controllers\ContratoLegacyController;
+
 
 // ==================== NUEVOS CONTROLADORES PARA CONTRATOS ====================
 use App\Http\Controllers\Comercial\Utils\TipoResponsabilidadController;
@@ -169,10 +171,18 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::get('/tiempos-estados', [ProspectosController::class, 'tiemposEntreEstados'])->name('leads.tiempos-estados');
             Route::get('/comentarios-modal-data', [ProspectosController::class, 'comentariosModalData'])->name('leads.comentarios-modal-data');
             Route::get('/datos-alta', [App\Http\Controllers\Comercial\Utils\LeadDataController::class, 'getDatosAlta']);
+            
+            // 🔹 RUTA CORREGIDA - Usamos {lead} pero con el modelo importado en el controlador
+            Route::get('/verificar-datos-contrato', [LeadController::class, 'verificarDatosContrato'])->name('comercial.leads.verificar-datos-contrato');
         });
-        
-            Route::get('/leads', [LeadController::class, 'index'])->name('comercial.leads.index');
-            Route::post('/leads', [LeadController::class, 'store'])->name('comercial.leads.store');
+
+        // Rutas existentes fuera del grupo
+        Route::get('/leads', [LeadController::class, 'index'])->name('comercial.leads.index');
+        Route::post('/leads', [LeadController::class, 'store'])->name('comercial.leads.store');
+
+        // Ruta para crear contrato desde lead
+        Route::get('/contratos/create-from-lead/{presupuestoId}', [App\Http\Controllers\Comercial\ContratoController::class, 'createFromLead'])
+            ->name('comercial.contratos.create-from-lead');
 
         // ========== LEADS PERDIDOS CON PARÁMETROS ==========
         Route::prefix('leads-perdidos/{lead}')->group(function () {
@@ -276,8 +286,53 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         Route::get('/{id}/descargar', [PresupuestoLegacyController::class, 'descargarPdf'])->name('presupuestos-legacy.descargar');
     });
     
+    // ==================== CONTRATOS LEGACY ====================
+    Route::prefix('contratos-legacy')->middleware(['auth'])->group(function () {
+        Route::get('/{id}/pdf', [ContratoLegacyController::class, 'verPdf'])->name('contratos-legacy.pdf');
+        Route::get('/{id}/descargar', [ContratoLegacyController::class, 'descargarPdf'])->name('contratos-legacy.descargar');
+    });
+
     // ==================== FALLBACK ====================
     Route::fallback(function () {
         return Inertia::render('Errors/404');
     });
+
+
+
+Route::get('/test-403', function () {
+    return Inertia::render('Errors/403', [
+        'status' => 403,
+        'message' => 'No tienes permisos para acceder a esta página.'
+    ]);
+})->name('test.403');
+
+Route::get('/test-404', function () {
+    return Inertia::render('Errors/404', [
+        'status' => 404,
+        'message' => 'La página que buscas no existe.'
+    ]);
+})->name('test.404');
+
+Route::get('/test-419', function () {
+    return Inertia::render('Errors/419', [
+        'status' => 419,
+        'message' => 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+    ]);
+})->name('test.419');
+
+Route::get('/test-500', function () {
+    return Inertia::render('Errors/500', [
+        'status' => 500,
+        'message' => 'Ha ocurrido un error interno en el servidor.'
+    ]);
+})->name('test.500');
+
+Route::get('/test-503', function () {
+    return Inertia::render('Errors/503', [
+        'status' => 503,
+        'message' => 'El sitio está en mantenimiento. Por favor, intenta más tarde.'
+    ]);
+})->name('test.503');
+
+
 });

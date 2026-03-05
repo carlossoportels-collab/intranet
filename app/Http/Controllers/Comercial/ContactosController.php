@@ -49,7 +49,7 @@ class ContactosController extends Controller
         return $query;
     }
 
-  public function index(Request $request)
+    public function index(Request $request)
     {
         $usuario = auth()->user();
         
@@ -142,9 +142,10 @@ class ContactosController extends Controller
         // Obtener IDs de leads de los contactos para los conteos
         $leadIds = $contactos->pluck('lead_id')->filter()->values()->toArray();
         
-        // Usar el LeadFilterService para obtener los conteos (incluye legacy)
+        // Usar el LeadFilterService para obtener los conteos
         $comentariosPorLead = $this->filterService->getConteoComentarios($leadIds);
         $presupuestosPorLead = $this->filterService->getConteoPresupuestos($leadIds);
+        $contratosPorLead = $this->getConteoContratos($leadIds);  // ← NUEVO
         
         return Inertia::render('Comercial/Contactos', [
             'contactos' => $contactos,
@@ -165,6 +166,7 @@ class ContactosController extends Controller
             ],
             'comentariosPorLead' => $comentariosPorLead,
             'presupuestosPorLead' => $presupuestosPorLead,
+            'contratosPorLead' => $contratosPorLead, // ← NUEVO
         ]);
     }
     
@@ -467,79 +469,117 @@ class ContactosController extends Controller
     }
 
     /**
- * Obtener conteo de comentarios (incluyendo legacy)
- */
-private function getConteoComentarios(array $leadIds): array
-{
-    if (empty($leadIds)) {
-        return [];
-    }
-
-    // Comentarios actuales
-    $comentariosActuales = DB::table('comentarios')
-        ->select('lead_id', DB::raw('COUNT(*) as total'))
-        ->whereIn('lead_id', $leadIds)
-        ->whereNull('deleted_at')
-        ->groupBy('lead_id')
-        ->pluck('total', 'lead_id')
-        ->toArray();
-
-    // Comentarios legacy
-    $comentariosLegacy = DB::table('comentarios_legacy')
-        ->select('lead_id', DB::raw('COUNT(*) as total'))
-        ->whereIn('lead_id', $leadIds)
-        ->groupBy('lead_id')
-        ->pluck('total', 'lead_id')
-        ->toArray();
-
-    // Combinar
-    $resultado = [];
-    foreach ($leadIds as $leadId) {
-        $total = ($comentariosActuales[$leadId] ?? 0) + ($comentariosLegacy[$leadId] ?? 0);
-        if ($total > 0) {
-            $resultado[$leadId] = $total;
+     * Obtener conteo de comentarios (incluyendo legacy)
+     */
+    private function getConteoComentarios(array $leadIds): array
+    {
+        if (empty($leadIds)) {
+            return [];
         }
-    }
 
-    return $resultado;
-}
+        // Comentarios actuales
+        $comentariosActuales = DB::table('comentarios')
+            ->select('lead_id', DB::raw('COUNT(*) as total'))
+            ->whereIn('lead_id', $leadIds)
+            ->whereNull('deleted_at')
+            ->groupBy('lead_id')
+            ->pluck('total', 'lead_id')
+            ->toArray();
 
-/**
- * Obtener conteo de presupuestos (incluyendo legacy)
- */
-private function getConteoPresupuestos(array $leadIds): array
-{
-    if (empty($leadIds)) {
-        return [];
-    }
+        // Comentarios legacy
+        $comentariosLegacy = DB::table('comentarios_legacy')
+            ->select('lead_id', DB::raw('COUNT(*) as total'))
+            ->whereIn('lead_id', $leadIds)
+            ->groupBy('lead_id')
+            ->pluck('total', 'lead_id')
+            ->toArray();
 
-    // Presupuestos actuales
-    $presupuestosActuales = DB::table('presupuestos')
-        ->select('lead_id', DB::raw('COUNT(*) as total'))
-        ->whereIn('lead_id', $leadIds)
-        ->whereNull('deleted_at')
-        ->groupBy('lead_id')
-        ->pluck('total', 'lead_id')
-        ->toArray();
-
-    // Presupuestos legacy
-    $presupuestosLegacy = DB::table('presupuestos_legacy')
-        ->select('lead_id', DB::raw('COUNT(*) as total'))
-        ->whereIn('lead_id', $leadIds)
-        ->groupBy('lead_id')
-        ->pluck('total', 'lead_id')
-        ->toArray();
-
-    // Combinar
-    $resultado = [];
-    foreach ($leadIds as $leadId) {
-        $total = ($presupuestosActuales[$leadId] ?? 0) + ($presupuestosLegacy[$leadId] ?? 0);
-        if ($total > 0) {
-            $resultado[$leadId] = $total;
+        // Combinar
+        $resultado = [];
+        foreach ($leadIds as $leadId) {
+            $total = ($comentariosActuales[$leadId] ?? 0) + ($comentariosLegacy[$leadId] ?? 0);
+            if ($total > 0) {
+                $resultado[$leadId] = $total;
+            }
         }
+
+        return $resultado;
     }
 
-    return $resultado;
-}
+    /**
+     * Obtener conteo de presupuestos (incluyendo legacy)
+     */
+    private function getConteoPresupuestos(array $leadIds): array
+    {
+        if (empty($leadIds)) {
+            return [];
+        }
 
+        // Presupuestos actuales
+        $presupuestosActuales = DB::table('presupuestos')
+            ->select('lead_id', DB::raw('COUNT(*) as total'))
+            ->whereIn('lead_id', $leadIds)
+            ->whereNull('deleted_at')
+            ->groupBy('lead_id')
+            ->pluck('total', 'lead_id')
+            ->toArray();
+
+        // Presupuestos legacy
+        $presupuestosLegacy = DB::table('presupuestos_legacy')
+            ->select('lead_id', DB::raw('COUNT(*) as total'))
+            ->whereIn('lead_id', $leadIds)
+            ->groupBy('lead_id')
+            ->pluck('total', 'lead_id')
+            ->toArray();
+
+        // Combinar
+        $resultado = [];
+        foreach ($leadIds as $leadId) {
+            $total = ($presupuestosActuales[$leadId] ?? 0) + ($presupuestosLegacy[$leadId] ?? 0);
+            if ($total > 0) {
+                $resultado[$leadId] = $total;
+            }
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * Obtener conteo de contratos (nuevos + legacy) ← NUEVO
+     */
+    private function getConteoContratos(array $leadIds): array
+    {
+        if (empty($leadIds)) {
+            return [];
+        }
+
+        // Contratos nuevos
+        $contratosNuevos = DB::table('contratos')
+            ->select('lead_id', DB::raw('COUNT(*) as total'))
+            ->whereIn('lead_id', $leadIds)
+            ->where('activo', 1)
+            ->whereNull('deleted_at')
+            ->groupBy('lead_id')
+            ->pluck('total', 'lead_id')
+            ->toArray();
+
+        // Contratos legacy
+        $contratosLegacy = DB::table('contratos_legacy')
+            ->select('lead_id', DB::raw('COUNT(*) as total'))
+            ->whereIn('lead_id', $leadIds)
+            ->groupBy('lead_id')
+            ->pluck('total', 'lead_id')
+            ->toArray();
+
+        // Combinar
+        $resultado = [];
+        foreach ($leadIds as $leadId) {
+            $total = ($contratosNuevos[$leadId] ?? 0) + ($contratosLegacy[$leadId] ?? 0);
+            if ($total > 0) {
+                $resultado[$leadId] = $total;
+            }
+        }
+
+        return $resultado;
+    }
 }

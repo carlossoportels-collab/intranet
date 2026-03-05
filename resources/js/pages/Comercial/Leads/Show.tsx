@@ -1,6 +1,6 @@
 // resources/js/Pages/Comercial/Leads/Show.tsx
 import { Head, router } from '@inertiajs/react';
-import { User, MessageSquare, Bell, TrendingUp, FileText } from 'lucide-react';
+import { User, MessageSquare, Bell, TrendingUp, FileText, FileSignature } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import AltaEmpresaModal from '@/components/empresa/AltaEmpresaModal';
@@ -12,6 +12,7 @@ import InfoTab from '@/components/leads/tabs/InfoTab';
 import NotasTab from '@/components/leads/tabs/NotasTab';
 import NotificacionesTab from '@/components/leads/tabs/NotificacionesTab';
 import PresupuestosUnificadosTab from '@/components/leads/tabs/PresupuestosUnificadosTab';
+import ContratosTab from '@/components/leads/tabs/ContratosTab'; 
 import TiemposTab from '@/components/leads/tabs/TiemposTab';
 import EditarLeadModal from '@/components/Modals/EditarLeadModal';
 import NuevoComentarioModal from '@/components/Modals/NuevoComentarioModal';
@@ -27,6 +28,7 @@ import {
   Comercial
 } from '@/types/leads';
 import { PresupuestoNuevo, PresupuestoLegacy } from '@/types/presupuestos';
+import { ContratoNuevo, ContratoLegacy } from '@/types/contratos';
 
 interface PageProps {
   auth: {
@@ -43,6 +45,8 @@ interface PageProps {
   notificaciones: Array<any>;
   presupuestos_nuevos?: PresupuestoNuevo[];
   presupuestos_legacy?: PresupuestoLegacy[];
+  contratos_nuevos?: ContratoNuevo[];
+  contratos_legacy?: ContratoLegacy[]; 
   estadisticas: {
     total_notas: number;
     total_comentarios: number;
@@ -53,6 +57,10 @@ interface PageProps {
     total_presupuestos_legacy: number;
     total_presupuestos_con_pdf: number;
     total_importe_presupuestos: string;
+    total_contratos: number;
+    total_contratos_nuevos: number;
+    total_contratos_legacy: number;
+    total_contratos_con_pdf: number;
   };
   origenes: Origen[]; 
   estadosLead?: EstadoLead[];
@@ -69,6 +77,8 @@ export default function Show({
   notificaciones,
   presupuestos_nuevos = [],
   presupuestos_legacy = [],
+  contratos_nuevos = [],
+  contratos_legacy = [],
   estadisticas,
   auth,
   origenes = [],
@@ -146,6 +156,16 @@ export default function Show({
     });
   }
 
+    // Contratos unificados (solo si hay alguno) ← NUEVO
+  if (estadisticas.total_contratos > 0) {
+    tabs.push({ 
+      id: 'contratos', 
+      label: 'Contratos', 
+      icon: <FileSignature className="h-4 w-4" />, 
+      count: estadisticas.total_contratos 
+    });
+  }
+
   // Función para abrir el modal de alta de empresa
   const handleAbrirAltaEmpresa = (presupuestoId: number, lead: Lead) => {
     setAltaEmpresaModal({
@@ -191,21 +211,29 @@ export default function Show({
       case 'notificaciones':
         return <NotificacionesTab notificaciones={notificaciones} />;
       case 'presupuestos':
-        return (
-          <PresupuestosUnificadosTab 
-            presupuestosNuevos={presupuestos_nuevos}
-            presupuestosLegacy={presupuestos_legacy}
-            lead={lead}
-            origenes={origenes}
-            rubros={rubros}
-            provincias={provincias}
-            onAltaEmpresa={handleAbrirAltaEmpresa}
-          />
-        );
-      default:
-        return null;
-    }
-  };
+              return (
+                <PresupuestosUnificadosTab 
+                  presupuestosNuevos={presupuestos_nuevos}
+                  presupuestosLegacy={presupuestos_legacy}
+                  lead={lead}
+                  origenes={origenes}
+                  rubros={rubros}
+                  provincias={provincias}
+                  onAltaEmpresa={handleAbrirAltaEmpresa}
+                />
+              );
+            case 'contratos': // ← NUEVO
+              return (
+                <ContratosTab
+                  contratosNuevos={contratos_nuevos}
+                  contratosLegacy={contratos_legacy}
+                  lead={lead}
+                />
+              );
+            default:
+              return null;
+          }
+        };
 
   return (
     <AppLayout title={`Lead #${lead.id} - ${lead.nombre_completo}`}>

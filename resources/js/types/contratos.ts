@@ -77,3 +77,44 @@ export interface Contacto {
     direccion_personal?: string;
     codigo_postal_personal?: string;
 }
+
+
+export interface ContratoNuevo {
+    id: number;
+    tipo: 'nuevo';
+    numero_contrato: string;
+    fecha_emision: string;
+    fecha_original: string;
+    estado: string;
+    cliente_nombre: string;
+    empresa_razon_social: string;
+    total_mensual: number;
+    total_inversion: number;
+    cantidad_vehiculos: number;
+    vendedor: string;
+    tiene_pdf: boolean;
+    pdf_url: string | null;
+    metadata: {
+        presupuesto_referencia?: string;
+        promocion?: string;
+        contacto_email?: string;
+        contacto_telefono?: string;
+    };
+}
+
+export interface ContratoLegacy {
+    id: number;
+    tipo: 'legacy';
+    numero_contrato: string;
+    nombre_completo: string;
+    razon_social: string;
+    fecha: string;
+    fecha_original: string;
+    tiene_pdf: boolean;
+    pdf_url: string | null;
+    metadata: {
+        lead_id: number;
+    };
+}
+
+export type ContratoUnificado = ContratoNuevo | ContratoLegacy;

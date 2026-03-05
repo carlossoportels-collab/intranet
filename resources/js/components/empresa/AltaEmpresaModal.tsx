@@ -25,12 +25,15 @@ import Paso3DatosEmpresa from './pasos/Paso3DatosEmpresa';
 
 interface Props {
     isOpen: boolean;
-    onClose: () => void;
+    onClose: (contratoGuardado?: boolean, irAContrato?: boolean) => void;
     presupuestoId: number | null;
     lead: Lead | null;
     origenes?: Origen[];
     rubros?: Rubro[];
     provincias?: Provincia[];
+    pasoInicial?: number;
+    esCliente?: boolean;
+    modoCompletar?: boolean;
 }
 
 const PASOS = [
@@ -46,14 +49,17 @@ export default function AltaEmpresaModal({
     lead,
     origenes = [],
     rubros = [],
-    provincias = []
+    provincias = [],
+    pasoInicial = 1,
+    esCliente = false,
+    modoCompletar = false
 }: Props) {
     const [isMounted, setIsMounted] = useState(false);
-    const [pasoActual, setPasoActual] = useState(1);
+    const [pasoActual, setPasoActual] = useState(pasoInicial);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [cargandoDatos, setCargandoDatos] = useState(false);
-    const [paso1Completado, setPaso1Completado] = useState(false);
-    const [paso2Completado, setPaso2Completado] = useState(false);
+    const [paso1Completado, setPaso1Completado] = useState(pasoInicial > 1);
+    const [paso2Completado, setPaso2Completado] = useState(pasoInicial > 2);
     const [contactoId, setContactoId] = useState<number | null>(null);
     const toast = useToast();
 
@@ -71,9 +77,9 @@ export default function AltaEmpresaModal({
             genero: 'no_especifica' as 'masculino' | 'femenino' | 'otro' | 'no_especifica',
             telefono: '',
             email: '',
-            localidad_id: '' as number | '',  // ← Forzamos el tipo
-            rubro_id: '' as number | '',      // ← Forzamos el tipo
-            origen_id: '' as number | '',     // ← Forzamos el tipo
+            localidad_id: '' as number | '',
+            rubro_id: '' as number | '',
+            origen_id: '' as number | '',
         },
         contacto: {
             tipo_responsabilidad_id: '' as number | '',
@@ -108,6 +114,15 @@ export default function AltaEmpresaModal({
             setIsMounted(true);
             document.body.style.overflow = 'hidden';
             cargarDatosIniciales();
+            
+            // Si hay paso inicial, configurar los pasos completados
+            if (pasoInicial > 1) {
+                setPaso1Completado(true);
+            }
+            if (pasoInicial > 2) {
+                setPaso2Completado(true);
+            }
+            setPasoActual(pasoInicial);
         } else {
             const timer = setTimeout(() => {
                 setIsMounted(false);
@@ -120,25 +135,67 @@ export default function AltaEmpresaModal({
         return () => {
             document.body.style.overflow = 'unset';
         };
-    }, [isOpen]);
+    }, [isOpen, pasoInicial]);
 
     // Cargar datos del lead cuando se abre el modal
-        useEffect(() => {
-            if (isOpen && lead) {
-                setFormData(prev => ({
-                    ...prev,
-                    lead: {
-                        nombre_completo: lead.nombre_completo || '',
-                        genero: (lead.genero || 'no_especifica') as 'masculino' | 'femenino' | 'otro' | 'no_especifica',
-                        telefono: lead.telefono || '',
-                        email: lead.email || '',
-                        localidad_id: lead.localidad_id || '',  // Esto ya es number de la BD
-                        rubro_id: lead.rubro_id || '',
-                        origen_id: lead.origen_id || '',
-                    }
-                }));
+    useEffect(() => {
+        if (isOpen && lead) {
+            // Cargar datos del lead
+            setFormData(prev => ({
+                ...prev,
+                lead: {
+                    nombre_completo: lead.nombre_completo || '',
+                    genero: (lead.genero || 'no_especifica') as 'masculino' | 'femenino' | 'otro' | 'no_especifica',
+                    telefono: lead.telefono || '',
+                    email: lead.email || '',
+                    localidad_id: lead.localidad_id || '',
+                    rubro_id: lead.rubro_id || '',
+                    origen_id: lead.origen_id || '',
+                }
+            }));
+
+            // Si el lead tiene empresa, cargar datos de empresa y contacto
+            if ((lead as any).empresa_contacto) {
+                const empresaContacto = (lead as any).empresa_contacto;
+                const empresa = empresaContacto?.empresa;
+                
+                if (empresa) {
+                    setFormData(prev => ({
+                        ...prev,
+                        empresa: {
+                            nombre_fantasia: empresa.nombre_fantasia || '',
+                            razon_social: empresa.razon_social || '',
+                            cuit: empresa.cuit || '',
+                            direccion_fiscal: empresa.direccion_fiscal || '',
+                            codigo_postal_fiscal: empresa.codigo_postal_fiscal || '',
+                            localidad_fiscal_id: empresa.localidad_fiscal_id || '',
+                            telefono_fiscal: empresa.telefono_fiscal || '',
+                            email_fiscal: empresa.email_fiscal || '',
+                            rubro_id: empresa.rubro_id || '',
+                            cat_fiscal_id: empresa.cat_fiscal_id || '',
+                            plataforma_id: empresa.plataforma_id || '',
+                            nombre_flota: empresa.nombre_flota || '',
+                        }
+                    }));
+                }
+
+                if (empresaContacto) {
+                    setFormData(prev => ({
+                        ...prev,
+                        contacto: {
+                            tipo_responsabilidad_id: empresaContacto.tipo_responsabilidad_id || '',
+                            tipo_documento_id: empresaContacto.tipo_documento_id || '',
+                            nro_documento: empresaContacto.nro_documento || '',
+                            nacionalidad_id: empresaContacto.nacionalidad_id || '',
+                            fecha_nacimiento: empresaContacto.fecha_nacimiento || '',
+                            direccion_personal: empresaContacto.direccion_personal || '',
+                            codigo_postal_personal: empresaContacto.codigo_postal_personal || '',
+                        }
+                    }));
+                }
             }
-        }, [isOpen, lead]);
+        }
+    }, [isOpen, lead]);
 
     const resetForm = () => {
         setPasoActual(1);
@@ -258,79 +315,88 @@ export default function AltaEmpresaModal({
         return Object.keys(nuevosErrores).length === 0;
     };
 
-const handleSubmitPaso1 = () => {
-    if (!validarPaso(1)) return;
+    const handleSubmitPaso1 = () => {
+        if (!validarPaso(1)) return;
 
-    setIsSubmitting(true);
-    
-    router.post('/comercial/utils/empresa/paso1', {
-        lead_id: lead?.id,
-        ...formData.lead
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            toast.success('Lead actualizado correctamente');
-            setPaso1Completado(true);
-            setPasoActual(2);
-            setIsSubmitting(false);
-        },
-        onError: (errors) => {
-            console.error('Errores paso 1:', errors);
-            setErrores(errors);
-            toast.error('Error al actualizar lead');
-            setIsSubmitting(false);
-        }
-    });
-};
+        setIsSubmitting(true);
+        
+        router.post('/comercial/utils/empresa/paso1', {
+            lead_id: lead?.id,
+            ...formData.lead
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Lead actualizado correctamente');
+                setPaso1Completado(true);
+                setPasoActual(2);
+                setIsSubmitting(false);
+            },
+            onError: (errors) => {
+                console.error('Errores paso 1:', errors);
+                setErrores(errors);
+                toast.error('Error al actualizar lead');
+                setIsSubmitting(false);
+            }
+        });
+    };
 
-const handleSubmitPaso2 = () => {
-    if (!validarPaso(2)) return;
+    const handleSubmitPaso2 = () => {
+        if (!validarPaso(2)) return;
 
-    setIsSubmitting(true);
-    
-    router.post('/comercial/utils/empresa/paso2', {
-        lead_id: lead?.id,
-        ...formData.contacto
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            toast.success('Datos personales guardados correctamente');
-            setPaso2Completado(true);
-            setPasoActual(3);
-            setIsSubmitting(false);
-        },
-        onError: (errors) => {
-            console.error('Errores paso 2:', errors);
-            setErrores(errors);
-            toast.error('Error al guardar datos personales');
-            setIsSubmitting(false);
-        }
-    });
-};
+        setIsSubmitting(true);
+        
+        router.post('/comercial/utils/empresa/paso2', {
+            lead_id: lead?.id,
+            ...formData.contacto
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Datos personales guardados correctamente');
+                setPaso2Completado(true);
+                setPasoActual(3);
+                setIsSubmitting(false);
+            },
+            onError: (errors) => {
+                console.error('Errores paso 2:', errors);
+                setErrores(errors);
+                toast.error('Error al guardar datos personales');
+                setIsSubmitting(false);
+            }
+        });
+    };
 
-const handleSubmitPaso3 = () => {
-    if (!validarPaso(3)) return;
+    const handleSubmitPaso3 = () => {
+        if (!validarPaso(3)) return;
 
-    setIsSubmitting(true);
-    
-    router.post('/comercial/utils/empresa/paso3', {
-        presupuesto_id: presupuestoId,
-        lead_id: lead?.id,
-        ...formData.empresa
-    }, {
-        preserveScroll: true,
-        onSuccess: (page) => {
-            toast.success('Empresa creada exitosamente');
-            setIsSubmitting(false);
-        },
-        onError: (errors) => {
-            console.error('Errores paso 3:', errors);
-            setErrores(errors);
-            toast.error('Error al crear empresa');
-            setIsSubmitting(false);
-        }
-    });
-};
+        setIsSubmitting(true);
+        
+        router.post('/comercial/utils/empresa/paso3', {
+            presupuesto_id: presupuestoId,
+            lead_id: lead?.id,
+            ...formData.empresa
+        }, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                toast.success('Empresa creada exitosamente');
+                setIsSubmitting(false);
+                
+                // Si estamos en modo completar para cliente, después de guardar vamos a la página de contrato
+                if (modoCompletar && esCliente && presupuestoId) {
+                    toast.success('Datos guardados. Complete los vehículos para generar el contrato');
+                    // Cerramos el modal y le decimos que vaya a la página de contrato
+                    onClose(false, true);
+                } else {
+                    onClose(true);
+                }
+            },
+            onError: (errors) => {
+                console.error('Errores paso 3:', errors);
+                setErrores(errors);
+                toast.error('Error al crear empresa');
+                setIsSubmitting(false);
+            }
+        });
+    };
 
     const handleSiguiente = () => {
         if (pasoActual === 1) {
@@ -399,11 +465,30 @@ const handleSubmitPaso3 = () => {
         }
     };
 
+    const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Solo cerrar si el click fue en el overlay, no en el contenido
+        if (e.target === e.currentTarget) {
+            onClose(false);
+        }
+    };
+
     if (!isMounted && !isOpen) return null;
+
+    // Determinar el título según el modo
+    const titulo = modoCompletar 
+        ? 'Completar datos para contrato' 
+        : 'Alta de Empresa';
+    
+    const descripcion = modoCompletar
+        ? 'Complete los datos faltantes para generar el contrato'
+        : 'Complete los datos paso a paso';
 
     return (
         <div className={`fixed inset-0 z-50 overflow-y-auto transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+            <div 
+                className="fixed inset-0 bg-black/50" 
+                onClick={handleOverlayClick}
+            />
             
             <div className="flex min-h-full items-center justify-center p-4">
                 <div className={`relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col transition-all duration-300 transform ${isOpen ? 'translate-y-0 scale-100' : 'translate-y-4 scale-95'}`}>
@@ -411,19 +496,19 @@ const handleSubmitPaso3 = () => {
                     {/* Header */}
                     <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white flex-shrink-0">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <Building className="h-6 w-6 text-blue-600" />
+                            <div className={`p-2 rounded-lg ${modoCompletar ? 'bg-amber-100' : 'bg-blue-100'}`}>
+                                <Building className={`h-6 w-6 ${modoCompletar ? 'text-amber-600' : 'text-blue-600'}`} />
                             </div>
                             <div>
                                 <h2 className="text-xl font-semibold text-gray-900">
-                                    Alta de Empresa
+                                    {titulo}
                                 </h2>
                                 <p className="text-sm text-gray-600 mt-1">
-                                    Complete los datos paso a paso
+                                    {descripcion}
                                 </p>
                             </div>
                         </div>
-                        <button onClick={onClose} disabled={isSubmitting} className="p-2 text-gray-400 hover:text-gray-600">
+                        <button onClick={() => onClose(false)} disabled={isSubmitting} className="p-2 text-gray-400 hover:text-gray-600">
                             <X className="h-5 w-5" />
                         </button>
                     </div>
@@ -444,7 +529,7 @@ const handleSubmitPaso3 = () => {
                                         <div className="flex items-center">
                                             <div className={`
                                                 flex items-center justify-center w-10 h-10 rounded-full 
-                                                ${isActive ? 'bg-blue-600 text-white' : ''}
+                                                ${isActive ? (modoCompletar ? 'bg-amber-600 text-white' : 'bg-blue-600 text-white') : ''}
                                                 ${isCompleted ? 'bg-green-500 text-white' : ''}
                                                 ${!isActive && !isCompleted ? 'bg-gray-200 text-gray-400' : ''}
                                                 transition-colors
@@ -517,6 +602,8 @@ const handleSubmitPaso3 = () => {
                                         provincias={provincias}
                                         onChange={handleChangeEmpresa}
                                         errores={errores}
+                                        localidadInicial={formData.empresa.localidad_fiscal_id ? '' : (lead as any)?.empresa_contacto?.empresa?.localidadFiscal?.nombre || ''}
+                                        provinciaInicial={formData.empresa.localidad_fiscal_id ? '' : (lead as any)?.empresa_contacto?.empresa?.localidadFiscal?.provincia_id || ''}
                                     />
                                 )}
                             </>
@@ -527,7 +614,7 @@ const handleSubmitPaso3 = () => {
                     <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-white flex-shrink-0">
                         <button
                             type="button"
-                            onClick={pasoActual === 1 ? onClose : handleAnterior}
+                            onClick={() => pasoActual === 1 ? onClose(false) : handleAnterior()}
                             disabled={isSubmitting || cargandoDatos}
                             className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                         >
@@ -541,7 +628,9 @@ const handleSubmitPaso3 = () => {
                                 type="button"
                                 onClick={handleSiguiente}
                                 disabled={isSubmitting || cargandoDatos}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                                className={`px-4 py-2 text-white rounded-md text-sm font-medium disabled:opacity-50 flex items-center gap-2 ${
+                                    modoCompletar ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
+                                }`}
                             >
                                 {isSubmitting ? (
                                     <><Loader className="h-4 w-4 animate-spin" /> Guardando...</>
@@ -557,7 +646,9 @@ const handleSubmitPaso3 = () => {
                                 className="px-6 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
                             >
                                 {isSubmitting ? (
-                                    <><Loader className="h-4 w-4 animate-spin" /> Creando...</>
+                                    <><Loader className="h-4 w-4 animate-spin" /> Guardando...</>
+                                ) : modoCompletar ? (
+                                    <><Check className="h-4 w-4" /> Guardar y Continuar</>
                                 ) : (
                                     <><Building className="h-4 w-4" /> Crear Empresa</>
                                 )}

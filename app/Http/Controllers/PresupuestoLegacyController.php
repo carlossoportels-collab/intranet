@@ -10,54 +10,78 @@ use Illuminate\Http\Request;
 class PresupuestoLegacyController extends Controller
 {
     /**
-     * Ver PDF en el navegador o descargar según el parámetro download
+     * Ver PDF en el navegador
      */
-    public function verPdf(Request $request, $id): BinaryFileResponse
+    public function verPdf($id): BinaryFileResponse
     {
-        $presupuesto = PresupuestoLegacy::find($id);
-        
-        if (!$presupuesto || !$presupuesto->pdf_path) {
-            abort(404, 'PDF no encontrado');
-        }
-
-        $path = storage_path('app/public/' . $presupuesto->pdf_path);
-        
-        if (!file_exists($path)) {
-            abort(404, 'Archivo no encontrado');
-        }
-
-        $nombreArchivo = ($presupuesto->nombre_presupuesto ?? 'presupuesto') . '.pdf';
-        
-        // Determinar si es descarga o visualización
-        $isDownload = $request->has('download') && $request->download == 1;
-        
-        return response()->file($path, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => ($isDownload ? 'attachment' : 'inline') . '; filename="' . $nombreArchivo . '"'
-        ]);
+        return $this->getPdfResponse($id, 'inline');
     }
 
     /**
-     * Método específico para descargar (opcional, más semántico)
+     * Descargar PDF
      */
     public function descargarPdf($id): BinaryFileResponse
     {
+        return $this->getPdfResponse($id, 'attachment');
+    }
+
+    /**
+     * Obtener respuesta del PDF
+     */
+    private function getPdfResponse($id, $disposition): BinaryFileResponse
+    {
+        
+        // Verificar autenticación
+        if (!auth()->check()) {
+            abort(403, 'No autenticado');
+        }
+
         $presupuesto = PresupuestoLegacy::find($id);
         
-        if (!$presupuesto || !$presupuesto->pdf_path) {
-            abort(404, 'PDF no encontrado');
+        if (!$presupuesto) {
+            abort(404, 'Presupuesto no encontrado');
         }
 
-        $path = storage_path('app/public/' . $presupuesto->pdf_path);
+        // 📌 IMPORTANTE: Buscar el archivo con el nombre correcto (presupuesto_ID.pdf)
+        $filename = "presupuesto_{$id}.pdf";
         
-        if (!file_exists($path)) {
-            abort(404, 'Archivo no encontrado');
+        // Rutas donde buscar
+        $paths = [
+            // Ruta principal según storage link
+            public_path("storage/presupuestos_legacy/{$filename}"),
+            // Ruta directa en storage
+            storage_path("app/public/presupuestos_legacy/{$filename}"),
+            // Ruta alternativa
+            storage_path("app/presupuestos_legacy/{$filename}"),
+        ];
+
+        // Si hay pdf_path en la BD, también probar esa ruta exacta
+        if (!empty($presupuesto->pdf_path)) {
+            array_unshift($paths, storage_path("app/public/{$presupuesto->pdf_path}"));
         }
 
-        $nombreArchivo = ($presupuesto->nombre_presupuesto ?? 'presupuesto') . '.pdf';
+        $filePath = null;
+        foreach ($paths as $path) {
+            if (file_exists($path)) {
+                $filePath = $path;
+                break;
+            }
+        }
+
+        if (!$filePath) {
+            \Log::error('PDF no encontrado para presupuesto legacy', [
+                'id' => $id,
+                'pdf_path_db' => $presupuesto->pdf_path,
+                'paths_buscadas' => $paths
+            ]);
+            abort(404, 'Archivo PDF no encontrado');
+        }
+
+        $nombreArchivo = ($presupuesto->nombre_presupuesto ?? "presupuesto_{$id}") . '.pdf';
         
-        return response()->download($path, $nombreArchivo, [
+        return response()->file($filePath, [
             'Content-Type' => 'application/pdf',
+            'Content-Disposition' => $disposition . '; filename="' . $nombreArchivo . '"'
         ]);
     }
 }

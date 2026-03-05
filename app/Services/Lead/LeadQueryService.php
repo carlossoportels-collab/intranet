@@ -14,10 +14,11 @@ use Illuminate\Support\Facades\Log;
  * joins complejos con selects específicos).
  *
  * Para lógica de negocio compleja, delega a los services especializados:
- *   - LeadDetailsService    → datos completos de un lead con relaciones
+ *   - LeadDetailsService     → datos completos de un lead con relaciones
+ *   - LeadContratoService    → contratos unificados (nuevos + legacy)
  *   - LeadStateTransitionService → tiempos entre estados (fuente de verdad)
- *   - LeadFormService       → datos de formularios con cache
- *   - LeadCommentService    → comentarios con lógica de negocio
+ *   - LeadFormService        → datos de formularios con cache
+ *   - LeadCommentService     → comentarios con lógica de negocio
  */
 class LeadQueryService
 {

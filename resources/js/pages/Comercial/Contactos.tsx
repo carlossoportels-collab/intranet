@@ -2,19 +2,20 @@
 import { Head, router } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Eye, MessageSquare, FileText, Briefcase } from 'lucide-react';
+import { Eye, MessageSquare, FileText, Briefcase, FileSignature } from 'lucide-react'; // ← Agregar FileSignature
 import React, { useState, useCallback } from 'react';
 
 import ClienteComentarioModal from '@/components/Modals/ClienteComentarioModal';
 import { Pagination, EmptyState } from '@/components/ui';
 import AppLayout from '@/layouts/app-layout';
-
+import { TipoComentario } from '@/types/leads';
 interface Lead {
     id: number;
     nombre_completo: string;
     email?: string;
     telefono?: string;
 }
+
 
 interface Empresa {
     id: number;
@@ -57,6 +58,7 @@ interface Props {
     };
     comentariosPorLead?: Record<number, number>;
     presupuestosPorLead?: Record<number, number>;
+    contratosPorLead?: Record<number, number>; // ← NUEVO
 }
 
 export default function Contactos({ 
@@ -65,13 +67,14 @@ export default function Contactos({
     filters = {},
     usuario,
     comentariosPorLead = {},
-    presupuestosPorLead = {}
+    presupuestosPorLead = {},
+    contratosPorLead = {} // ← NUEVO
 }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [showComentarioModal, setShowComentarioModal] = useState(false);
     const [selectedContact, setSelectedContact] = useState<Contacto | null>(null);
-    const [tiposComentario, setTiposComentario] = useState([]);
+    const [tiposComentario, setTiposComentario] = useState<TipoComentario[]>([]);
     const [comentariosExistentes, setComentariosExistentes] = useState(0);
     
     const { data: contactosData, current_page, last_page, total, per_page } = contactos;
@@ -133,6 +136,10 @@ export default function Contactos({
     const contarPresupuestosDeLead = useCallback((leadId: number): number => {
         return presupuestosPorLead[leadId] || 0;
     }, [presupuestosPorLead]);
+    
+    const contarContratosDeLead = useCallback((leadId: number): number => { // ← NUEVO
+        return contratosPorLead[leadId] || 0;
+    }, [contratosPorLead]);
 
     const formatDate = (dateString: string | null) => {
         if (!dateString) return 'N/A';
@@ -279,9 +286,9 @@ export default function Contactos({
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-1 text-xs bg-amber-50 px-2 py-1 rounded-full">
-                                                    <Briefcase className="h-3 w-3 text-amber-600" />
+                                                    <FileSignature className="h-3 w-3 text-amber-600" /> {/* ← Cambiado a FileSignature */}
                                                     <span className="font-medium text-amber-700">
-                                                        0 contratos
+                                                        {contarContratosDeLead(contacto.lead_id)} contratos
                                                     </span>
                                                 </div>
                                             </div>
@@ -333,7 +340,7 @@ export default function Contactos({
                                             Comentarios
                                         </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Contratos
+                                            Contratos {/* ← Cambiado de "Contratos" a "Contratos" pero con ícono diferente */}
                                         </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Registro
@@ -386,7 +393,7 @@ export default function Contactos({
                                                 {contarComentariosDeLead(contacto.lead_id)}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-700">
-                                                0
+                                                {contarContratosDeLead(contacto.lead_id)} {/* ← NUEVO */}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                                 {formatDate(contacto.created)}
@@ -422,7 +429,7 @@ export default function Contactos({
                             total={total}
                             perPage={per_page}
                             baseUrl="/comercial/contactos"
-                            only={['contactos', 'comentariosPorLead', 'presupuestosPorLead']}
+                            only={['contactos', 'comentariosPorLead', 'presupuestosPorLead', 'contratosPorLead']} // ← Agregado contratosPorLead
                         />
                     </>
                 )}
@@ -440,7 +447,7 @@ export default function Contactos({
                 tiposComentario={tiposComentario}
                 comentariosExistentes={comentariosExistentes}
                 onSuccess={() => {
-                    router.reload({ only: ['contactos', 'comentariosPorLead'] });
+                    router.reload({ only: ['contactos', 'comentariosPorLead', 'contratosPorLead'] }); // ← Agregado contratosPorLead
                 }}
             />
         </AppLayout>

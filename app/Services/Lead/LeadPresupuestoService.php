@@ -31,11 +31,10 @@ class LeadPresupuestoService
     public function getPresupuestosNuevos(Lead $lead): Collection
     {
         return Presupuesto::where('lead_id', $lead->id)
-            ->with(['prefijo.comercial.personal', 'promocion', 'estado']) // Cambiado de 'comercial' a 'prefijo.comercial.personal'
+            ->with(['prefijo.comercial.personal', 'promocion', 'estado'])
             ->orderBy('created', 'desc')
             ->get()
             ->map(function ($presupuesto) {
-                // Obtener el nombre del comercial a través del accessor
                 $nombreComercial = $presupuesto->nombre_comercial;
                 
                 return [
@@ -49,7 +48,7 @@ class LeadPresupuestoService
                     'estado_color' => $presupuesto->estado->color ?? null,
                     'total' => (float) $presupuesto->total_presupuesto,
                     'comercial' => $nombreComercial,
-                    'comercial_id' => $presupuesto->prefijo_id, // ID del prefijo (comercial)
+                    'comercial_id' => $presupuesto->prefijo_id,
                     'promocion' => $presupuesto->promocion->nombre ?? null,
                     'promocion_id' => $presupuesto->promocion_id,
                     'tiene_pdf' => true,
@@ -67,8 +66,42 @@ class LeadPresupuestoService
             });
     }
 
+
+/**
+ * Verifica si existe PDF para presupuesto legacy
+ */
+protected function tienePdfLegacy(int $presupuestoId): bool
+{
+    // Buscar con el nombre correcto: presupuesto_ID.pdf
+    $filename = "presupuesto_{$presupuestoId}.pdf";
+    
+    $paths = [
+        public_path("storage/presupuestos_legacy/{$filename}"),
+        storage_path("app/public/presupuestos_legacy/{$filename}"),
+        storage_path("app/presupuestos_legacy/{$filename}"),
+    ];
+    
+    foreach ($paths as $path) {
+        if (file_exists($path)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Obtiene URL del PDF legacy
+ */
+protected function getPdfUrlLegacy(int $presupuestoId): ?string
+{
+    if ($this->tienePdfLegacy($presupuestoId)) {
+        return "/presupuestos-legacy/{$presupuestoId}/pdf";
+    }
+    return null;
+}
+
     /**
-     * Obtener presupuestos legacy (sistema anterior)
+     * Obtener presupuestos legacy (sistema anterior) CON DEBUG
      */
     public function getPresupuestosLegacy(Lead $lead): Collection
     {
@@ -76,34 +109,53 @@ class LeadPresupuestoService
             return collect([]);
         }
 
-        return PresupuestoLegacy::with('prefijo')
+        $presupuestos = PresupuestoLegacy::with('prefijo')
             ->where('lead_id', $lead->id)
             ->orderBy('fecha_presupuesto', 'desc')
-            ->get()
-            ->map(function ($presupuesto) {
-                $metadata = $presupuesto->metadata ?? [];
-                
-                return [
-                    'id' => $presupuesto->id,
-                    'tipo' => 'legacy',
-                    'nombre' => $presupuesto->nombre_presupuesto ?? "Presupuesto #{$presupuesto->id}",
-                    'fecha' => $presupuesto->fecha_presupuesto?->format('d/m/Y H:i'),
-                    'fecha_original' => $presupuesto->fecha_presupuesto?->toISOString(),
-                    'tiene_pdf' => !empty($presupuesto->pdf_path),
-                    'pdf_url' => $presupuesto->pdf_path ? "/presupuestos-legacy/{$presupuesto->id}/pdf" : null,
-                    'prefijo_id' => $presupuesto->prefijo_id,
-                    'prefijo' => $presupuesto->prefijo ? [
-                        'id' => $presupuesto->prefijo->id,
-                        'codigo' => $presupuesto->prefijo->codigo,
-                        'nombre' => $presupuesto->prefijo->nombre
-                    ] : null,
-                    'metadata' => [
-                        'cantidad_vehiculos' => $metadata['cantidad_vehiculos'] ?? $metadata['cantidad'] ?? null,
-                        'descripcion' => $metadata['descripcion'] ?? null,
-                        'importe' => $metadata['importe'] ?? 0,
-                    ]
-                ];
-            });
+            ->get();
+
+        Log::info("Procesando " . $presupuestos->count() . " presupuestos legacy para lead {$lead->id}");
+
+        return $presupuestos->map(function ($presupuesto) {
+            $metadata = $presupuesto->metadata ?? [];
+            
+            // Verificaciones explícitas
+            $tienePdfPorPath = !empty($presupuesto->pdf_path);
+            $tienePdfPorArchivo = $this->tienePdfLegacy($presupuesto->id);
+            $tienePdf = $tienePdfPorPath || $tienePdfPorArchivo;
+            
+            $pdfUrl = $this->getPdfUrlLegacy($presupuesto->id);
+            
+            Log::info("Presupuesto legacy ID: {$presupuesto->id}", [
+                'pdf_path_db' => $presupuesto->pdf_path,
+                'tienePdfPorPath' => $tienePdfPorPath,
+                'tienePdfPorArchivo' => $tienePdfPorArchivo,
+                'tienePdf_final' => $tienePdf,
+                'pdfUrl_generada' => $pdfUrl,
+                'nombre' => $presupuesto->nombre_presupuesto
+            ]);
+            
+            return [
+                'id' => $presupuesto->id,
+                'tipo' => 'legacy',
+                'nombre' => $presupuesto->nombre_presupuesto ?? "Presupuesto #{$presupuesto->id}",
+                'fecha' => $presupuesto->fecha_presupuesto?->format('d/m/Y H:i'),
+                'fecha_original' => $presupuesto->fecha_presupuesto?->toISOString(),
+                'tiene_pdf' => $tienePdf,
+                'pdf_url' => $pdfUrl,
+                'prefijo_id' => $presupuesto->prefijo_id,
+                'prefijo' => $presupuesto->prefijo ? [
+                    'id' => $presupuesto->prefijo->id,
+                    'codigo' => $presupuesto->prefijo->codigo,
+                    'nombre' => $presupuesto->prefijo->nombre
+                ] : null,
+                'metadata' => [
+                    'cantidad_vehiculos' => $metadata['cantidad_vehiculos'] ?? $metadata['cantidad'] ?? null,
+                    'descripcion' => $metadata['descripcion'] ?? null,
+                    'importe' => $metadata['importe'] ?? 0,
+                ]
+            ];
+        });
     }
 
     /**

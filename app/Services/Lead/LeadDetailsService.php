@@ -25,13 +25,16 @@ class LeadDetailsService
 {
     private LeadStateTransitionService $stateTransitionService;
     private LeadPresupuestoService $presupuestoService;
+    private LeadContratoService $contratoService; // ← NUEVO
 
     public function __construct(
         LeadStateTransitionService $stateTransitionService,
-        LeadPresupuestoService $presupuestoService
+        LeadPresupuestoService $presupuestoService,
+        LeadContratoService $contratoService // ← NUEVO
     ) {
         $this->stateTransitionService = $stateTransitionService;
         $this->presupuestoService = $presupuestoService;
+        $this->contratoService = $contratoService; // ← NUEVO
     }
 
     public function getLeadWithDetails(int $id): ?Lead
@@ -101,6 +104,10 @@ class LeadDetailsService
         // Obtener presupuestos unificados
         $presupuestosUnificados = $this->presupuestoService->getPresupuestosUnificados($lead);
         $estadisticasPresupuestos = $this->presupuestoService->getEstadisticas($lead);
+        
+        // Obtener contratos unificados ← NUEVO
+        $contratosUnificados = $this->contratoService->getContratosUnificados($lead);
+        $estadisticasContratos = $this->contratoService->getEstadisticas($lead);
 
         return [
             'lead' => $lead,
@@ -112,6 +119,8 @@ class LeadDetailsService
             'tiempos_estados' => $tiemposEstados,
             'presupuestos_nuevos' => $presupuestosUnificados['nuevos'],
             'presupuestos_legacy' => $presupuestosUnificados['legacy'],
+            'contratos_nuevos' => $contratosUnificados['nuevos'], // ← NUEVO
+            'contratos_legacy' => $contratosUnificados['legacy'], // ← NUEVO
             'estadisticas' => [
                 'total_notas' => $notas->count(),
                 'total_comentarios' => $comentarios->count(),
@@ -123,6 +132,11 @@ class LeadDetailsService
                 'total_presupuestos_legacy' => $estadisticasPresupuestos['total_legacy'],
                 'total_presupuestos_con_pdf' => $estadisticasPresupuestos['total_con_pdf'],
                 'total_importe_presupuestos' => $estadisticasPresupuestos['total_importe_formateado'],
+                // Estadísticas de contratos ← NUEVO
+                'total_contratos' => $estadisticasContratos['total_contratos'],
+                'total_contratos_nuevos' => $estadisticasContratos['total_nuevos'],
+                'total_contratos_legacy' => $estadisticasContratos['total_legacy'],
+                'total_contratos_con_pdf' => $estadisticasContratos['total_con_pdf'],
             ]
         ];
     }

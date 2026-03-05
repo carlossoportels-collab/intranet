@@ -1,12 +1,16 @@
 // resources/js/components/leads/tabs/PresupuestosUnificadosTab.tsx
-import { FileText, Calendar, Truck, Eye, Download, Tag, User, Loader, Building, ChevronDown, ChevronUp } from 'lucide-react';
-import React, { useState, useMemo } from 'react';
+
+import { router } from '@inertiajs/react';
+import { FileText, Calendar, Truck, Eye, Download, Tag, User, Loader, Building, ChevronDown, ChevronUp, FileSignature } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 
 import { Amount } from '@/components/ui/Amount';
 import { Badge } from '@/components/ui/badge';
 import Pagination from '@/components/ui/Pagination';
 import { useToast } from '@/contexts/ToastContext';
 import { Lead, Origen, Rubro, Provincia } from '@/types/leads';
+import AltaEmpresaModal from '@/components/empresa/AltaEmpresaModal';
+import { usePagination } from '@/hooks/usePagination';
 
 // Tipos
 interface PresupuestoNuevo {
@@ -70,12 +74,22 @@ export default function PresupuestosUnificadosTab({
     presupuestosNuevos, 
     presupuestosLegacy,
     lead,
+    origenes,
+    rubros,
+    provincias,
     onAltaEmpresa
 }: Props) {
-    const [currentPage, setCurrentPage] = useState(1);
     const [orden, setOrden] = useState<'reciente' | 'antiguo'>('reciente');
     const [generandoPDF, setGenerandoPDF] = useState<number | null>(null);
     const [expandedMobileCard, setExpandedMobileCard] = useState<string | null>(null);
+    
+    // Estados para el flujo inteligente
+    const [modalAltaEmpresaOpen, setModalAltaEmpresaOpen] = useState(false);
+    const [presupuestoSeleccionado, setPresupuestoSeleccionado] = useState<number | null>(null);
+    const [verificandoDatos, setVerificandoDatos] = useState(false);
+    const [pasoInicialModal, setPasoInicialModal] = useState<number>(1);
+    const [modoCompletar, setModoCompletar] = useState(false);
+    
     const toast = useToast();
 
     // Asegurarnos de que los arrays existan
@@ -89,7 +103,6 @@ export default function PresupuestosUnificadosTab({
         
         const presupuestos = [...nuevosConTipo, ...legacyConTipo];
 
-        // Ordenar
         presupuestos.sort((a, b) => {
             const fechaA = new Date(a.fecha_original).getTime();
             const fechaB = new Date(b.fecha_original).getTime();
@@ -99,67 +112,53 @@ export default function PresupuestosUnificadosTab({
         return presupuestos;
     }, [nuevos, legacy, orden]);
 
-    const totalPages = Math.ceil(todosLosPresupuestos.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginatedPresupuestos = todosLosPresupuestos.slice(startIndex, endIndex);
+    // Usar el hook de paginación
+    const {
+        currentPage,
+        totalPages,
+        paginatedItems: paginatedPresupuestos,
+        goToPage
+    } = usePagination({
+        items: todosLosPresupuestos,
+        initialItemsPerPage: ITEMS_PER_PAGE
+    });
 
-    // Resetear página cuando cambia el orden
-    React.useEffect(() => {
-        setCurrentPage(1);
-    }, [orden]);
+    // Resetear a página 1 cuando cambia el orden
+    useEffect(() => {
+        goToPage(1);
+    }, [orden]); // Solo depende de orden
 
-    const handleVerPdf = (presupuesto: PresupuestoUnificado, e: React.MouseEvent) => {
+    const handleVerPdf = useCallback((presupuesto: PresupuestoUnificado, e: React.MouseEvent) => {
         e.preventDefault();
-        if (presupuesto.tipo === 'nuevo') {
-            window.open(`/comercial/presupuestos/${presupuesto.id}/pdf`, '_blank');
-        } else {
-            // Para archivos legacy: usamos la ruta pública de storage
-            window.open(`/storage/presupuestos_legacy/${presupuesto.id}.pdf`, '_blank');
+        e.stopPropagation();
+        
+        if (!presupuesto.tiene_pdf || !presupuesto.pdf_url) {
+            toast.error('No hay PDF disponible');
+            return;
         }
-    };
+        
+        window.open(presupuesto.pdf_url, '_blank');
+    }, [toast]);
 
-    const handleDescargarPdf = async (presupuesto: PresupuestoUnificado, e: React.MouseEvent) => {
+    const handleDescargarPdf = useCallback(async (presupuesto: PresupuestoUnificado, e: React.MouseEvent) => {
         e.preventDefault();
+        e.stopPropagation();
+        
+        if (!presupuesto.tiene_pdf || !presupuesto.pdf_url) {
+            toast.error('No hay PDF disponible');
+            return;
+        }
         
         if (presupuesto.tipo === 'nuevo') {
             setGenerandoPDF(presupuesto.id);
             toast.info('Generando PDF...');
             
             try {
-                const pdfWindow = window.open(`/comercial/presupuestos/${presupuesto.id}/pdf?download=1`, '_blank');
+                window.open(`${presupuesto.pdf_url}?download=1`, '_blank');
                 
-                if (!pdfWindow) {
-                    toast.error('Por favor, permita ventanas emergentes para generar el PDF');
+                setTimeout(() => {
                     setGenerandoPDF(null);
-                    return;
-                }
-                
-                const handleMessage = (event: MessageEvent) => {
-                    if (event.data.type === 'PDF_GENERADO') {
-                        const blob = event.data.pdfBlob;
-                        const url = window.URL.createObjectURL(blob);
-                        
-                        toast.success('PDF generado correctamente');
-                        
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = `Presupuesto_${presupuesto.nombre}.pdf`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        
-                        window.URL.revokeObjectURL(url);
-                        setGenerandoPDF(null);
-                        window.removeEventListener('message', handleMessage);
-                    } else if (event.data.type === 'PDF_ERROR') {
-                        toast.error(event.data.error || 'Error al generar el PDF');
-                        setGenerandoPDF(null);
-                        window.removeEventListener('message', handleMessage);
-                    }
-                };
-
-                window.addEventListener('message', handleMessage);
+                }, 1000);
                 
             } catch (error) {
                 console.error('Error generando PDF:', error);
@@ -167,18 +166,81 @@ export default function PresupuestosUnificadosTab({
                 setGenerandoPDF(null);
             }
         } else {
-            window.open(`/presupuestos-legacy/${presupuesto.id}/pdf?download=1`, '_blank');
+            window.open(`/presupuestos-legacy/${presupuesto.id}/descargar`, '_blank');
         }
-    };
+    }, [toast]);
 
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page);
-        document.getElementById('presupuestos-list')?.scrollIntoView({ behavior: 'smooth' });
-    };
+    /**
+     * Maneja la acción principal del botón (Alta Empresa o Generar Contrato)
+     */
+    const handleAccionPrincipal = useCallback(async (presupuestoId: number) => {
+        if (lead.es_cliente) {
+            setVerificandoDatos(true);
+            setGenerandoPDF(presupuestoId);
+            
+            try {
+                const response = await fetch(`/comercial/leads/${lead.id}/verificar-datos-contrato`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Error al verificar datos');
+                }
+                
+                if (data.todosCompletos) {
+                    toast.success('Todos los datos están completos. Generando contrato...');
+                    
+                    setTimeout(() => {
+                        window.location.href = `/comercial/contratos/create-from-lead/${presupuestoId}`;
+                    }, 500);
+                } else {
+                    setPasoInicialModal(data.pasoAMostrar || 2);
+                    setModoCompletar(true);
+                    setPresupuestoSeleccionado(presupuestoId);
+                    setModalAltaEmpresaOpen(true);
+                    
+                    toast.info('Complete los datos faltantes para generar el contrato');
+                }
+            } catch (error) {
+                console.error('Error verificando datos:', error);
+                toast.error('Error al verificar datos del cliente');
+            } finally {
+                setVerificandoDatos(false);
+                setGenerandoPDF(null);
+            }
+        } else {
+            setModoCompletar(false);
+            setPasoInicialModal(1);
+            onAltaEmpresa(presupuestoId, lead);
+        }
+    }, [lead, onAltaEmpresa, toast]);
 
-    const toggleMobileCard = (id: string) => {
-        setExpandedMobileCard(expandedMobileCard === id ? null : id);
-    };
+    /**
+     * Maneja el cierre del modal de alta empresa
+     */
+    const handleModalClose = useCallback((contratoGuardado?: boolean, irAContrato?: boolean) => {
+        setModalAltaEmpresaOpen(false);
+        setPresupuestoSeleccionado(null);
+        setPasoInicialModal(1);
+        setModoCompletar(false);
+        
+        if (contratoGuardado) {
+            toast.success('Datos guardados correctamente');
+            router.reload({ only: ['lead', 'presupuestos_nuevos', 'presupuestos_legacy'] });
+        } else if (irAContrato && presupuestoSeleccionado) {
+            router.visit(`/comercial/contratos/create-from-lead/${presupuestoSeleccionado}`);
+        }
+    }, [presupuestoSeleccionado, toast]);
+
+    const handlePageChange = useCallback((page: number) => {
+        goToPage(page);
+        setTimeout(() => {
+            document.getElementById('presupuestos-list')?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+    }, [goToPage]);
+
+    const toggleMobileCard = useCallback((id: string) => {
+        setExpandedMobileCard(prev => prev === id ? null : id);
+    }, []);
 
     const getBadgeColor = (estado?: string) => {
         const colores: Record<string, string> = {
@@ -203,10 +265,9 @@ export default function PresupuestosUnificadosTab({
 
     return (
         <div id="presupuestos-list" className="divide-y divide-gray-200">
-            {/* Cabecera informativa y ordenamiento - Responsive */}
+            {/* Cabecera informativa y ordenamiento */}
             <div className="p-3 sm:p-4 bg-gray-50 border-b border-gray-200">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    {/* Texto informativo con cantidades */}
                     <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                         <span className="font-medium text-gray-700">Presupuestos:</span>
                         <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md whitespace-nowrap">
@@ -220,7 +281,6 @@ export default function PresupuestosUnificadosTab({
                         </span>
                     </div>
                     
-                    {/* Ordenamiento */}
                     <div className="flex items-center gap-2">
                         <span className="text-xs sm:text-sm text-gray-600">Ordenar:</span>
                         <div className="flex gap-1">
@@ -253,10 +313,12 @@ export default function PresupuestosUnificadosTab({
             {paginatedPresupuestos.map((presupuesto) => {
                 const cardId = `${presupuesto.tipo}-${presupuesto.id}`;
                 const isExpanded = expandedMobileCard === cardId;
+                const mostrarBotonAccion = presupuesto.tipo === 'nuevo';
+                const estaCargando = verificandoDatos && generandoPDF === presupuesto.id;
                 
                 return (
                     <div key={cardId} className="p-3 sm:p-4 hover:bg-gray-50 transition-colors">
-                        {/* Vista Desktop (visible en sm y superior) */}
+                        {/* Vista Desktop */}
                         <div className="hidden sm:block">
                             <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                                 <div className="flex-1 min-w-0">
@@ -289,7 +351,7 @@ export default function PresupuestosUnificadosTab({
                                         )}
                                     </div>
                                     
-                                    {/* Detalles en grid responsivo */}
+                                    {/* Detalles en grid */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-3 text-xs lg:text-sm">
                                         <div className="flex items-center text-gray-600">
                                             <Calendar className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2 text-gray-400 flex-shrink-0" />
@@ -318,14 +380,14 @@ export default function PresupuestosUnificadosTab({
                                         )}
                                     </div>
                                     
-                                    {/* Descripción si existe */}
+                                    {/* Descripción */}
                                     {presupuesto.metadata.descripcion && (
                                         <p className="mt-2 text-xs lg:text-sm text-gray-600 line-clamp-2">
                                             {presupuesto.metadata.descripcion}
                                         </p>
                                     )}
 
-                                    {/* Promoción si existe (solo nuevos) */}
+                                    {/* Promoción */}
                                     {presupuesto.tipo === 'nuevo' && (presupuesto as PresupuestoNuevo).promocion && (
                                         <div className="mt-2">
                                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
@@ -350,7 +412,7 @@ export default function PresupuestosUnificadosTab({
                                             disabled={generandoPDF === presupuesto.id}
                                             className="inline-flex items-center px-2 lg:px-3 py-1.5 lg:py-2 border border-gray-300 shadow-sm text-xs lg:text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {generandoPDF === presupuesto.id ? (
+                                            {generandoPDF === presupuesto.id && !verificandoDatos ? (
                                                 <>
                                                     <Loader className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2 animate-spin" />
                                                     <span>Generando...</span>
@@ -363,14 +425,33 @@ export default function PresupuestosUnificadosTab({
                                             )}
                                         </button>
                                         
-                                        {/* Botón Alta Empresa - Solo para presupuestos nuevos */}
-                                        {presupuesto.tipo === 'nuevo' && (
+                                        {/* Botón dinámico */}
+                                        {mostrarBotonAccion && (
                                             <button
-                                                onClick={() => onAltaEmpresa(presupuesto.id, lead)}
-                                                className="inline-flex items-center px-2 lg:px-3 py-1.5 lg:py-2 bg-green-600 text-white text-xs lg:text-sm leading-4 font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 justify-center transition-colors"
+                                                onClick={() => handleAccionPrincipal(presupuesto.id)}
+                                                disabled={estaCargando}
+                                                className={`inline-flex items-center px-2 lg:px-3 py-1.5 lg:py-2 text-xs lg:text-sm leading-4 font-medium rounded-md justify-center transition-colors ${
+                                                    lead.es_cliente
+                                                        ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                                                        : 'bg-green-600 text-white hover:bg-green-700 focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
+                                                } disabled:opacity-50 disabled:cursor-not-allowed`}
                                             >
-                                                <Building className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2" />
-                                                <span>Alta Empresa</span>
+                                                {estaCargando ? (
+                                                    <>
+                                                        <Loader className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2 animate-spin" />
+                                                        <span>Verificando...</span>
+                                                    </>
+                                                ) : lead.es_cliente ? (
+                                                    <>
+                                                        <FileSignature className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2" />
+                                                        <span>Generar Contrato</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Building className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2" />
+                                                        <span>Alta Empresa</span>
+                                                    </>
+                                                )}
                                             </button>
                                         )}
                                     </div>
@@ -378,7 +459,7 @@ export default function PresupuestosUnificadosTab({
                             </div>
                         </div>
 
-                        {/* Vista Mobile (visible solo en móvil) */}
+                        {/* Vista Mobile */}
                         <div className="sm:hidden">
                             {/* Cabecera siempre visible */}
                             <div className="flex items-start justify-between mb-2">
@@ -451,7 +532,7 @@ export default function PresupuestosUnificadosTab({
                                         </div>
                                     )}
 
-                                    {/* Comercial (solo nuevos) */}
+                                    {/* Comercial */}
                                     {presupuesto.tipo === 'nuevo' && (presupuesto as PresupuestoNuevo).comercial && (
                                         <div className="flex items-center text-xs text-gray-600 mb-2">
                                             <User className="h-3 w-3 mr-2 text-gray-400" />
@@ -459,7 +540,7 @@ export default function PresupuestosUnificadosTab({
                                         </div>
                                     )}
 
-                                    {/* Total (solo nuevos) */}
+                                    {/* Total */}
                                     {presupuesto.tipo === 'nuevo' && (presupuesto as PresupuestoNuevo).total > 0 && (
                                         <div className="flex items-center text-xs text-gray-900 font-medium mb-2">
                                             <Tag className="h-3 w-3 mr-2 text-gray-400" />
@@ -489,7 +570,7 @@ export default function PresupuestosUnificadosTab({
                                                 disabled={generandoPDF === presupuesto.id}
                                                 className="px-2 py-2 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 flex flex-col items-center disabled:opacity-50"
                                             >
-                                                {generandoPDF === presupuesto.id ? (
+                                                {generandoPDF === presupuesto.id && !verificandoDatos ? (
                                                     <>
                                                         <Loader className="h-4 w-4 mb-1 animate-spin" />
                                                         <span>Gen.</span>
@@ -502,14 +583,33 @@ export default function PresupuestosUnificadosTab({
                                                 )}
                                             </button>
                                             
-                                            {/* Botón Alta Empresa */}
-                                            {presupuesto.tipo === 'nuevo' && (
+                                            {/* Botón dinámico en móvil */}
+                                            {mostrarBotonAccion && (
                                                 <button
-                                                    onClick={() => onAltaEmpresa(presupuesto.id, lead)}
-                                                    className="px-2 py-2 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 flex flex-col items-center"
+                                                    onClick={() => handleAccionPrincipal(presupuesto.id)}
+                                                    disabled={estaCargando}
+                                                    className={`px-2 py-2 text-white rounded-md text-xs font-medium flex flex-col items-center ${
+                                                        lead.es_cliente
+                                                            ? 'bg-blue-600 hover:bg-blue-700'
+                                                            : 'bg-green-600 hover:bg-green-700'
+                                                    } disabled:opacity-50`}
                                                 >
-                                                    <Building className="h-4 w-4 mb-1" />
-                                                    <span>Alta</span>
+                                                    {estaCargando ? (
+                                                        <>
+                                                            <Loader className="h-4 w-4 mb-1 animate-spin" />
+                                                            <span>Verif.</span>
+                                                        </>
+                                                    ) : lead.es_cliente ? (
+                                                        <>
+                                                            <FileSignature className="h-4 w-4 mb-1" />
+                                                            <span>Contrato</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Building className="h-4 w-4 mb-1" />
+                                                            <span>Alta</span>
+                                                        </>
+                                                    )}
                                                 </button>
                                             )}
                                         </div>
@@ -529,9 +629,25 @@ export default function PresupuestosUnificadosTab({
                         lastPage={totalPages}
                         total={todosLosPresupuestos.length}
                         perPage={ITEMS_PER_PAGE}
+                        onPageChange={handlePageChange}
+                        useLinks={false}
                     />
                 </div>
             )}
+
+            {/* Modal de Alta Empresa */}
+            <AltaEmpresaModal
+                isOpen={modalAltaEmpresaOpen}
+                onClose={handleModalClose}
+                presupuestoId={presupuestoSeleccionado}
+                lead={lead}
+                origenes={origenes}
+                rubros={rubros}
+                provincias={provincias}
+                pasoInicial={pasoInicialModal}
+                esCliente={lead.es_cliente}
+                modoCompletar={modoCompletar}
+            />
         </div>
     );
 }

@@ -1,6 +1,9 @@
 // resources/js/components/leads/tabs/ComentariosTab.tsx
+
 import { MessageSquare, User, Clock, Tag } from 'lucide-react';
-import React from 'react';
+import React, { useState, useMemo } from 'react';
+import Pagination from '@/components/ui/Pagination';
+import { usePagination } from '@/hooks/usePagination';
 
 interface Comentario {
   id: number;
@@ -16,11 +19,29 @@ interface ComentariosTabProps {
   total: number;
 }
 
+const ITEMS_PER_PAGE = 5;
+
 const ComentariosTab: React.FC<ComentariosTabProps> = ({
   comentarios,
   onNuevoComentario,
   total
 }) => {
+  // Usar el hook de paginación
+  const {
+    currentPage,
+    totalPages,
+    paginatedItems: paginatedComentarios,
+    goToPage
+  } = usePagination({
+    items: comentarios,
+    initialItemsPerPage: ITEMS_PER_PAGE
+  });
+
+  const handlePageChange = (page: number) => {
+    goToPage(page);
+    document.getElementById('comentarios-list')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const formatFecha = (fecha: string) => {
     try {
       return new Date(fecha).toLocaleDateString('es-ES', {
@@ -57,7 +78,7 @@ const ComentariosTab: React.FC<ComentariosTabProps> = ({
   }
 
   return (
-    <div className="p-4 sm:p-6">
+    <div id="comentarios-list" className="p-4 sm:p-6">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-semibold text-gray-900">
           Comentarios y Seguimientos ({total})
@@ -72,8 +93,9 @@ const ComentariosTab: React.FC<ComentariosTabProps> = ({
         </button>
       </div>
 
+      {/* Lista de comentarios paginada */}
       <div className="space-y-4">
-        {comentarios.map((comentario) => (
+        {paginatedComentarios.map((comentario) => (
           <div
             key={comentario.id}
             className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
@@ -111,6 +133,20 @@ const ComentariosTab: React.FC<ComentariosTabProps> = ({
           </div>
         ))}
       </div>
+
+      {/* Paginación */}
+      {comentarios.length > ITEMS_PER_PAGE && (
+        <div className="mt-6">
+          <Pagination
+            currentPage={currentPage}
+            lastPage={totalPages}
+            total={comentarios.length}
+            perPage={ITEMS_PER_PAGE}
+            onPageChange={handlePageChange}
+            useLinks={false}
+          />
+        </div>
+      )}
     </div>
   );
 };
