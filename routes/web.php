@@ -296,43 +296,4 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
     Route::fallback(function () {
         return Inertia::render('Errors/404');
     });
-
-
-
-Route::get('/test-403', function () {
-    return Inertia::render('Errors/403', [
-        'status' => 403,
-        'message' => 'No tienes permisos para acceder a esta página.'
-    ]);
-})->name('test.403');
-
-Route::get('/test-404', function () {
-    return Inertia::render('Errors/404', [
-        'status' => 404,
-        'message' => 'La página que buscas no existe.'
-    ]);
-})->name('test.404');
-
-Route::get('/test-419', function () {
-    return Inertia::render('Errors/419', [
-        'status' => 419,
-        'message' => 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
-    ]);
-})->name('test.419');
-
-Route::get('/test-500', function () {
-    return Inertia::render('Errors/500', [
-        'status' => 500,
-        'message' => 'Ha ocurrido un error interno en el servidor.'
-    ]);
-})->name('test.500');
-
-Route::get('/test-503', function () {
-    return Inertia::render('Errors/503', [
-        'status' => 503,
-        'message' => 'El sitio está en mantenimiento. Por favor, intenta más tarde.'
-    ]);
-})->name('test.503');
-
-
 });
