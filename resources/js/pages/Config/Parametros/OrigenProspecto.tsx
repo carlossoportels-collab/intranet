@@ -1,177 +1,221 @@
 // resources/js/Pages/Config/Parametros/OrigenProspecto.tsx
-import React, { useState } from 'react';
-
+import React from 'react';
 import AppLayout from '@/layouts/app-layout';
+import { PageProps } from '@/types';
 
 interface OrigenProspecto {
     id: number;
     nombre: string;
-    tipo: string;
+    descripcion?: string;
+    color?: string;
+    icono?: string;
     efectividad: number;
     activo: boolean;
+    total_leads: number;
+    clientes_convertidos: number;
 }
 
-export default function OrigenProspecto() {
-    const [origenes] = useState<OrigenProspecto[]>([
-        { id: 1, nombre: 'Referido de cliente', tipo: 'Referido', efectividad: 85, activo: true },
-        { id: 2, nombre: 'Campaña email', tipo: 'Marketing', efectividad: 45, activo: true },
-        { id: 3, nombre: 'Redes sociales', tipo: 'Digital', efectividad: 60, activo: true },
-        { id: 4, nombre: 'Evento/Exposición', tipo: 'Presencial', efectividad: 70, activo: true },
-        { id: 5, nombre: 'Búsqueda web', tipo: 'Digital', efectividad: 55, activo: false },
-    ]);
+interface ResumenGlobal {
+    total_origenes: number;
+    total_leads_con_origen: number;
+    total_leads_sin_origen: number;
+    efectividad_global: number;
+    clientes_convertidos: number;
+}
+
+interface Props extends PageProps {
+    origenesProspecto?: OrigenProspecto[];
+    resumenGlobal?: ResumenGlobal;
+}
+
+export default function OrigenProspecto({ 
+    origenesProspecto = [], 
+    resumenGlobal = {
+        total_origenes: 0,
+        total_leads_con_origen: 0,
+        total_leads_sin_origen: 0,
+        efectividad_global: 0,
+        clientes_convertidos: 0
+    }
+}: Props) {
+    
+    const getEfectividadColor = (efectividad: number) => {
+        if (efectividad > 70) return 'bg-green-500';
+        if (efectividad > 50) return 'bg-yellow-500';
+        if (efectividad > 30) return 'bg-orange-500';
+        return 'bg-red-500';
+    };
+
+    const getEfectividadBgClass = (efectividad: number) => {
+        if (efectividad > 70) return 'bg-green-100 text-green-800';
+        if (efectividad > 50) return 'bg-yellow-100 text-yellow-800';
+        if (efectividad > 30) return 'bg-orange-100 text-orange-800';
+        return 'bg-red-100 text-red-800';
+    };
 
     return (
         <AppLayout title="Origen de Prospectos">
-            <div className="mb-4">
-                <h1 className="text-3xl font-bold text-gray-900">
+            {/* Header */}
+            <div className="mb-6">
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
                     Origen de Prospectos
                 </h1>
-                <p className="mt-1 text-gray-600 text-base">
-                    Configuración de fuentes de prospección comercial
+                <p className="mt-1 text-sm md:text-base text-gray-600">
+                    Análisis de fuentes de prospección y su efectividad
                 </p>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                            Orígenes Configurados
-                        </h2>
-                        <p className="text-sm text-gray-600">
-                            Gestione las fuentes de obtención de prospectos
-                        </p>
-                    </div>
-                    <button className="px-4 py-2 bg-local text-white text-sm rounded hover:bg-local-600 transition-colors">
-                        + Nuevo Origen
-                    </button>
+            {/* Stats Cards - Responsive grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+                    <div className="text-xs md:text-sm font-medium text-gray-600">Orígenes con leads</div>
+                    <div className="text-xl md:text-2xl font-bold text-gray-900">{resumenGlobal.total_origenes}</div>
                 </div>
-
-                {/* Effectiveness Summary */}
-                <div className="mb-6 p-4 bg-gray-50 rounded border">
-                    <h3 className="font-medium text-gray-900 mb-2">Efectividad por Tipo</h3>
-                    <div className="space-y-3">
-                        {['Referido', 'Marketing', 'Digital', 'Presencial'].map((tipo) => {
-                            const origenesTipo = origenes.filter(o => o.tipo === tipo && o.activo);
-                            const promedio = origenesTipo.length > 0 
-                                ? origenesTipo.reduce((acc, o) => acc + o.efectividad, 0) / origenesTipo.length 
-                                : 0;
-                            
-                            if (origenesTipo.length === 0) return null;
-                            
-                            return (
-                                <div key={tipo}>
-                                    <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-gray-700">{tipo}</span>
-                                        <span className="font-medium text-gray-900">{promedio.toFixed(0)}%</span>
-                                    </div>
-                                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full ${promedio > 70 ? 'bg-green-500' : promedio > 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                                            style={{ width: `${promedio}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+                    <div className="text-xs md:text-sm font-medium text-gray-600">Leads con origen</div>
+                    <div className="text-xl md:text-2xl font-bold text-blue-600">{resumenGlobal.total_leads_con_origen}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                        {resumenGlobal.total_leads_sin_origen} sin origen
                     </div>
                 </div>
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+                    <div className="text-xs md:text-sm font-medium text-gray-600">Clientes convertidos</div>
+                    <div className="text-xl md:text-2xl font-bold text-green-600">{resumenGlobal.clientes_convertidos}</div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+                    <div className="text-xs md:text-sm font-medium text-gray-600">Efectividad global</div>
+                    <div className="text-xl md:text-2xl font-bold text-purple-600">{resumenGlobal.efectividad_global}%</div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                        <div 
+                            className={`h-full rounded-full ${getEfectividadColor(resumenGlobal.efectividad_global)}`}
+                            style={{ width: `${resumenGlobal.efectividad_global}%` }}
+                        ></div>
+                    </div>
+                </div>
+            </div>
 
-                {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">ID</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Origen</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Tipo</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Efectividad</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Estado</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {origenes.map((origen) => (
-                                <tr key={origen.id} className="hover:bg-gray-50">
-                                    <td className="py-3 px-4">{origen.id}</td>
-                                    <td className="py-3 px-4 font-medium">{origen.nombre}</td>
-                                    <td className="py-3 px-4">
-                                        <span className={`px-2 py-1 text-xs rounded-full ${
-                                            origen.tipo === 'Referido' ? 'bg-green-100 text-green-800' :
-                                            origen.tipo === 'Marketing' ? 'bg-blue-100 text-blue-800' :
-                                            origen.tipo === 'Digital' ? 'bg-purple-100 text-purple-800' :
-                                            'bg-yellow-100 text-yellow-800'
-                                        }`}>
-                                            {origen.tipo}
-                                        </span>
-                                    </td>
-                                    <td className="py-3 px-4">
-                                        <div className="flex items-center">
-                                            <div className="w-16 bg-gray-200 rounded-full h-2 mr-3">
-                                                <div 
-                                                    className={`h-full rounded-full ${origen.efectividad > 70 ? 'bg-green-500' : origen.efectividad > 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                                                    style={{ width: `${origen.efectividad}%` }}
-                                                ></div>
-                                            </div>
-                                            <span className="font-medium">{origen.efectividad}%</span>
+            {/* Tabla de orígenes */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-4 md:p-6 border-b border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                        Efectividad por origen
+                    </h2>
+                </div>
+
+                {origenesProspecto.length === 0 ? (
+                    <div className="text-center py-8 md:py-12 px-4">
+                        <p className="text-gray-500">No hay datos de leads con origen registrado</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Desktop Table - visible en md y superior */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="py-3 px-4 text-left font-medium text-gray-700">Origen</th>
+                                        <th className="py-3 px-4 text-left font-medium text-gray-700">Descripción</th>
+                                        <th className="py-3 px-4 text-center font-medium text-gray-700">Leads</th>
+                                        <th className="py-3 px-4 text-center font-medium text-gray-700">Clientes</th>
+                                        <th className="py-3 px-4 text-left font-medium text-gray-700">Efectividad</th>
+                                        <th className="py-3 px-4 text-center font-medium text-gray-700">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {origenesProspecto.map((origen) => (
+                                        <tr key={origen.id} className="hover:bg-gray-50">
+                                            <td className="py-3 px-4">
+                                                <div className="flex items-center gap-2">
+                                                    {origen.icono && <i className={origen.icono}></i>}
+                                                    <span className="font-medium">{origen.nombre}</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-4 text-gray-600 max-w-xs truncate">
+                                                {origen.descripcion}
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-medium">
+                                                {origen.total_leads}
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-medium">
+                                                {origen.clientes_convertidos}
+                                            </td>
+                                            <td className="py-3 px-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-20 bg-gray-200 rounded-full h-2">
+                                                        <div 
+                                                            className={`h-full rounded-full ${getEfectividadColor(origen.efectividad)}`}
+                                                            style={{ width: `${origen.efectividad}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className={`px-2 py-0.5 text-xs rounded-full ${getEfectividadBgClass(origen.efectividad)}`}>
+                                                        {origen.efectividad}%
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                <span className={`px-2 py-1 text-xs rounded-full ${origen.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                    {origen.activo ? 'Activo' : 'Inactivo'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Mobile Cards - visible en móvil */}
+                        <div className="md:hidden divide-y divide-gray-200">
+                            {origenesProspecto.map((origen) => (
+                                <div key={origen.id} className="p-4 hover:bg-gray-50">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            {origen.icono && <i className={origen.icono}></i>}
+                                            <span className="font-medium text-gray-900">{origen.nombre}</span>
                                         </div>
-                                    </td>
-                                    <td className="py-3 px-4">
                                         <span className={`px-2 py-1 text-xs rounded-full ${origen.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                                             {origen.activo ? 'Activo' : 'Inactivo'}
                                         </span>
-                                    </td>
-                                    <td className="py-3 px-4">
-                                        <button className="text-sat hover:text-sat-600 text-sm">
-                                            Editar
-                                        </button>
-                                    </td>
-                                </tr>
+                                    </div>
+                                    
+                                    {origen.descripcion && (
+                                        <div className="text-sm text-gray-600 mb-3">
+                                            {origen.descripcion}
+                                        </div>
+                                    )}
+                                    
+                                    <div className="grid grid-cols-2 gap-3 mb-3">
+                                        <div className="bg-gray-50 p-2 rounded text-center">
+                                            <div className="text-xs text-gray-500">Leads</div>
+                                            <div className="text-lg font-bold text-gray-900">{origen.total_leads}</div>
+                                        </div>
+                                        <div className="bg-gray-50 p-2 rounded text-center">
+                                            <div className="text-xs text-gray-500">Clientes</div>
+                                            <div className="text-lg font-bold text-green-600">{origen.clientes_convertidos}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-sm text-gray-600">Efectividad</span>
+                                            <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${getEfectividadBgClass(origen.efectividad)}`}>
+                                                {origen.efectividad}%
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div 
+                                                className={`h-full rounded-full ${getEfectividadColor(origen.efectividad)}`}
+                                                style={{ width: `${origen.efectividad}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                </div>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Mobile Cards */}
-                <div className="md:hidden space-y-4">
-                    {origenes.map((origen) => (
-                        <div key={origen.id} className="p-4 border border-gray-200 rounded-lg hover:border-sat transition-colors">
-                            <div className="flex justify-between items-start mb-3">
-                                <div>
-                                    <div className="font-medium text-gray-900">{origen.nombre}</div>
-                                    <div className="text-sm text-gray-600">ID: {origen.id}</div>
-                                </div>
-                                <div className="flex flex-col items-end gap-1">
-                                    <span className={`px-2 py-1 text-xs rounded-full ${
-                                        origen.tipo === 'Referido' ? 'bg-green-100 text-green-800' :
-                                        origen.tipo === 'Marketing' ? 'bg-blue-100 text-blue-800' :
-                                        origen.tipo === 'Digital' ? 'bg-purple-100 text-purple-800' :
-                                        'bg-yellow-100 text-yellow-800'
-                                    }`}>
-                                        {origen.tipo}
-                                    </span>
-                                    <span className={`px-2 py-1 text-xs rounded-full ${origen.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                        {origen.activo ? 'Activo' : 'Inactivo'}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="mb-4">
-                                <div className="flex justify-between text-sm mb-1">
-                                    <span className="text-gray-700">Efectividad:</span>
-                                    <span className="font-medium">{origen.efectividad}%</span>
-                                </div>
-                                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div 
-                                        className={`h-full ${origen.efectividad > 70 ? 'bg-green-500' : origen.efectividad > 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                                        style={{ width: `${origen.efectividad}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-                            <button className="w-full text-center px-3 py-1.5 text-sm text-sat border border-sat rounded hover:bg-sat-50 transition-colors">
-                                Editar
-                            </button>
                         </div>
-                    ))}
-                </div>
+                    </>
+                )}
             </div>
         </AppLayout>
     );

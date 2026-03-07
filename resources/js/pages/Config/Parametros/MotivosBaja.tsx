@@ -1,25 +1,31 @@
 // resources/js/Pages/Config/Parametros/MotivosBaja.tsx
-import React, { useState } from 'react';
-
+import React from 'react';
 import AppLayout from '@/layouts/app-layout';
+import { PageProps } from '@/types';
 
 interface MotivoBaja {
     id: number;
     nombre: string;
-    categoria: string;
     descripcion: string;
-    requiere_comentario: boolean;
     activo: boolean;
 }
 
-export default function MotivosBaja() {
-    const [motivos] = useState<MotivoBaja[]>([
-        { id: 1, nombre: 'Fin de contrato', categoria: 'Contrato', descripcion: 'Finalización del período contractual', requiere_comentario: false, activo: true },
-        { id: 2, nombre: 'Insatisfacción con servicio', categoria: 'Servicio', descripcion: 'Cliente no satisfecho con el servicio', requiere_comentario: true, activo: true },
-        { id: 3, nombre: 'Problemas económicos', categoria: 'Financiero', descripcion: 'Dificultades económicas del cliente', requiere_comentario: true, activo: true },
-        { id: 4, nombre: 'Cambio de proveedor', categoria: 'Competencia', descripcion: 'Cliente cambió a otro proveedor', requiere_comentario: true, activo: true },
-        { id: 5, nombre: 'Falta de respuesta', categoria: 'Comunicación', descripcion: 'Cliente no responde contactos', requiere_comentario: false, activo: false },
-    ]);
+interface Props extends PageProps {
+    motivosBaja?: MotivoBaja[];
+}
+
+export default function MotivosBaja({ motivosBaja = [] }: Props) {
+    if (!motivosBaja) {
+        return (
+            <AppLayout title="Motivos de Baja">
+                <div className="p-4">
+                    <p className="text-red-600">Error: No se pudieron cargar los motivos de baja</p>
+                </div>
+            </AppLayout>
+        );
+    }
+
+    const activos = motivosBaja.filter(m => m.activo).length;
 
     return (
         <AppLayout title="Motivos de Baja">
@@ -33,123 +39,78 @@ export default function MotivosBaja() {
             </div>
 
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                            Motivos Configurados
-                        </h2>
-                        <p className="text-sm text-gray-600">
-                            Gestione los motivos de baja disponibles
-                        </p>
+                <div className="mb-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                        Motivos Configurados
+                    </h2>
+                    <p className="text-sm text-gray-600">
+                        Listado de motivos de baja disponibles en el sistema
+                    </p>
+                </div>
+
+                {/* Stats simple */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div className="p-4 bg-blue-50 rounded border border-blue-100">
+                        <div className="text-sm font-medium text-blue-700">Total motivos</div>
+                        <div className="text-2xl font-bold text-blue-900">{motivosBaja.length}</div>
                     </div>
-                    <button className="px-4 py-2 bg-sat text-white text-sm rounded hover:bg-sat-600 transition-colors">
-                        + Nuevo Motivo
-                    </button>
+                    <div className="p-4 bg-green-50 rounded border border-green-100">
+                        <div className="text-sm font-medium text-green-700">Activos</div>
+                        <div className="text-2xl font-bold text-green-900">{activos}</div>
+                    </div>
                 </div>
 
-                {/* Categorías Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    {['Contrato', 'Servicio', 'Financiero', 'Competencia'].map((categoria) => {
-                        const count = motivos.filter(m => m.categoria === categoria && m.activo).length;
-                        return (
-                            <div key={categoria} className="p-3 bg-gray-50 rounded border">
-                                <div className="text-sm font-medium text-gray-700">{categoria}</div>
-                                <div className="text-xl font-bold text-gray-900">{count}</div>
-                            </div>
-                        );
-                    })}
-                </div>
+                {motivosBaja.length === 0 ? (
+                    <div className="text-center py-8">
+                        <p className="text-gray-500">No hay motivos de baja configurados</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Desktop Table */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="py-3 px-4 text-left font-medium text-gray-700">ID</th>
+                                        <th className="py-3 px-4 text-left font-medium text-gray-700">Motivo</th>
+                                        <th className="py-3 px-4 text-left font-medium text-gray-700">Descripción</th>
+                                        <th className="py-3 px-4 text-left font-medium text-gray-700">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {motivosBaja.map((motivo) => (
+                                        <tr key={motivo.id} className="hover:bg-gray-50">
+                                            <td className="py-3 px-4">{motivo.id}</td>
+                                            <td className="py-3 px-4 font-medium">{motivo.nombre}</td>
+                                            <td className="py-3 px-4 text-gray-600">{motivo.descripcion}</td>
+                                            <td className="py-3 px-4">
+                                                <span className={`px-2 py-1 text-xs rounded-full ${motivo.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                    {motivo.activo ? 'Activo' : 'Inactivo'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
 
-                {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">ID</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Motivo</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Categoría</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Descripción</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Requiere Comentario</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Estado</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {motivos.map((motivo) => (
-                                <tr key={motivo.id} className="hover:bg-gray-50">
-                                    <td className="py-3 px-4">{motivo.id}</td>
-                                    <td className="py-3 px-4 font-medium">{motivo.nombre}</td>
-                                    <td className="py-3 px-4">
-                                        <span className={`px-2 py-1 text-xs rounded-full ${
-                                            motivo.categoria === 'Contrato' ? 'bg-blue-100 text-blue-800' :
-                                            motivo.categoria === 'Servicio' ? 'bg-red-100 text-red-800' :
-                                            motivo.categoria === 'Financiero' ? 'bg-yellow-100 text-yellow-800' :
-                                            'bg-purple-100 text-purple-800'
-                                        }`}>
-                                            {motivo.categoria}
-                                        </span>
-                                    </td>
-                                    <td className="py-3 px-4 text-gray-600">{motivo.descripcion}</td>
-                                    <td className="py-3 px-4">
-                                        {motivo.requiere_comentario ? (
-                                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Sí</span>
-                                        ) : (
-                                            <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">No</span>
-                                        )}
-                                    </td>
-                                    <td className="py-3 px-4">
+                        {/* Mobile Cards */}
+                        <div className="md:hidden space-y-4">
+                            {motivosBaja.map((motivo) => (
+                                <div key={motivo.id} className="p-4 border border-gray-200 rounded-lg">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="font-medium text-gray-900">{motivo.nombre}</div>
                                         <span className={`px-2 py-1 text-xs rounded-full ${motivo.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                                             {motivo.activo ? 'Activo' : 'Inactivo'}
                                         </span>
-                                    </td>
-                                    <td className="py-3 px-4">
-                                        <button className="text-sat hover:text-sat-600 text-sm">
-                                            Editar
-                                        </button>
-                                    </td>
-                                </tr>
+                                    </div>
+                                    <div className="text-sm text-gray-600 mb-1">ID: {motivo.id}</div>
+                                    <div className="text-sm text-gray-700">{motivo.descripcion}</div>
+                                </div>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Mobile Cards */}
-                <div className="md:hidden space-y-4">
-                    {motivos.map((motivo) => (
-                        <div key={motivo.id} className="p-4 border border-gray-200 rounded-lg hover:border-sat transition-colors">
-                            <div className="flex justify-between items-start mb-3">
-                                <div>
-                                    <div className="font-medium text-gray-900">{motivo.nombre}</div>
-                                    <div className="text-sm text-gray-600">ID: {motivo.id}</div>
-                                </div>
-                                <div className="flex flex-col items-end gap-1">
-                                    <span className={`px-2 py-1 text-xs rounded-full ${
-                                        motivo.categoria === 'Contrato' ? 'bg-blue-100 text-blue-800' :
-                                        motivo.categoria === 'Servicio' ? 'bg-red-100 text-red-800' :
-                                        motivo.categoria === 'Financiero' ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-purple-100 text-purple-800'
-                                    }`}>
-                                        {motivo.categoria}
-                                    </span>
-                                    <span className={`px-2 py-1 text-xs rounded-full ${motivo.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                        {motivo.activo ? 'Activo' : 'Inactivo'}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="text-sm text-gray-600 mb-3">
-                                {motivo.descripcion}
-                            </div>
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="text-sm text-gray-700">
-                                    Requiere comentario: {motivo.requiere_comentario ? 'Sí' : 'No'}
-                                </span>
-                            </div>
-                            <button className="w-full text-center px-3 py-1.5 text-sm text-sat border border-sat rounded hover:bg-sat-50 transition-colors">
-                                Editar
-                            </button>
                         </div>
-                    ))}
-                </div>
+                    </>
+                )}
             </div>
         </AppLayout>
     );

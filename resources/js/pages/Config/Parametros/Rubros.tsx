@@ -1,167 +1,169 @@
 // resources/js/Pages/Config/Parametros/Rubros.tsx
-import React, { useState } from 'react';
-
+import React from 'react';
 import AppLayout from '@/layouts/app-layout';
+import { PageProps } from '@/types';
 
 interface Rubro {
     id: number;
     nombre: string;
-    descripcion: string;
-    categoria: string;
-    clientes_asociados: number;
     activo: boolean;
+    total_leads: number;
+    total_empresas: number;
+    total_asociados: number;
 }
 
-export default function Rubros() {
-    const [rubros] = useState<Rubro[]>([
-        { id: 1, nombre: 'Transporte de Carga', categoria: 'Logística', descripcion: 'Empresas de transporte terrestre', clientes_asociados: 45, activo: true },
-        { id: 2, nombre: 'Distribución', categoria: 'Logística', descripcion: 'Distribución de mercaderías', clientes_asociados: 32, activo: true },
-        { id: 3, nombre: 'Logística Integral', categoria: 'Logística', descripcion: 'Servicios logísticos completos', clientes_asociados: 18, activo: true },
-        { id: 4, nombre: 'Comercio Exterior', categoria: 'Import/Export', descripcion: 'Importación y exportación', clientes_asociados: 12, activo: true },
-        { id: 5, nombre: 'Almacenamiento', categoria: 'Logística', descripcion: 'Depósitos y almacenes', clientes_asociados: 8, activo: false },
-    ]);
+interface Resumen {
+    total_rubros: number;
+    rubros_activos: number;
+    total_leads_con_rubro: number;
+    total_leads_sin_rubro: number;
+    total_empresas_con_rubro: number;
+    total_empresas_sin_rubro: number;
+}
+
+interface Props extends PageProps {
+    rubros?: Rubro[];
+    resumen?: Resumen;
+}
+
+export default function Rubros({ 
+    rubros = [], 
+    resumen = {
+        total_rubros: 0,
+        rubros_activos: 0,
+        total_leads_con_rubro: 0,
+        total_leads_sin_rubro: 0,
+        total_empresas_con_rubro: 0,
+        total_empresas_sin_rubro: 0
+    }
+}: Props) {
 
     return (
         <AppLayout title="Rubros">
-            <div className="mb-4">
-                <h1 className="text-3xl font-bold text-gray-900">
-                    Rubros Comerciales
+            {/* Header */}
+            <div className="mb-6">
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                    Rubros
                 </h1>
-                <p className="mt-1 text-gray-600 text-base">
-                    Configuración de rubros para clasificación de clientes
+                <p className="mt-1 text-sm md:text-base text-gray-600">
+                    Listado de rubros para clasificación
                 </p>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                            Rubros Configurados
-                        </h2>
-                        <p className="text-sm text-gray-600">
-                            Gestione los rubros comerciales del sistema
-                        </p>
+            {/* Stats Cards - Resumen de asociados y no asociados */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+                    <div className="text-xs md:text-sm font-medium text-gray-600">Total Rubros</div>
+                    <div className="text-xl md:text-2xl font-bold text-gray-900">{resumen.total_rubros}</div>
+                    <div className="text-xs text-gray-500 mt-1">{resumen.rubros_activos} activos</div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+                    <div className="text-xs md:text-sm font-medium text-gray-600">Leads con Rubro</div>
+                    <div className="text-xl md:text-2xl font-bold text-blue-600">{resumen.total_leads_con_rubro}</div>
+                    <div className="text-xs text-gray-500 mt-1">{resumen.total_leads_sin_rubro} sin rubro</div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+                    <div className="text-xs md:text-sm font-medium text-gray-600">Empresas con Rubro</div>
+                    <div className="text-xl md:text-2xl font-bold text-purple-600">{resumen.total_empresas_con_rubro}</div>
+                    <div className="text-xs text-gray-500 mt-1">{resumen.total_empresas_sin_rubro} sin rubro</div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+                    <div className="text-xs md:text-sm font-medium text-gray-600">Total Asociados</div>
+                    <div className="text-xl md:text-2xl font-bold text-green-600">
+                        {resumen.total_leads_con_rubro + resumen.total_empresas_con_rubro}
                     </div>
-                    <button className="px-4 py-2 bg-sat text-white text-sm rounded hover:bg-sat-600 transition-colors">
-                        + Nuevo Rubro
-                    </button>
+                    <div className="text-xs text-gray-500 mt-1">leads + empresas</div>
+                </div>
+            </div>
+
+            {/* Tabla de rubros */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-4 md:p-6 border-b border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                        Listado de Rubros
+                    </h2>
                 </div>
 
-                {/* Categorías Summary */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    {['Logística', 'Import/Export'].map((categoria) => {
-                        const rubrosCategoria = rubros.filter(r => r.categoria === categoria && r.activo);
-                        const totalClientes = rubrosCategoria.reduce((acc, r) => acc + r.clientes_asociados, 0);
-                        
-                        return (
-                            <div key={categoria} className="p-4 bg-gray-50 rounded border">
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="font-medium text-gray-900">{categoria}</h3>
-                                    <span className="text-sm text-gray-600">{rubrosCategoria.length} rubros</span>
-                                </div>
-                                <div className="text-2xl font-bold text-local">{totalClientes}</div>
-                                <div className="text-sm text-gray-600">clientes asociados</div>
-                            </div>
-                        );
-                    })}
-                </div>
+                {rubros.length === 0 ? (
+                    <div className="text-center py-8 md:py-12 px-4">
+                        <p className="text-gray-500">No hay rubros configurados</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Desktop Table */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="py-3 px-4 text-left font-medium text-gray-700">ID</th>
+                                        <th className="py-3 px-4 text-left font-medium text-gray-700">Rubro</th>
+                                        <th className="py-3 px-4 text-center font-medium text-gray-700">Leads</th>
+                                        <th className="py-3 px-4 text-center font-medium text-gray-700">Empresas</th>
+                                        <th className="py-3 px-4 text-center font-medium text-gray-700">Total Asociados</th>
+                                        <th className="py-3 px-4 text-center font-medium text-gray-700">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {rubros.map((rubro) => (
+                                        <tr key={rubro.id} className="hover:bg-gray-50">
+                                            <td className="py-3 px-4 text-gray-600">{rubro.id}</td>
+                                            <td className="py-3 px-4 font-medium">{rubro.nombre}</td>
+                                            <td className="py-3 px-4 text-center font-medium text-blue-600">
+                                                {rubro.total_leads}
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-medium text-purple-600">
+                                                {rubro.total_empresas}
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-bold text-gray-900">
+                                                {rubro.total_asociados}
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                <span className={`px-2 py-1 text-xs rounded-full ${rubro.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                    {rubro.activo ? 'Activo' : 'Inactivo'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
 
-                {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">ID</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Rubro</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Categoría</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Descripción</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Clientes</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Estado</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        {/* Mobile Cards */}
+                        <div className="md:hidden divide-y divide-gray-200">
                             {rubros.map((rubro) => (
-                                <tr key={rubro.id} className="hover:bg-gray-50">
-                                    <td className="py-3 px-4">{rubro.id}</td>
-                                    <td className="py-3 px-4 font-medium">{rubro.nombre}</td>
-                                    <td className="py-3 px-4">
-                                        <span className={`px-2 py-1 text-xs rounded-full ${
-                                            rubro.categoria === 'Logística' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-green-100 text-green-800'
-                                        }`}>
-                                            {rubro.categoria}
-                                        </span>
-                                    </td>
-                                    <td className="py-3 px-4 text-gray-600">{rubro.descripcion}</td>
-                                    <td className="py-3 px-4">
-                                        <div className="flex items-center">
-                                            <span className="font-medium mr-2">{rubro.clientes_asociados}</span>
-                                            <div className="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden">
-                                                <div 
-                                                    className="h-full bg-local"
-                                                    style={{ width: `${Math.min(rubro.clientes_asociados * 2, 100)}%` }}
-                                                ></div>
-                                            </div>
+                                <div key={rubro.id} className="p-4 hover:bg-gray-50">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                            <span className="font-medium text-gray-900">{rubro.nombre}</span>
+                                            <span className="text-xs text-gray-500 ml-2">ID: {rubro.id}</span>
                                         </div>
-                                    </td>
-                                    <td className="py-3 px-4">
                                         <span className={`px-2 py-1 text-xs rounded-full ${rubro.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                                             {rubro.activo ? 'Activo' : 'Inactivo'}
                                         </span>
-                                    </td>
-                                    <td className="py-3 px-4">
-                                        <button className="text-sat hover:text-sat-600 text-sm">
-                                            Editar
-                                        </button>
-                                    </td>
-                                </tr>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="bg-gray-50 p-2 rounded text-center">
+                                            <div className="text-xs text-gray-500">Leads</div>
+                                            <div className="text-base font-bold text-blue-600">{rubro.total_leads}</div>
+                                        </div>
+                                        <div className="bg-gray-50 p-2 rounded text-center">
+                                            <div className="text-xs text-gray-500">Empresas</div>
+                                            <div className="text-base font-bold text-purple-600">{rubro.total_empresas}</div>
+                                        </div>
+                                        <div className="bg-gray-50 p-2 rounded text-center">
+                                            <div className="text-xs text-gray-500">Total</div>
+                                            <div className="text-base font-bold text-gray-900">{rubro.total_asociados}</div>
+                                        </div>
+                                    </div>
+                                </div>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Mobile Cards */}
-                <div className="md:hidden space-y-4">
-                    {rubros.map((rubro) => (
-                        <div key={rubro.id} className="p-4 border border-gray-200 rounded-lg hover:border-sat transition-colors">
-                            <div className="flex justify-between items-start mb-3">
-                                <div>
-                                    <div className="font-medium text-gray-900">{rubro.nombre}</div>
-                                    <div className="text-sm text-gray-600">ID: {rubro.id}</div>
-                                </div>
-                                <div className="flex flex-col items-end gap-1">
-                                    <span className={`px-2 py-1 text-xs rounded-full ${
-                                        rubro.categoria === 'Logística' ? 'bg-blue-100 text-blue-800' :
-                                        'bg-green-100 text-green-800'
-                                    }`}>
-                                        {rubro.categoria}
-                                    </span>
-                                    <span className={`px-2 py-1 text-xs rounded-full ${rubro.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                        {rubro.activo ? 'Activo' : 'Inactivo'}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="text-sm text-gray-600 mb-3">
-                                {rubro.descripcion}
-                            </div>
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="text-sm text-gray-700">
-                                    Clientes: {rubro.clientes_asociados}
-                                </span>
-                                <div className="h-2 w-16 bg-gray-200 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-local"
-                                        style={{ width: `${Math.min(rubro.clientes_asociados * 2, 100)}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-                            <button className="w-full text-center px-3 py-1.5 text-sm text-sat border border-sat rounded hover:bg-sat-50 transition-colors">
-                                Editar
-                            </button>
                         </div>
-                    ))}
-                </div>
+                    </>
+                )}
             </div>
         </AppLayout>
     );

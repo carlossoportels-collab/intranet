@@ -11,7 +11,7 @@ import AppLayout from '@/layouts/app-layout';
 // Define el tipo para el estado del formulario
 interface EstadoLeadForm {
     nombre: string;
-    tipo: 'nuevo' | 'activo' | 'final_positivo' | 'final_negativo';
+    tipo: 'nuevo' | 'activo' | 'recontacto' |'final_positivo' | 'final_negativo';
     orden_en_proceso: number;
     descripcion: string;
     color_hex: string;
@@ -129,6 +129,7 @@ export default function EstadosLead({ estados = [] }: Props) {
     const tipoLabels = {
         nuevo: 'Nuevo',
         activo: 'Activo',
+        recontacto: 'recontacto',
         final_positivo: 'Final Positivo',
         final_negativo: 'Final Negativo',
     };
@@ -136,6 +137,7 @@ export default function EstadosLead({ estados = [] }: Props) {
     const tipoColors = {
         nuevo: 'bg-blue-100 text-blue-800 border-blue-200',
         activo: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        recontacto: 'bg-blue-100 text-blue-800 border-blue-200',
         final_positivo: 'bg-green-100 text-green-800 border-green-200',
         final_negativo: 'bg-red-100 text-red-800 border-red-200',
     };
@@ -269,13 +271,13 @@ export default function EstadosLead({ estados = [] }: Props) {
                                                         >
                                                             <Edit2 className="h-4 w-4" />
                                                         </button>
-                                                        <button 
+                                                        {/*  <button 
                                                             onClick={() => setConfirmDelete(estado.id)}
                                                             className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
                                                             title="Eliminar"
                                                         >
                                                             <Trash2 className="h-4 w-4" />
-                                                        </button>
+                                                        </button>*/} 
                                                     </div>
                                                 </td>
                                             </tr>
@@ -370,13 +372,13 @@ export default function EstadosLead({ estados = [] }: Props) {
                                                         <Edit2 className="h-4 w-4" />
                                                         Editar
                                                     </button>
-                                                    <button
+                                               {/*     <button
                                                         onClick={() => setConfirmDelete(estado.id)}
                                                         className="px-3 py-2 bg-red-50 text-red-700 text-sm rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                         Eliminar
-                                                    </button>
+                                                    </button> */} 
                                                 </div>
                                             </div>
                                         )}

@@ -1232,10 +1232,7 @@
 
             <li style="margin-bottom: 8px;">
                 <strong>PLAZO</strong> – El plazo de este contrato es de 24 meses y será automáticamente renovado por períodos anuales a menos que alguna de las partes notifique a la otra en forma escrita la no-renovación con 10 días de anticipación al vencimiento originario.
-            </li>
-
-            <li style="margin-bottom: 8px;">
-                <strong>EL CLIENTE</strong> declara haber leído y estar de acuerdo con las cláusulas ubicadas al frente y al dorso de este contrato. EL CLIENTE declara haber sido instruido y tener pleno conocimiento del servicio que contrata y que LA EMPRESA le ha informado acerca del alcance del servicio, sus limitaciones y sus consecuencias y/o efectos.
+                EL CLIENTEdeclara haber leído y estar de acuerdo con las cláusulas ubicadas al frente y al dorso de este contrato. EL CLIENTE declara haber sido instruido y tener pleno conocimiento del servicio que contrata y que LA EMPRESA le ha informado acerca del alcance del servicio, sus limitaciones y sus consecuencias y/o efectos.
             </li>
         </ol>
     </div>

@@ -13,7 +13,7 @@ class EstadosLeadController extends Controller
     public function index()
     {
         // Obtener todos los estados ordenados por orden_en_proceso
-        $estados = EstadoLead::orderBy('orden_en_proceso')->get();
+        $estados = EstadoLead::orderBy('id')->get();
         
         return Inertia::render('Config/Parametros/EstadosLead', [
             'estados' => $estados
