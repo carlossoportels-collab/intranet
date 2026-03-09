@@ -147,7 +147,7 @@ private function getCompaniaNombre($usuario)
         
         $request->session()->forget('welcome_data');
         
-        $redirectTo = $welcomeData['rol_id'] == 5 ? route('comercial.actividad') : route('dashboard');
+        $redirectTo = $welcomeData['rol_id'] == 5 ? route('comercial.prospectos') : route('comercial.prospectos');
         
         return inertia('Auth/Welcome', [
             'compania' => $welcomeData['compania'],
