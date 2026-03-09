@@ -232,17 +232,5 @@ class LeadController extends Controller
         }
     }
 
-    /**
-     * Endpoint para obtener tiempos entre estados (API)
-     */
-    public function tiemposEstados($leadId): \Illuminate\Http\JsonResponse
-    {
-        $tiempos = $this->detailsService->getStateTransitionTimes($leadId);
 
-        if (empty($tiempos)) {
-            return response()->json(['error' => 'Lead no encontrado'], 404);
-        }
-
-        return response()->json($tiempos);
-    }
 }

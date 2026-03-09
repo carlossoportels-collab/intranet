@@ -1,7 +1,6 @@
 // resources/js/components/leads/tabs/TiemposTab.tsx
-import { Clock, TrendingUp, BarChart3, Target } from 'lucide-react';
+import { Clock, TrendingUp, BarChart3, Target, Info } from 'lucide-react';
 import React from 'react';
-
 import { useLeadTiempos } from '@/hooks/useLeadTiempos';
 
 interface TiemposTabProps {
@@ -74,25 +73,24 @@ const TiemposTab: React.FC<TiemposTabProps> = ({ leadId, puedeVer }) => {
             />
             <StatCard
               icon={<Clock className="h-5 w-5 text-green-600" />}
-              title="Total días"
+              title="Tiempo total"
               value={estadisticas.totalDias}
+              subtitle={`${estadisticas.totalHoras}h ${estadisticas.totalMinutos}m`}
               bgColor="bg-green-50"
               textColor="text-green-600"
             />
             <StatCard
               icon={<Target className="h-5 w-5 text-purple-600" />}
-              title="Promedio"
+              title="Promedio por cambio"
               value={`${estadisticas.promedioDias} días`}
+              subtitle={`1 cambio cada ${estadisticas.promedioDias} días`}
               bgColor="bg-purple-50"
               textColor="text-purple-600"
             />
-            <StatCard
-              icon={<BarChart3 className="h-5 w-5 text-orange-600" />}
-              title="Rango"
-              value={`${estadisticas.minimoDias} - ${estadisticas.maximoDias} días`}
-              bgColor="bg-orange-50"
-              textColor="text-orange-600"
-            />
+          </div>
+          <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+            <Info className="h-3 w-3" />
+            <span>Promedio calculado sobre tiempo total real ({estadisticas.totalDias}d {estadisticas.totalHoras}h {estadisticas.totalMinutos}m)</span>
           </div>
         </div>
       )}
@@ -114,15 +112,17 @@ const StatCard: React.FC<{
   icon: React.ReactNode;
   title: string;
   value: string | number;
+  subtitle?: string;
   bgColor: string;
   textColor: string;
-}> = ({ icon, title, value, bgColor, textColor }) => (
+}> = ({ icon, title, value, subtitle, bgColor, textColor }) => (
   <div className={`${bgColor} p-4 rounded-lg border`}>
     <div className="flex items-center gap-2 mb-2">
       {icon}
       <span className={`text-sm font-medium ${textColor}`}>{title}</span>
     </div>
     <p className={`text-2xl font-bold ${textColor}`}>{value}</p>
+    {subtitle && <p className={`text-xs ${textColor} opacity-75 mt-1`}>{subtitle}</p>}
   </div>
 );
 

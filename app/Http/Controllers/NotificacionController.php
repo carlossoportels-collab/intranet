@@ -25,7 +25,7 @@ class NotificacionController extends Controller
         $this->aplicarFiltros($query, $request);
         
         // Paginación
-        $notificaciones = $query->paginate(20);
+        $notificaciones = $query->paginate(10);
         
         // Transformar resultados
         $notificaciones->getCollection()->transform(function($notificacion) {
@@ -71,7 +71,7 @@ public function programadas(Request $request)
     }
     
     // Paginación
-    $programadas = $query->paginate(20);
+    $programadas = $query->paginate(10);
     
     // Transformar resultados con información adicional
     $programadas->getCollection()->transform(function($notificacion) {

@@ -1,70 +1,159 @@
-// resources/js/Pages/RRHH/Personal/Licencias.tsx
-import React, { useState } from 'react';
+// resources/js/Pages/rrhh/Personal/Licencias.tsx
 
+import React, { useState } from 'react';
+import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import Pagination from '@/components/ui/Pagination';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import NuevaLicenciaModal from '@/components/Modals/NuevaLicenciaModal';
+import EditarLicenciaModal from '@/components/Modals/EditarLicenciaModal';
+import { Edit, Trash2 } from 'lucide-react';
+import { useToast } from '@/contexts/ToastContext';
 
 interface Licencia {
     id: number;
+    personal_id: number;
     empleado: string;
     tipo: string;
+    tipo_id: number;
     fecha_inicio: string;
     fecha_fin: string;
     dias_totales: number;
     dias_restantes: number;
-    motivo: string;
+    observacion: string;
     estado: string;
     fecha_solicitud: string;
 }
 
-export default function Licencias() {
-    const [licencias] = useState<Licencia[]>([
-        { id: 1, empleado: 'María López', tipo: 'Vacaciones', fecha_inicio: '2026-02-01', fecha_fin: '2026-02-15', dias_totales: 15, dias_restantes: 15, motivo: 'Vacaciones anuales', estado: 'Aprobada', fecha_solicitud: '2026-01-10' },
-        { id: 2, empleado: 'Juan Pérez', tipo: 'Enfermedad', fecha_inicio: '2026-01-20', fecha_fin: '2026-01-25', dias_totales: 5, dias_restantes: 0, motivo: 'Gripe con certificado médico', estado: 'Finalizada', fecha_solicitud: '2026-01-19' },
-        { id: 3, empleado: 'Carlos Gómez', tipo: 'Estudio', fecha_inicio: '2026-03-01', fecha_fin: '2026-03-01', dias_totales: 1, dias_restantes: 1, motivo: 'Examen final', estado: 'Pendiente', fecha_solicitud: '2026-01-18' },
-        { id: 4, empleado: 'Ana Rodríguez', tipo: 'Maternidad', fecha_inicio: '2026-04-01', fecha_fin: '2026-07-31', dias_totales: 120, dias_restantes: 120, motivo: 'Licencia por maternidad', estado: 'Programada', fecha_solicitud: '2026-01-15' },
-        { id: 5, empleado: 'Luis Martínez', tipo: 'Vacaciones', fecha_inicio: '2026-01-10', fecha_fin: '2026-01-12', dias_totales: 3, dias_restantes: 0, motivo: 'Descanso', estado: 'Finalizada', fecha_solicitud: '2026-01-05' },
-    ]);
+interface Motivo {
+    id: number;
+    nombre: string;
+}
 
-    const [filtroEstado, setFiltroEstado] = useState<string>('todos');
-    const [filtroTipo, setFiltroTipo] = useState<string>('todos');
+interface PaginatedData<T> {
+    data: T[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+}
+
+interface Props {
+    licencias: PaginatedData<Licencia>;
+    motivos: Motivo[];
+    filters: {
+        estado?: string;
+        motivo_id?: number;
+        empleado?: string;
+    };
+    userRole: number;
+    esComercial: boolean;
+}
+
+export default function Licencias({ licencias, motivos, filters, userRole, esComercial }: Props) {
+    const toast = useToast();
+    const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
+    const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+    const [confirmDialogAbierto, setConfirmDialogAbierto] = useState(false);
+    const [licenciaAEliminar, setLicenciaAEliminar] = useState<{ id: number; empleado: string } | null>(null);
+    const [licenciaSeleccionada, setLicenciaSeleccionada] = useState<Licencia | null>(null);
+    
+    const [filtroEstado, setFiltroEstado] = useState<string>(filters.estado || 'todos');
+    const [filtroMotivo, setFiltroMotivo] = useState<number | 'todos'>(filters.motivo_id || 'todos');
+    const [filtroEmpleado, setFiltroEmpleado] = useState<string>(filters.empleado || '');
+
+    // Permisos por rol
+    const esAdmin = userRole === 2; // Solo rol 2 puede hacer todo
+    const puedeVerTodo = esAdmin; // Solo admin ve todo
+    const puedeCrear = esAdmin;
+    const puedeEditar = esAdmin;
+    const puedeEliminar = esAdmin;
 
     const getTipoColor = (tipo: string) => {
-        switch (tipo) {
-            case 'Vacaciones': return 'bg-blue-100 text-blue-800';
-            case 'Enfermedad': return 'bg-red-100 text-red-800';
-            case 'Estudio': return 'bg-purple-100 text-purple-800';
-            case 'Maternidad': return 'bg-pink-100 text-pink-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
+        const tipoLower = tipo.toLowerCase();
+        if (tipoLower.includes('vacacion')) return 'bg-blue-100 text-blue-800';
+        if (tipoLower.includes('enfermedad')) return 'bg-red-100 text-red-800';
+        if (tipoLower.includes('estudio')) return 'bg-purple-100 text-purple-800';
+        if (tipoLower.includes('maternidad')) return 'bg-pink-100 text-pink-800';
+        if (tipoLower.includes('paternidad')) return 'bg-indigo-100 text-indigo-800';
+        if (tipoLower.includes('examen')) return 'bg-yellow-100 text-yellow-800';
+        return 'bg-gray-100 text-gray-800';
     };
 
     const getEstadoColor = (estado: string) => {
         switch (estado) {
-            case 'Aprobada': return 'bg-green-100 text-green-800';
-            case 'Pendiente': return 'bg-yellow-100 text-yellow-800';
-            case 'Finalizada': return 'bg-gray-100 text-gray-800';
             case 'Programada': return 'bg-blue-100 text-blue-800';
-            case 'Rechazada': return 'bg-red-100 text-red-800';
+            case 'En Curso': return 'bg-green-100 text-green-800';
+            case 'Finalizada': return 'bg-gray-100 text-gray-800';
             default: return 'bg-gray-100 text-gray-800';
         }
     };
 
-    const filteredLicencias = licencias.filter(l => {
-        if (filtroEstado !== 'todos' && l.estado !== filtroEstado) return false;
-        if (filtroTipo !== 'todos' && l.tipo !== filtroTipo) return false;
-        return true;
-    });
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-AR', {
-            style: 'currency',
-            currency: 'ARS',
-            minimumFractionDigits: 0
-        }).format(amount);
+    const handleFiltroChange = (tipo: 'estado' | 'motivo' | 'empleado', valor: any) => {
+        const params: any = {
+            page: 1
+        };
+        
+        if (tipo === 'estado') {
+            setFiltroEstado(valor);
+            params.estado = valor !== 'todos' ? valor : undefined;
+            params.motivo_id = filtroMotivo !== 'todos' ? filtroMotivo : undefined;
+            params.empleado = filtroEmpleado || undefined;
+        } else if (tipo === 'motivo') {
+            setFiltroMotivo(valor);
+            params.motivo_id = valor !== 'todos' ? valor : undefined;
+            params.estado = filtroEstado !== 'todos' ? filtroEstado : undefined;
+            params.empleado = filtroEmpleado || undefined;
+        } else {
+            setFiltroEmpleado(valor);
+            params.empleado = valor || undefined;
+            params.estado = filtroEstado !== 'todos' ? filtroEstado : undefined;
+            params.motivo_id = filtroMotivo !== 'todos' ? filtroMotivo : undefined;
+        }
+        
+        router.get('/rrhh/personal/licencias', params, { preserveState: true, replace: true });
     };
+
+    const handleSuccess = () => {
+        router.reload({ only: ['licencias'] });
+    };
+
+    const handleEditClick = (licencia: Licencia) => {
+        setLicenciaSeleccionada(licencia);
+        setModalEditarAbierto(true);
+    };
+
+    const handleDeleteClick = (id: number, empleado: string) => {
+        setLicenciaAEliminar({ id, empleado });
+        setConfirmDialogAbierto(true);
+    };
+
+    const handleConfirmDelete = () => {
+        if (licenciaAEliminar) {
+            router.delete(`/rrhh/personal/licencias/${licenciaAEliminar.id}`, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Licencia eliminada correctamente');
+                    router.reload({ only: ['licencias'] });
+                },
+                onError: (errors) => {
+                    console.error('Error al eliminar:', errors);
+                    toast.error('Error al eliminar la licencia');
+                }
+            });
+        }
+        setLicenciaAEliminar(null);
+    };
+
+    // Obtener lista única de empleados para el filtro
+    const empleadosUnicos = [...new Set(licencias.data.map(l => l.empleado))].sort();
 
     return (
         <AppLayout title="Licencias">
+            <Head title="Licencias" />
+            
             <div className="mb-4">
                 <h1 className="text-3xl font-bold text-gray-900">
                     Licencias y Ausencias
@@ -75,84 +164,71 @@ export default function Licencias() {
             </div>
 
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-                {/* Header y Filtros */}
+                {/* Header y Botón Nueva Solicitud */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                     <div>
                         <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                            Gestión de Licencias
+                            Listado de Licencias
                         </h2>
                         <p className="text-sm text-gray-600">
-                            Administre solicitudes y seguimiento de ausencias
+                            {licencias.total} registros encontrados
                         </p>
                     </div>
-                    <button className="px-4 py-2 bg-sat text-white text-sm rounded hover:bg-sat-600 transition-colors">
-                        + Nueva Solicitud
-                    </button>
+                    
+                    {puedeCrear && (
+                        <button 
+                            onClick={() => setModalNuevoAbierto(true)}
+                            className="px-4 py-2 bg-sat text-white text-sm rounded hover:bg-sat-600 transition-colors"
+                        >
+                            + Nueva Solicitud
+                        </button>
+                    )}
                 </div>
 
                 {/* Filtros */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por estado</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
                         <select
                             value={filtroEstado}
-                            onChange={(e) => setFiltroEstado(e.target.value)}
+                            onChange={(e) => handleFiltroChange('estado', e.target.value)}
                             className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-sat focus:border-sat"
                         >
                             <option value="todos">Todos los estados</option>
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="Aprobada">Aprobada</option>
-                            <option value="Finalizada">Finalizada</option>
                             <option value="Programada">Programada</option>
-                            <option value="Rechazada">Rechazada</option>
+                            <option value="En Curso">En Curso</option>
+                            <option value="Finalizada">Finalizada</option>
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por tipo</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
                         <select
-                            value={filtroTipo}
-                            onChange={(e) => setFiltroTipo(e.target.value)}
+                            value={filtroMotivo}
+                            onChange={(e) => handleFiltroChange('motivo', e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
                             className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-sat focus:border-sat"
                         >
                             <option value="todos">Todos los tipos</option>
-                            <option value="Vacaciones">Vacaciones</option>
-                            <option value="Enfermedad">Enfermedad</option>
-                            <option value="Estudio">Estudio</option>
-                            <option value="Maternidad">Maternidad</option>
-                            <option value="Paternidad">Paternidad</option>
+                            {motivos.map(motivo => (
+                                <option key={motivo.id} value={motivo.id}>
+                                    {motivo.nombre}
+                                </option>
+                            ))}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Acciones</label>
-                        <button className="w-full px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">
-                            Exportar Reporte
-                        </button>
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-                    <div className="p-4 bg-blue-50 rounded border border-blue-100">
-                        <div className="text-sm font-medium text-blue-700">Total licencias</div>
-                        <div className="text-2xl font-bold text-blue-900">{licencias.length}</div>
-                    </div>
-                    <div className="p-4 bg-green-50 rounded border border-green-100">
-                        <div className="text-sm font-medium text-green-700">Días activos</div>
-                        <div className="text-2xl font-bold text-green-900">
-                            {licencias.filter(l => l.estado === 'Aprobada' || l.estado === 'Programada').reduce((sum, l) => sum + l.dias_restantes, 0)}
-                        </div>
-                    </div>
-                    <div className="p-4 bg-yellow-50 rounded border border-yellow-100">
-                        <div className="text-sm font-medium text-yellow-700">Pendientes</div>
-                        <div className="text-2xl font-bold text-yellow-900">
-                            {licencias.filter(l => l.estado === 'Pendiente').length}
-                        </div>
-                    </div>
-                    <div className="p-4 bg-purple-50 rounded border border-purple-100">
-                        <div className="text-sm font-medium text-purple-700">Vacaciones promedio</div>
-                        <div className="text-2xl font-bold text-purple-900">
-                            {Math.round(licencias.filter(l => l.tipo === 'Vacaciones').reduce((sum, l) => sum + l.dias_totales, 0) / licencias.filter(l => l.tipo === 'Vacaciones').length)} días
-                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Empleado</label>
+                        <select
+                            value={filtroEmpleado}
+                            onChange={(e) => handleFiltroChange('empleado', e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-sat focus:border-sat"
+                        >
+                            <option value="">Todos los empleados</option>
+                            {empleadosUnicos.map(empleado => (
+                                <option key={empleado} value={empleado}>
+                                    {empleado}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 
@@ -165,18 +241,23 @@ export default function Licencias() {
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Tipo</th>
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Período</th>
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Días</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Motivo</th>
+                                {/* Columna Observación - Solo visible para admin */}
+                                {puedeVerTodo && (
+                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Observación</th>
+                                )}
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Solicitado</th>
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Estado</th>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Acciones</th>
+                                {/* Columna Acciones - Solo visible para admin */}
+                                {(puedeEditar || puedeEliminar) && (
+                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Acciones</th>
+                                )}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {filteredLicencias.map((licencia) => (
+                            {licencias.data.map((licencia) => (
                                 <tr key={licencia.id} className="hover:bg-gray-50">
                                     <td className="py-3 px-4">
                                         <div className="font-medium">{licencia.empleado}</div>
-                                        <div className="text-xs text-gray-500">ID: {licencia.id}</div>
                                     </td>
                                     <td className="py-3 px-4">
                                         <span className={`px-2 py-1 text-xs rounded-full ${getTipoColor(licencia.tipo)}`}>
@@ -185,14 +266,14 @@ export default function Licencias() {
                                     </td>
                                     <td className="py-3 px-4">
                                         <div className="text-sm">
-                                            <div>Inicio: {licencia.fecha_inicio}</div>
-                                            <div>Fin: {licencia.fecha_fin}</div>
+                                            <div>{licencia.fecha_inicio}</div>
+                                            <div className="text-gray-500">al {licencia.fecha_fin}</div>
                                         </div>
                                     </td>
                                     <td className="py-3 px-4">
                                         <div>
                                             <div className="font-medium">{licencia.dias_restantes}/{licencia.dias_totales} días</div>
-                                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden w-20">
                                                 <div 
                                                     className={`h-full ${
                                                         (licencia.dias_restantes / licencia.dias_totales) > 0.5 ? 'bg-green-500' :
@@ -200,24 +281,45 @@ export default function Licencias() {
                                                         'bg-red-500'
                                                     }`}
                                                     style={{ width: `${(licencia.dias_restantes / licencia.dias_totales) * 100}%` }}
-                                                ></div>
+                                                />
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="py-3 px-4 text-gray-600">{licencia.motivo}</td>
+                                    {/* Observación - Solo visible para admin */}
+                                    {puedeVerTodo && (
+                                        <td className="py-3 px-4 text-gray-600 max-w-xs truncate">{licencia.observacion}</td>
+                                    )}
                                     <td className="py-3 px-4">{licencia.fecha_solicitud}</td>
                                     <td className="py-3 px-4">
                                         <span className={`px-2 py-1 text-xs rounded-full ${getEstadoColor(licencia.estado)}`}>
                                             {licencia.estado}
                                         </span>
                                     </td>
-                                    <td className="py-3 px-4">
-                                        <div className="flex gap-2">
-                                            <button className="text-sat hover:text-sat-600 text-sm">
-                                                Ver
-                                            </button>
-                                        </div>
-                                    </td>
+                                    {/* Acciones - Solo visible para admin */}
+                                    {(puedeEditar || puedeEliminar) && (
+                                        <td className="py-3 px-4">
+                                            <div className="flex gap-2">
+                                                {puedeEditar && (
+                                                    <button
+                                                        onClick={() => handleEditClick(licencia)}
+                                                        className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded transition-colors"
+                                                        title="Editar"
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </button>
+                                                )}
+                                                {puedeEliminar && (
+                                                    <button
+                                                        onClick={() => handleDeleteClick(licencia.id, licencia.empleado)}
+                                                        className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                                                        title="Eliminar"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
@@ -226,63 +328,134 @@ export default function Licencias() {
 
                 {/* Mobile Cards */}
                 <div className="md:hidden space-y-4">
-                    {filteredLicencias.map((licencia) => (
+                    {licencias.data.map((licencia) => (
                         <div key={licencia.id} className="p-4 border border-gray-200 rounded-lg hover:border-sat transition-colors">
                             <div className="flex justify-between items-start mb-3">
                                 <div>
                                     <div className="font-medium text-gray-900">{licencia.empleado}</div>
-                                    <div className="text-sm text-gray-600">ID: {licencia.id}</div>
+                                    <div className="mt-1">
+                                        <span className={`px-2 py-1 text-xs rounded-full ${getTipoColor(licencia.tipo)}`}>
+                                            {licencia.tipo}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col items-end gap-1">
-                                    <span className={`px-2 py-1 text-xs rounded-full ${getTipoColor(licencia.tipo)}`}>
-                                        {licencia.tipo}
-                                    </span>
-                                    <span className={`px-2 py-1 text-xs rounded-full ${getEstadoColor(licencia.estado)}`}>
-                                        {licencia.estado}
-                                    </span>
+                                <span className={`px-2 py-1 text-xs rounded-full ${getEstadoColor(licencia.estado)}`}>
+                                    {licencia.estado}
+                                </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+                                <div>
+                                    <span className="text-gray-600">Inicio:</span>
+                                    <span className="ml-1 font-medium">{licencia.fecha_inicio}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Fin:</span>
+                                    <span className="ml-1 font-medium">{licencia.fecha_fin}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Días:</span>
+                                    <span className="ml-1 font-medium">{licencia.dias_restantes}/{licencia.dias_totales}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Solicitud:</span>
+                                    <span className="ml-1 font-medium">{licencia.fecha_solicitud}</span>
                                 </div>
                             </div>
-                            <div className="mb-4">
-                                <div className="text-sm text-gray-700 mb-1">Período: {licencia.fecha_inicio} - {licencia.fecha_fin}</div>
-                                <div className="text-sm text-gray-700">Días: {licencia.dias_restantes}/{licencia.dias_totales}</div>
-                            </div>
-                            <div className="mb-4">
-                                <div className="text-sm font-medium text-gray-700 mb-1">Motivo</div>
-                                <div className="text-sm text-gray-600">{licencia.motivo}</div>
-                            </div>
-                            <div className="flex gap-2">
-                                <button className="flex-1 px-3 py-1.5 text-sm text-sat border border-sat rounded hover:bg-sat-50 transition-colors">
-                                    Ver detalles
-                                </button>
-                                {licencia.estado === 'Pendiente' && (
-                                    <button className="flex-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
-                                        Aprobar
-                                    </button>
-                                )}
-                            </div>
+                            
+                            {/* Observación - Solo visible para admin */}
+                            {puedeVerTodo && (
+                                <div className="mb-3">
+                                    <div className="text-sm font-medium text-gray-700 mb-1">Observación</div>
+                                    <div className="text-sm text-gray-600">{licencia.observacion}</div>
+                                </div>
+                            )}
+                            
+                            {/* Acciones - Solo visible para admin */}
+                            {(puedeEditar || puedeEliminar) && (
+                                <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
+                                    {puedeEditar && (
+                                        <button
+                                            onClick={() => handleEditClick(licencia)}
+                                            className="flex-1 px-3 py-1.5 text-sm text-amber-600 border border-amber-600 rounded hover:bg-amber-50 transition-colors flex items-center justify-center gap-1"
+                                        >
+                                            <Edit className="h-4 w-4" />
+                                            Editar
+                                        </button>
+                                    )}
+                                    {puedeEliminar && (
+                                        <button
+                                            onClick={() => handleDeleteClick(licencia.id, licencia.empleado)}
+                                            className="flex-1 px-3 py-1.5 text-sm text-red-600 border border-red-600 rounded hover:bg-red-50 transition-colors flex items-center justify-center gap-1"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            Eliminar
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
 
-                {/* Vacation Balance */}
-                <div className="mt-8 p-4 bg-blue-50 rounded border border-blue-200">
-                    <h3 className="font-medium text-blue-900 mb-3">Balance de Vacaciones 2026</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="p-3 bg-white rounded border">
-                            <div className="text-sm text-gray-600 mb-1">Días asignados por ley</div>
-                            <div className="text-lg font-bold text-blue-700">14 días</div>
-                        </div>
-                        <div className="p-3 bg-white rounded border">
-                            <div className="text-sm text-gray-600 mb-1">Días tomados promedio</div>
-                            <div className="text-lg font-bold text-green-700">8 días</div>
-                        </div>
-                        <div className="p-3 bg-white rounded border">
-                            <div className="text-sm text-gray-600 mb-1">Saldo restante promedio</div>
-                            <div className="text-lg font-bold text-purple-700">6 días</div>
-                        </div>
+                {/* Paginación */}
+                {licencias.total > 0 && (
+                    <Pagination
+                        currentPage={licencias.current_page}
+                        lastPage={licencias.last_page}
+                        total={licencias.total}
+                        perPage={licencias.per_page}
+                        preserveState={true}
+                        preserveScroll={true}
+                        only={['licencias']}
+                    />
+                )}
+
+                {licencias.data.length === 0 && (
+                    <div className="text-center py-8">
+                        <p className="text-gray-500">No se encontraron licencias con los filtros seleccionados</p>
                     </div>
-                </div>
+                )}
             </div>
+
+            {/* Modal Nueva Licencia */}
+            {puedeCrear && (
+                <NuevaLicenciaModal
+                    isOpen={modalNuevoAbierto}
+                    onClose={() => setModalNuevoAbierto(false)}
+                    onSuccess={handleSuccess}
+                    motivos={motivos}
+                />
+            )}
+
+            {/* Modal Editar Licencia */}
+            {puedeEditar && (
+                <EditarLicenciaModal
+                    isOpen={modalEditarAbierto}
+                    onClose={() => {
+                        setModalEditarAbierto(false);
+                        setLicenciaSeleccionada(null);
+                    }}
+                    onSuccess={handleSuccess}
+                    licencia={licenciaSeleccionada}
+                    motivos={motivos}
+                />
+            )}
+
+            {/* Confirm Dialog para eliminar */}
+            <ConfirmDialog
+                isOpen={confirmDialogAbierto}
+                onClose={() => {
+                    setConfirmDialogAbierto(false);
+                    setLicenciaAEliminar(null);
+                }}
+                onConfirm={handleConfirmDelete}
+                title="Eliminar Licencia"
+                message={`¿Está seguro que desea eliminar la licencia de ${licenciaAEliminar?.empleado}? Esta acción no se puede deshacer.`}
+                confirmText="Eliminar"
+                cancelText="Cancelar"
+                type="danger"
+            />
         </AppLayout>
     );
 }

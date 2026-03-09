@@ -12,8 +12,9 @@ class CumpleanosController extends Controller
 {
     public function index(Request $request)
     {
-        // Obtener personal con fecha de nacimiento válida
-        $personal = Personal::whereNotNull('fecha_nacimiento')
+        // Obtener personal con fecha de nacimiento válida y su tipo
+        $personal = Personal::with('tipoPersonal')
+            ->whereNotNull('fecha_nacimiento')
             ->whereNull('deleted_at')
             ->orderByRaw("
                 CASE 
@@ -25,11 +26,27 @@ class CumpleanosController extends Controller
                 MONTH(fecha_nacimiento),
                 DAY(fecha_nacimiento)
             ")
-            ->get();
+            ->get()
+            ->map(function($p) {
+                return [
+                    'id' => $p->id,
+                    'nombre' => $p->nombre,
+                    'apellido' => $p->apellido,
+                    'email' => $p->email,
+                    'telefono' => $p->telefono,
+                    'fecha_nacimiento' => $p->fecha_nacimiento,
+                    'activo' => $p->activo,
+                    'departamento' => $p->tipoPersonal?->nombre ?? 'General',
+                    'tipo_personal_id' => $p->tipo_personal_id,
+                ];
+            });
+        
+        // Obtener departamentos únicos para los filtros
+        $departamentos = $personal->pluck('departamento')->unique()->values();
         
         return Inertia::render('rrhh/Personal/Cumpleanos', [
             'personal' => $personal,
-            'filtros' => $request->only(['mes', 'departamento']),
+            'departamentos' => $departamentos,
         ]);
     }
 }

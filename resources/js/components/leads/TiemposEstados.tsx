@@ -1,5 +1,5 @@
 // resources/js/Components/Lead/TiemposEstados.tsx
-import { Clock, TrendingUp, Calendar, BarChart3, Target, AlertCircle } from 'lucide-react';
+import { Clock, TrendingUp, Calendar, BarChart3, Target, AlertCircle, Info } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 interface TiempoEstado {
@@ -12,6 +12,14 @@ interface TiempoEstado {
     razon?: string;
 }
 
+interface EstadisticasTiempos {
+    totalCambios: number;
+    totalDias: number;
+    totalHoras: number;
+    totalMinutos: number;
+    promedioDias: number;
+}
+
 interface TiemposEstadosProps {
     leadId: number;
     isOpen?: boolean;
@@ -22,6 +30,7 @@ export default function TiemposEstados({ leadId, isOpen = false, onClose }: Tiem
     const [tiempos, setTiempos] = useState<TiempoEstado[]>([]);
     const [cargando, setCargando] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [estadisticas, setEstadisticas] = useState<EstadisticasTiempos | null>(null);
     
     useEffect(() => {
         if (leadId && isOpen) {
@@ -34,10 +43,29 @@ export default function TiemposEstados({ leadId, isOpen = false, onClose }: Tiem
         setError(null);
         
         try {
-            const response = await fetch(`/comercial/leads/${leadId}/tiempos-estados`);
-            if (!response.ok) throw new Error('Error al cargar tiempos');
+            const response = await fetch(`/comercial/leads/${leadId}/tiempos-estados`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
-            setTiempos(data);
+            
+            if (Array.isArray(data)) {
+                setTiempos(data);
+                setEstadisticas(calcularEstadisticas(data));
+            } else if (data.error) {
+                throw new Error(data.error);
+            } else {
+                console.warn('Formato de respuesta inesperado:', data);
+                setTiempos([]);
+                setEstadisticas(null);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al cargar datos');
             console.error('Error cargando tiempos:', err);
@@ -46,16 +74,32 @@ export default function TiemposEstados({ leadId, isOpen = false, onClose }: Tiem
         }
     };
     
-    const calcularEstadisticas = () => {
-        if (tiempos.length === 0) return null;
+    const calcularEstadisticas = (data: TiempoEstado[]): EstadisticasTiempos | null => {
+        if (data.length === 0) return null;
         
-        const totalDias = tiempos.reduce((total, tiempo) => total + tiempo.dias, 0);
-        const promedioDias = totalDias / tiempos.length;
+        // Calcular tiempo total real en días (con decimales)
+        const fechas = data.map(t => new Date(t.fecha_cambio).getTime());
+        const primeraFecha = Math.min(...fechas);
+        const ultimaFecha = Math.max(...fechas);
+        const diffMs = ultimaFecha - primeraFecha;
+        const diffHoras = diffMs / (1000 * 60 * 60);
+        const totalDiasReales = diffHoras / 24;
+        
+        // Para mostrar en días enteros + horas/minutos
+        const totalDias = Math.floor(totalDiasReales);
+        const restoHoras = (totalDiasReales - totalDias) * 24;
+        const totalHoras = Math.floor(restoHoras);
+        const totalMinutos = Math.floor((restoHoras - totalHoras) * 60);
+        
+        // Calcular promedio usando los días reales
+        const promedioDias = totalDiasReales / data.length;
         
         return {
-            totalCambios: tiempos.length,
+            totalCambios: data.length,
             totalDias,
-            promedioDias: promedioDias.toFixed(1)
+            totalHoras,
+            totalMinutos,
+            promedioDias: Number(promedioDias.toFixed(1))
         };
     };
     
@@ -72,8 +116,6 @@ export default function TiemposEstados({ leadId, isOpen = false, onClose }: Tiem
             return 'Fecha inválida';
         }
     };
-    
-    const estadisticas = calcularEstadisticas();
     
     if (!isOpen) return null;
     
@@ -140,36 +182,51 @@ export default function TiemposEstados({ leadId, isOpen = false, onClose }: Tiem
                     ) : (
                         <>
                             {/* Estadísticas */}
-                            <div className="mb-6">
-                                <h3 className="text-sm font-medium text-gray-700 mb-3">Estadísticas</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <BarChart3 className="h-5 w-5 text-blue-600" />
-                                            <span className="text-sm font-medium text-blue-700">Total cambios</span>
+                            {estadisticas && (
+                                <div className="mb-6">
+                                    <h3 className="text-sm font-medium text-gray-700 mb-3">Estadísticas</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <BarChart3 className="h-5 w-5 text-blue-600" />
+                                                <span className="text-sm font-medium text-blue-700">Total cambios</span>
+                                            </div>
+                                            <p className="text-2xl font-bold text-blue-600">{estadisticas.totalCambios}</p>
                                         </div>
-                                        <p className="text-2xl font-bold text-blue-600">{estadisticas?.totalCambios}</p>
+                                        
+                                        <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Clock className="h-5 w-5 text-green-600" />
+                                                <span className="text-sm font-medium text-green-700">Tiempo total</span>
+                                            </div>
+                                            <p className="text-2xl font-bold text-green-600">{estadisticas.totalDias}</p>
+                                            {(estadisticas.totalHoras > 0 || estadisticas.totalMinutos > 0) && (
+                                                <p className="text-xs text-green-600 opacity-75 mt-1">
+                                                    {estadisticas.totalHoras > 0 && `${estadisticas.totalHoras}h `}
+                                                    {estadisticas.totalMinutos > 0 && `${estadisticas.totalMinutos}m`}
+                                                </p>
+                                            )}
+                                        </div>
+                                        
+                                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Target className="h-5 w-5 text-purple-600" />
+                                                <span className="text-sm font-medium text-purple-700">Promedio por cambio</span>
+                                            </div>
+                                            <p className="text-2xl font-bold text-purple-600">
+                                                {estadisticas.promedioDias} días
+                                            </p>
+                                            <p className="text-xs text-purple-600 opacity-75 mt-1">
+                                                1 cambio cada {estadisticas.promedioDias} días
+                                            </p>
+                                        </div>
                                     </div>
-                                    
-                                    <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Clock className="h-5 w-5 text-green-600" />
-                                            <span className="text-sm font-medium text-green-700">Total días</span>
-                                        </div>
-                                        <p className="text-2xl font-bold text-green-600">{estadisticas?.totalDias}</p>
-                                    </div>
-                                    
-                                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Target className="h-5 w-5 text-purple-600" />
-                                            <span className="text-sm font-medium text-purple-700">Promedio por cambio</span>
-                                        </div>
-                                        <p className="text-2xl font-bold text-purple-600">
-                                            {estadisticas?.promedioDias} días
-                                        </p>
+                                    <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                                        <Info className="h-3 w-3" />
+                                        <span>Promedio calculado sobre tiempo total real ({estadisticas.totalDias}d {estadisticas.totalHoras}h {estadisticas.totalMinutos}m)</span>
                                     </div>
                                 </div>
-                            </div>
+                            )}
                             
                             {/* Lista de tiempos */}
                             <div>

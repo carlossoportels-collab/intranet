@@ -1,3 +1,5 @@
+// resources/js/Pages/Notificaciones/Index.tsx
+
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { 
   Bell, 
@@ -10,27 +12,28 @@ import {
   FileText, 
   Users,
   CheckCircle,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   Search,
   RefreshCw,
   Menu,
-  X as XIcon
+  X as XIcon,
+  Square,
+  CheckSquare
 } from 'lucide-react';
 import React, { useState } from 'react';
 
-import AlertError from '@/components/alert-error';
-import AlertSuccess from '@/components/alert-succes';
 import AppLayout from '@/layouts/app-layout';
+import Pagination from '@/components/ui/Pagination';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { notificacionesApi } from '@/utils/axiosHelper';
+import { useToast } from '@/contexts/ToastContext';
 
 interface Notificacion {
   id: number;
   titulo: string;
   mensaje: string;
   tipo: string;
-  entidad_tipo: 'lead' | 'presupuesto' | 'contrato' | 'comentario' | 'seguimiento_perdida';
+  entidad_tipo: 'lead' | 'presupuesto' | 'contrato' | 'comentario' | 'seguimiento_perdida' | 'personal';
   entidad_id: number | null;
   leida: boolean;
   fecha_notificacion: string;
@@ -44,8 +47,13 @@ interface PageProps {
   };
   notificaciones: {
     data: Notificacion[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
     links: any[];
-    meta: any;
   };
   filtros: {
     tipo?: string;
@@ -59,14 +67,23 @@ interface PageProps {
   };
 }
 
-export default function Index({ notificaciones, filtros, totalNoLeidas, flash }: PageProps) {
+export default function Index({ notificaciones, filtros, totalNoLeidas }: PageProps) {
+  const toast = useToast();
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
-  const [showAlert, setShowAlert] = useState<boolean>(false);
-  const [alertType, setAlertType] = useState<'success' | 'error' | 'confirm' | null>(null);
-  const [alertMessage, setAlertMessage] = useState<string>('');
-  const [notificacionAEliminar, setNotificacionAEliminar] = useState<Notificacion | null>(null);
+  
+  // Estados para selección múltiple
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
+  
+  // Estados para confirmación
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'delete' | 'deleteSelected';
+    notificacion?: Notificacion;
+  } | null>(null);
+  
   const [mostrarMenuMovil, setMostrarMenuMovil] = useState(false);
   
   const filtrosLocales = {
@@ -74,6 +91,23 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
     leida: filtros.leida || '',
     prioridad: filtros.prioridad || ''
   };
+
+  // Filtrar notificaciones por búsqueda
+  const notificacionesFiltradas = busqueda 
+    ? notificaciones.data.filter(n => 
+        n.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
+        n.mensaje.toLowerCase().includes(busqueda.toLowerCase())
+      )
+    : notificaciones.data;
+
+  // Actualizar selectAll cuando cambian los datos
+  React.useEffect(() => {
+    if (selectAll) {
+      setSelectedIds(notificacionesFiltradas.map(n => n.id));
+    } else {
+      setSelectedIds([]);
+    }
+  }, [notificacionesFiltradas, selectAll]);
 
   // Aplicar filtros
   const aplicarFiltros = () => {
@@ -83,6 +117,8 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
       onStart: () => setCargando(true),
       onFinish: () => setCargando(false),
     });
+    setSelectedIds([]);
+    setSelectAll(false);
   };
 
   // Limpiar filtros
@@ -93,14 +129,90 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
       onStart: () => setCargando(true),
       onFinish: () => setCargando(false),
     });
+    setSelectedIds([]);
+    setSelectAll(false);
   };
 
-  // Mostrar alerta de confirmación
+  // Mostrar confirmación para eliminar una notificación
   const mostrarConfirmacionEliminar = (notificacion: Notificacion) => {
-    setNotificacionAEliminar(notificacion);
-    setAlertType('confirm');
-    setAlertMessage(`¿Estás seguro de eliminar la notificación "${notificacion.titulo}"? Esta acción no se puede deshacer.`);
-    setShowAlert(true);
+    setConfirmAction({
+      type: 'delete',
+      notificacion
+    });
+    setConfirmDialogOpen(true);
+  };
+
+  // Mostrar confirmación para eliminar seleccionadas
+  const mostrarConfirmacionEliminarSeleccionadas = () => {
+    if (selectedIds.length === 0) return;
+    setConfirmAction({
+      type: 'deleteSelected'
+    });
+    setConfirmDialogOpen(true);
+  };
+
+  // Ejecutar eliminación
+  const ejecutarEliminacion = async () => {
+    if (!confirmAction) return;
+    
+    setCargando(true);
+    
+    try {
+      if (confirmAction.type === 'delete' && confirmAction.notificacion) {
+        // Eliminar una notificación
+        const response = await notificacionesApi.eliminar(confirmAction.notificacion.id);
+        
+        if (response.data.success) {
+          toast.success('Notificación eliminada correctamente');
+          
+          // Actualizar dropdown
+          window.dispatchEvent(new Event('notificaciones-actualizadas'));
+          
+          // Recargar
+          router.reload({ 
+            only: ['notificaciones', 'totalNoLeidas'],
+          });
+        }
+      } else if (confirmAction.type === 'deleteSelected') {
+        // Eliminar múltiples notificaciones
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const id of selectedIds) {
+          try {
+            const response = await notificacionesApi.eliminar(id);
+            if (response.data.success) {
+              successCount++;
+            } else {
+              errorCount++;
+            }
+          } catch {
+            errorCount++;
+          }
+        }
+        
+        if (successCount > 0) {
+          toast.success(`${successCount} notificación(es) eliminada(s) correctamente${errorCount > 0 ? `. ${errorCount} fallaron` : ''}`);
+          
+          // Actualizar dropdown
+          window.dispatchEvent(new Event('notificaciones-actualizadas'));
+          
+          // Recargar
+          router.reload({ 
+            only: ['notificaciones', 'totalNoLeidas'],
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error al eliminar la(s) notificación(es)');
+    } finally {
+      setCargando(false);
+      setConfirmDialogOpen(false);
+      setConfirmAction(null);
+      setSelectedIds([]);
+      setSelectAll(false);
+    }
   };
 
   // Marcar como leída
@@ -112,10 +224,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
         const response = await notificacionesApi.marcarLeida(id);
         
         if (response.data.success) {
-            // 1. Actualizar dropdown
             window.dispatchEvent(new Event('notificaciones-actualizadas'));
-            
-            // 2. Recargar solo lo necesario
             router.reload({ 
                 only: ['notificaciones', 'totalNoLeidas'],
             });
@@ -124,6 +233,39 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
         console.error('Error:', error);
     } finally {
         setCargando(false);
+    }
+  };
+
+  // Marcar seleccionadas como leídas
+  const marcarSeleccionadasLeidas = async () => {
+    if (selectedIds.length === 0) return;
+    
+    setCargando(true);
+    
+    try {
+      let successCount = 0;
+      
+      for (const id of selectedIds) {
+        const response = await notificacionesApi.marcarLeida(id);
+        if (response.data.success) {
+          successCount++;
+        }
+      }
+      
+      if (successCount > 0) {
+        toast.success(`${successCount} notificación(es) marcada(s) como leída(s)`);
+        
+        window.dispatchEvent(new Event('notificaciones-actualizadas'));
+        router.reload({ 
+          only: ['notificaciones', 'totalNoLeidas'],
+        });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setCargando(false);
+      setSelectedIds([]);
+      setSelectAll(false);
     }
   };
 
@@ -134,10 +276,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
         const response = await notificacionesApi.marcarTodasLeidas();
         
         if (response.data.success) {
-            // 1. Actualizar dropdown
             window.dispatchEvent(new Event('notificaciones-actualizadas'));
-            
-            // 2. Recargar solo lo necesario
             router.reload({ 
                 only: ['notificaciones', 'totalNoLeidas'],
             });
@@ -149,68 +288,36 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
     }
   };
 
-  // Eliminar notificación
-  const eliminarNotificacion = async () => {
-    if (!notificacionAEliminar) return;
+  // Manejar selección de una notificación
+  const toggleSelect = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
     
-    try {
-        setCargando(true);
-        const response = await notificacionesApi.eliminar(notificacionAEliminar.id);
-        
-        if (response.data.success) {
-            // 1. Emitir evento para actualizar dropdown
-            window.dispatchEvent(new Event('notificaciones-actualizadas'));
-            
-            // 2. Mostrar mensaje de éxito
-            setAlertType('success');
-            setAlertMessage('Notificación eliminada correctamente');
-            setShowAlert(true);
-            
-            // 3. Recargar
-            router.reload({ 
-                only: ['notificaciones', 'totalNoLeidas'],
-            });
-            
-            // Ocultar alerta después de 3 segundos
-            setTimeout(() => {
-                if (alertType === 'success') {
-                    setShowAlert(false);
-                    setAlertType(null);
-                }
-            }, 3000);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        setAlertType('error');
-        setAlertMessage('Error al eliminar la notificación');
-        setShowAlert(true);
-        
-        setTimeout(() => {
-            if (alertType === 'error') {
-                setShowAlert(false);
-                setAlertType(null);
-            }
-        }, 3000);
-    } finally {
-        setCargando(false);
-        setNotificacionAEliminar(null);
+    setSelectedIds(prev => {
+      const newSelected = prev.includes(id) 
+        ? prev.filter(itemId => itemId !== id)
+        : [...prev, id];
+      
+      // Actualizar selectAll
+      setSelectAll(newSelected.length === notificacionesFiltradas.length && notificacionesFiltradas.length > 0);
+      
+      return newSelected;
+    });
+  };
+
+  // Manejar seleccionar/deseleccionar todas
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(notificacionesFiltradas.map(n => n.id));
     }
+    setSelectAll(!selectAll);
   };
 
-  // Cancelar eliminación
-  const cancelarEliminacion = () => {
-    setShowAlert(false);
-    setAlertType(null);
-    setAlertMessage('');
-    setNotificacionAEliminar(null);
-  };
-
-  // Cerrar alert manualmente
-  const closeAlert = () => {
-    setShowAlert(false);
-    setAlertType(null);
-    setAlertMessage('');
-    setNotificacionAEliminar(null);
+  // Cancelar confirmación
+  const cancelarConfirmacion = () => {
+    setConfirmDialogOpen(false);
+    setConfirmAction(null);
   };
 
   // Navegar a entidad
@@ -234,11 +341,13 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
       case 'seguimiento_perdida':
         ruta = `/comercial/seguimientos-perdida`;
         break;
+      case 'personal':
+        ruta = `/rrhh/personal/cumpleanos`;
+        break;
       default:
         return;
     }
     
-    // Marcar como leída al navegar
     if (!notificacion.leida) {
       marcarComoLeida(notificacion.id);
     }
@@ -249,6 +358,8 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
   // Funciones auxiliares
   const getIconoPorTipo = (tipo: string) => {
     switch(tipo) {
+      case 'cumpleanos':
+        return <Clock className="h-5 w-5 text-pink-500" />;
       case 'lead_sin_contactar':
         return <Clock className="h-5 w-5 text-orange-500" />;
       case 'lead_proximo_contacto':
@@ -256,14 +367,18 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
       case 'presupuesto_por_vencer':
       case 'presupuesto_vencido':
         return <FileText className="h-5 w-5 text-yellow-500" />;
-      case 'contrato_por_vencer':
+      case 'contrato_activo':
+      case 'contrato_pendiente':
+      case 'contrato_instalado':
         return <FileText className="h-5 w-5 text-blue-500" />;
+      case 'recordatorio_seguimiento':
+        return <CheckCircle className="h-5 w-5 text-purple-500" />;
       case 'asignacion_lead':
         return <Users className="h-5 w-5 text-green-500" />;
       case 'comentario_recordatorio':
-        return <CheckCircle className="h-5 w-5 text-purple-500" />;
+        return <CheckCircle className="h-5 w-5 text-indigo-500" />;
       case 'lead_posible_recontacto':
-      return <RefreshCw className="h-5 w-5 text-cyan-500" />;
+        return <RefreshCw className="h-5 w-5 text-cyan-500" />;
       default:
         return <Bell className="h-5 w-5 text-gray-500" />;
     }
@@ -304,94 +419,26 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
     }
   };
 
-  // Verificar si es notificación activa (fecha ya pasó)
-  const esNotificacionActiva = (fechaString: string): boolean => {
-    try {
-      const fechaNotificacion = new Date(fechaString);
-      const ahora = new Date();
-      return fechaNotificacion <= ahora;
-    } catch {
-      return false;
-    }
-  };
-
-  // Filtrar notificaciones por búsqueda y solo mostrar activas
-  const notificacionesFiltradas = busqueda 
-    ? notificaciones.data.filter(n => 
-        (n.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
-        n.mensaje.toLowerCase().includes(busqueda.toLowerCase())) &&
-        esNotificacionActiva(n.fecha_notificacion) // ← Filtrar solo activas
-      )
-    : notificaciones.data.filter(n => esNotificacionActiva(n.fecha_notificacion)); // ← Filtrar solo activas
-
   return (
     <AppLayout title="Notificaciones">
       <Head title="Notificaciones" />
       
       <div className="max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-4 lg:px-8">
-        {/* Alertas */}
-        {showAlert && alertType === 'success' && (
-          <div className="mb-4 sm:mb-6 relative">
-            <AlertSuccess 
-              message={alertMessage}
-              title="¡Éxito!"
-            />
-            <button
-              onClick={closeAlert}
-              className="absolute right-3 top-3 text-green-600 hover:text-green-800"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        )}
-
-        {showAlert && alertType === 'error' && (
-          <div className="mb-4 sm:mb-6 relative">
-            <AlertError 
-              errors={[alertMessage]}
-              title="Error"
-            />
-            <button
-              onClick={closeAlert}
-              className="absolute right-3 top-3 text-red-600 hover:text-red-800"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        )}
-
-        {showAlert && alertType === 'confirm' && (
-          <div className="mb-4 sm:mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 relative">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-amber-800 mb-1 text-sm sm:text-base">Confirmar eliminación</h3>
-                <p className="text-amber-700 text-xs sm:text-sm">{alertMessage}</p>
-                <div className="flex gap-2 mt-3 flex-wrap">
-                  <button
-                    onClick={cancelarEliminacion}
-                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex-1 sm:flex-none"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={eliminarNotificacion}
-                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-1 sm:gap-2 flex-1 sm:flex-none"
-                  >
-                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-              <button
-                onClick={closeAlert}
-                className="text-amber-600 hover:text-amber-800 flex-shrink-0"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Confirm Dialog */}
+        <ConfirmDialog
+          isOpen={confirmDialogOpen}
+          onClose={cancelarConfirmacion}
+          onConfirm={ejecutarEliminacion}
+          title={confirmAction?.type === 'delete' ? 'Eliminar Notificación' : 'Eliminar Notificaciones Seleccionadas'}
+          message={
+            confirmAction?.type === 'delete' && confirmAction.notificacion
+              ? `¿Estás seguro de eliminar la notificación "${confirmAction.notificacion.titulo}"? Esta acción no se puede deshacer.`
+              : `¿Estás seguro de eliminar ${selectedIds.length} notificación(es) seleccionada(s)? Esta acción no se puede deshacer.`
+          }
+          confirmText="Eliminar"
+          cancelText="Cancelar"
+          type="danger"
+        />
 
         {/* Header - Responsive */}
         <div className="mb-4 sm:mb-6">
@@ -441,19 +488,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
                 Filtros
               </button>
               
-              <button
-                onClick={marcarTodasLeidas}
-                disabled={totalNoLeidas === 0 || cargando}
-                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base ${
-                  totalNoLeidas === 0
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                <Check className="h-4 w-4" />
-                <span className="hidden sm:inline">Marcar todas como leídas</span>
-                <span className="sm:hidden">Marcar todas</span>
-              </button>
             </div>
           </div>
           
@@ -479,35 +513,9 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
                 <Filter className="h-4 w-4" />
                 Filtros
               </button>
-              
-              <button
-                onClick={marcarTodasLeidas}
-                disabled={totalNoLeidas === 0 || cargando}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg flex-1 justify-center ${
-                  totalNoLeidas === 0
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                <Check className="h-4 w-4" />
-                Marcar todas
-              </button>
             </div>
           )}
           
-          {/* Barra de búsqueda */}
-          <div className="mt-3 sm:mt-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
-              <input
-                type="text"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar en notificaciones activas..."
-                className="w-full pl-9 sm:pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
         </div>
 
         {/* Filtros - Responsive */}
@@ -535,6 +543,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
                   <option value="contrato_por_vencer">Contrato por vencer</option>
                   <option value="comentario_recordatorio">Recordatorio</option>
                   <option value="lead_posible_recontacto">Posible recontacto lead</option>
+                  <option value="cumpleanos">Cumpleaños</option>
                 </select>
               </div>
               
@@ -594,8 +603,56 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
           </div>
         )}
 
+        {/* Barra de selección múltiple - ARRIBA */}
+        {notificacionesFiltradas.length > 0 && (
+          <div className="bg-gray-50 border border-gray-200 rounded-t-lg p-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-2 text-sm text-gray-700 hover:text-blue-600"
+              >
+                {selectAll ? (
+                  <>
+                    <CheckSquare className="h-4 w-4" />
+                    <span>Deseleccionar todo</span>
+                  </>
+                ) : (
+                  <>
+                    <Square className="h-4 w-4" />
+                    <span>Seleccionar todo</span>
+                  </>
+                )}
+              </button>
+              <span className="text-xs text-gray-500">
+                {selectedIds.length} de {notificacionesFiltradas.length} seleccionadas
+              </span>
+            </div>
+            
+            {selectedIds.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={marcarSeleccionadasLeidas}
+                  disabled={cargando}
+                  className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors flex items-center gap-1"
+                >
+                  <Check className="h-4 w-4" />
+                  Marcar como leídas
+                </button>
+                <button
+                  onClick={mostrarConfirmacionEliminarSeleccionadas}
+                  disabled={cargando}
+                  className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors flex items-center gap-1"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar seleccionadas
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Lista de notificaciones */}
-        <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+        <div className={`bg-white shadow-sm rounded-b-lg border border-t-0 border-gray-200 overflow-hidden ${notificacionesFiltradas.length === 0 ? 'rounded-lg border-t' : ''}`}>
           {cargando ? (
             <div className="p-6 sm:p-8 text-center">
               <div className="inline-block animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
@@ -628,17 +685,35 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
                 {notificacionesFiltradas.map((notificacion) => (
                   <div 
                     key={notificacion.id}
-                    className={`p-3 sm:p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                    className={`p-3 sm:p-4 hover:bg-gray-50 transition-colors ${
                       !notificacion.leida ? 'bg-blue-50' : ''
                     }`}
-                    onClick={() => navegarAEntidad(notificacion)}
                   >
                     <div className="flex items-start">
-                      <div className="mr-2 sm:mr-3 mt-0.5 sm:mt-1 flex-shrink-0">
+                      {/* Checkbox para selección */}
+                      <div className="mr-2 sm:mr-3 mt-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => toggleSelect(notificacion.id, e)}
+                          className="text-gray-400 hover:text-blue-600"
+                        >
+                          {selectedIds.includes(notificacion.id) ? (
+                            <CheckSquare className="h-5 w-5 text-blue-600" />
+                          ) : (
+                            <Square className="h-5 w-5" />
+                          )}
+                        </button>
+                      </div>
+                      
+                      {/* Icono */}
+                      <div className="mr-2 sm:mr-3 mt-0.5 sm:mt-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                         {getIconoPorTipo(notificacion.tipo)}
                       </div>
                       
-                      <div className="flex-1 min-w-0">
+                      {/* Contenido (clickeable para navegar) */}
+                      <div 
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => navegarAEntidad(notificacion)}
+                      >
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
@@ -661,7 +736,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
                               {getBadgePrioridad(notificacion.prioridad)}
                             </div>
                             
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                               {!notificacion.leida && (
                                 <button
                                   onClick={(e) => marcarComoLeida(notificacion.id, e)}
@@ -709,41 +784,18 @@ export default function Index({ notificaciones, filtros, totalNoLeidas, flash }:
                 ))}
               </div>
               
-              {/* Paginación */}
-              {notificaciones.links && notificaciones.links.length > 3 && (
-                <div className="px-3 sm:px-4 py-3 border-t border-gray-200 sm:px-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
-                    <div className="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
-                      Mostrando {notificaciones.data.length} de {notificaciones.meta.total} notificaciones activas
-                    </div>
-                    
-                    <div className="flex justify-center space-x-1 sm:space-x-2 overflow-x-auto">
-                      {notificaciones.links.map((link, index) => (
-                        <button
-                          key={index}
-                          onClick={() => {
-                            if (link.url) {
-                              const url = new URL(link.url);
-                              router.get(url.pathname + url.search, {}, {
-                                preserveState: true,
-                                onStart: () => setCargando(true),
-                                onFinish: () => setCargando(false),
-                              });
-                            }
-                          }}
-                          disabled={!link.url || link.active}
-                          className={`px-2 py-1 text-xs sm:px-3 sm:py-1 sm:text-sm rounded-md ${
-                            link.active
-                              ? 'bg-blue-600 text-white'
-                              : link.url
-                              ? 'text-gray-700 hover:bg-gray-100'
-                              : 'text-gray-400 cursor-not-allowed'
-                          }`}
-                          dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+              {/* Paginación con componente existente */}
+              {notificaciones.total > 0 && (
+                <div className="px-3 sm:px-4 py-3 border-t border-gray-200">
+                  <Pagination
+                    currentPage={notificaciones.current_page}
+                    lastPage={notificaciones.last_page}
+                    total={notificaciones.total}
+                    perPage={notificaciones.per_page}
+                    preserveState={true}
+                    preserveScroll={true}
+                    only={['notificaciones']}
+                  />
                 </div>
               )}
             </>

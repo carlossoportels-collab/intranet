@@ -1,4 +1,4 @@
-// SidebarNav.tsx - Versión limpia
+// SidebarNav.tsx - Versión modificada
 import { Link } from '@inertiajs/react';
 import { 
     ChevronDown, ChevronRight, 
@@ -24,6 +24,10 @@ interface SidebarNavProps {
         user?: {
             id: number;
             rol_nombre: string;
+            // Asegurarnos de incluir los datos de comercial
+            comercial?: {
+                compania_id: number | null;
+            } | null;
             [key: string]: any;
         };
     };
@@ -53,6 +57,8 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
     const userData = auth?.user;
     const userId = userData?.id;
     const userRole = userData?.rol_nombre;
+    // Obtener la compañía del usuario desde el objeto comercial
+    const userCompaniaId = userData?.comercial?.compania_id;
 
     const navigation: NavItem[] = [
         {
@@ -105,15 +111,12 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             children: [
                 { id: 'tarifas-consulta', name: 'Tarifas (consulta)', href: '/comercial/tarifas', icon: <Eye size={14} /> },
                 { id: 'convenios-vigentes', name: 'Convenios vigentes', href: '/comercial/convenios', icon: <FileCheck size={14} /> },
-                {
-                    id: 'documentacion',
-                    name: 'Documentación',
-                    icon: <Folder size={14} />,
-                    children: [
-                        { id: 'anexos', name: 'Anexos', href: '/comercial/documentacion/anexos', icon: <FileQuestion size={12} /> },
-                        { id: 'adendas', name: 'Adendas', href: '/comercial/documentacion/adendas', icon: <FileSignature size={12} /> },
-                        { id: 'formularios', name: 'Formularios', href: '/comercial/documentacion/formularios', icon: <FileSpreadsheet size={12} /> },
-                    ]
+                // CAMBIO IMPORTANTE: "Documentación" ahora es un enlace directo, no un submenú
+                { 
+                    id: 'documentacion', 
+                    name: 'Documentación', 
+                    href: '/comercial/documentacion', // Enlace directo a la nueva vista
+                    icon: <Folder size={14} /> 
                 },
                 { id: 'novedades', name: 'Novedades', href: '/comercial/novedades', icon: <Megaphone size={14} /> },
                 { id: 'reenvios-activos', name: 'Reenvíos activos', href: '/comercial/reenvios', icon: <Mail size={14} /> },

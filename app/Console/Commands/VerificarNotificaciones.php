@@ -3,9 +3,10 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Notificaciones\CumpleaniosNotificationService;
 use App\Services\Lead\Notifications\LeadCommentNotificationService;
 use App\Services\Lead\Notifications\LeadAssignmentNotificationService;
-use App\Services\Lead\Notifications\LeadExpiredNotificationService; // ← NUEVO
+use App\Services\Lead\Notifications\LeadExpiredNotificationService;
 use App\Services\Presupuesto\PresupuestoNotificationService;
 use App\Services\Contrato\ContratoNotificationService;
 use Illuminate\Console\Command;
@@ -16,23 +17,26 @@ class VerificarNotificaciones extends Command
     protected $signature = 'notificaciones:verificar';
     protected $description = 'Verifica y genera notificaciones automáticas';
     
+    protected $cumpleaniosNotificationService;
     protected $commentNotificationService;
     protected $assignmentNotificationService;
-    protected $expiredNotificationService; // ← NUEVO
+    protected $expiredNotificationService;
     protected $presupuestoNotificationService;
     protected $contratoNotificationService;
 
     public function __construct(
+        CumpleaniosNotificationService $cumpleaniosNotificationService,
         LeadCommentNotificationService $commentNotificationService,
         LeadAssignmentNotificationService $assignmentNotificationService,
-        LeadExpiredNotificationService $expiredNotificationService, // ← NUEVO
+        LeadExpiredNotificationService $expiredNotificationService,
         PresupuestoNotificationService $presupuestoNotificationService,
         ContratoNotificationService $contratoNotificationService
     ) {
         parent::__construct();
+        $this->cumpleaniosNotificationService = $cumpleaniosNotificationService;
         $this->commentNotificationService = $commentNotificationService;
         $this->assignmentNotificationService = $assignmentNotificationService;
-        $this->expiredNotificationService = $expiredNotificationService; // ← NUEVO
+        $this->expiredNotificationService = $expiredNotificationService;
         $this->presupuestoNotificationService = $presupuestoNotificationService;
         $this->contratoNotificationService = $contratoNotificationService;
     }
@@ -42,7 +46,13 @@ class VerificarNotificaciones extends Command
         $this->info('[' . now()->format('Y-m-d H:i:s') . '] Iniciando verificación de notificaciones...');
         
         try {
-            // ===== LEADS VENCIDOS (30 días) ===== ← NUEVO
+            // ===== CUMPLEAÑOS =====
+            $this->info('Verificando cumpleaños...');
+            $resultadoCumpleanios = $this->cumpleaniosNotificationService->verificarCumpleanios();
+            $this->info("✓ Cumpleaños procesados: {$resultadoCumpleanios['procesados']}");
+            $this->info("✓ Notificaciones de cumpleaños: {$resultadoCumpleanios['notificaciones']}");
+            
+            // ===== LEADS VENCIDOS =====
             $this->info('Verificando leads vencidos (30 días)...');
             $resultadoVencidos = $this->expiredNotificationService->verificarLeadsVencidos();
             $this->info("✓ Leads vencidos procesados: {$resultadoVencidos['procesados']}");

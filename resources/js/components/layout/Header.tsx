@@ -74,7 +74,7 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
                                 {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
                             </button>
                             <div className="ml-2 lg:ml-0">
-                                <Link href="/">
+                                <Link href="">
                                     <img 
                                         src={`/images/logos/${compania.logo}`}
                                         alt={`Logo ${compania.nombre}`}

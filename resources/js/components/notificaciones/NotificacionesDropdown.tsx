@@ -1,5 +1,6 @@
 // resources/js/Components/Notificaciones/NotificacionesDropdown.tsx
-import { router, usePage, } from '@inertiajs/react';
+
+import { router, usePage } from '@inertiajs/react';
 import { 
   Bell, 
   Check, 
@@ -10,12 +11,17 @@ import {
   Users,
   RefreshCw,
   Calendar,
-  Eye
+  Eye,
+  Cake,
+  Gift,
+  Sparkles,
+  MessageCircle,
+  X
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { notificacionesApi } from '@/utils/axiosHelper';
-
+import { useToast } from '@/contexts/ToastContext';
 
 interface Notificacion {
   id: number;
@@ -23,12 +29,16 @@ interface Notificacion {
   titulo: string;
   mensaje: string;
   tipo: string;
-  entidad_tipo: 'lead' | 'presupuesto' | 'contrato' | 'comentario' | 'seguimiento_perdida';
+  entidad_tipo: 'lead' | 'presupuesto' | 'contrato' | 'comentario' | 'seguimiento_perdida' | 'personal';
   entidad_id: number | null;
   leida: boolean;
   fecha_notificacion: string;
   prioridad: 'baja' | 'normal' | 'alta' | 'urgente';
   created: string;
+  lead_nombre?: string;
+  lead_id?: number;
+  personal_id?: number;
+  personal_nombre?: string;
 }
 
 interface PageProps {
@@ -44,6 +54,7 @@ interface PageProps {
 }
 
 const NotificacionesDropdown: React.FC = () => {
+  const toast = useToast();
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [sinLeer, setSinLeer] = useState<number>(0);
   const [mostrarDropdown, setMostrarDropdown] = useState<boolean>(false);
@@ -76,31 +87,22 @@ const NotificacionesDropdown: React.FC = () => {
     setCargando(true);
     
     try {
-      // CAMBIO 1: Usar getNoLeidas en lugar de getActivas
       const response = await notificacionesApi.getNoLeidas({
         limit: 10
       });
       
       if (response.data.success) {
-        // Filtrar por fecha (doble verificación)
         const notificacionesActivas = response.data.data.filter((notif: Notificacion) => 
           esNotificacionActiva(notif.fecha_notificacion)
         );
         
-        // EL BACKEND YA DEVUELVE SOLO NO LEÍDAS, así que no necesitamos filtrar
         setNotificaciones(notificacionesActivas);
         setSinLeer(response.data.meta?.total_no_leidas || 0);
-        
-        // Si hay notificaciones pero no aparecen (bug), forzar recarga
-        if (response.data.meta?.total_no_leidas > 0 && notificacionesActivas.length === 0) {
-          setTimeout(() => cargarNotificaciones(), 1000);
-        }
       } else {
         console.error('Error en respuesta:', response.data);
       }
     } catch (error) {
       console.error('Error cargando notificaciones:', error);
-      // Fallback: intentar cargar contador
       try {
         const contadorResponse = await notificacionesApi.getContador();
         if (contadorResponse.data.success) {
@@ -122,13 +124,9 @@ const NotificacionesDropdown: React.FC = () => {
       const response = await notificacionesApi.marcarLeida(id);
       
       if (response.data.success) {
-        // Eliminar la notificación de la lista local inmediatamente
         setNotificaciones(prev => prev.filter(n => n.id !== id));
-        
-        // Actualizar contador del response
         setSinLeer(response.data.meta?.total_no_leidas || 0);
         
-        // Recargar después de un breve momento para sincronizar
         setTimeout(() => {
           cargarNotificaciones();
         }, 300);
@@ -146,11 +144,9 @@ const NotificacionesDropdown: React.FC = () => {
       const response = await notificacionesApi.marcarTodasLeidas();
       
       if (response.data.success) {
-        // Limpiar todas las notificaciones
         setNotificaciones([]);
         setSinLeer(0);
         
-        // Forzar recarga para sincronizar
         setTimeout(() => {
           cargarNotificaciones();
         }, 300);
@@ -181,7 +177,11 @@ const NotificacionesDropdown: React.FC = () => {
         break;
       case 'seguimiento_perdida':
         ruta = `/comercial/leads-perdidos/${notificacion.entidad_id}`;
-        break;  
+        break;
+      case 'personal':
+        // Para cumpleaños, ir a la vista de cumpleaños en lugar de datos personales
+        ruta = `/rrhh/personal/cumpleanos`; // CAMBIADO: Ahora va a cumpleaños
+        break;
       default:
         return;
     }
@@ -189,7 +189,6 @@ const NotificacionesDropdown: React.FC = () => {
     // Marcar como leída al navegar
     if (!notificacion.leida) {
       notificacionesApi.marcarLeida(notificacion.id).catch(console.error);
-      // Actualizar localmente
       setNotificaciones(prev => prev.filter(n => n.id !== notificacion.id));
       setSinLeer(prev => Math.max(0, prev - 1));
     }
@@ -197,9 +196,53 @@ const NotificacionesDropdown: React.FC = () => {
     router.visit(ruta);
     setMostrarDropdown(false);
   };
+
+  const enviarWhatsAppCumpleanios = async (notificacion: Notificacion, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      // Obtener datos del cumpleañero
+      const response = await fetch(`/api/personal/${notificacion.entidad_id}`);
+      const data = await response.json();
+      
+      if (!data.telefono) {
+        toast.error('El empleado no tiene teléfono registrado');
+        return;
+      }
+
+      let telefono = data.telefono.replace(/[\s\-\(\)]/g, '');
+      
+      // Formatear número para WhatsApp
+      if (!telefono.startsWith('54')) {
+        if (telefono.startsWith('15')) {
+          telefono = '54' + telefono;
+        } else if (telefono.startsWith('11')) {
+          telefono = '54' + telefono;
+        } else if (telefono.length === 10) {
+          telefono = '54' + telefono;
+        }
+      }
+
+      const mensaje = `¡Feliz cumpleaños ${data.nombre}!`;
+      
+      const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+      window.open(url, '_blank');
+      
+      // Opcional: marcar como leída después de felicitar
+      await notificacionesApi.marcarLeida(notificacion.id);
+      setNotificaciones(prev => prev.filter(n => n.id !== notificacion.id));
+      setSinLeer(prev => Math.max(0, prev - 1));
+      
+    } catch (error) {
+      console.error('Error enviando WhatsApp:', error);
+      toast.error('Error al enviar el mensaje');
+    }
+  };
   
   const getIconoPorTipo = (tipo: string): React.ReactNode => {
     switch(tipo) {
+      case 'cumpleanos':
+        return <Cake className="h-5 w-5 text-pink-500" />;
       case 'lead_sin_contactar':
         return <Clock className="h-5 w-5 text-orange-500" />;
       case 'lead_proximo_contacto':
@@ -207,16 +250,20 @@ const NotificacionesDropdown: React.FC = () => {
       case 'presupuesto_por_vencer':
       case 'presupuesto_vencido':
         return <FileText className="h-5 w-5 text-yellow-500" />;
-      case 'contrato_por_vencer':
+      case 'contrato_activo':
+      case 'contrato_pendiente':
+      case 'contrato_instalado':
         return <FileText className="h-5 w-5 text-blue-500" />;
+      case 'recordatorio_seguimiento':
+        return <Calendar className="h-5 w-5 text-purple-500" />;
       case 'asignacion_lead':
         return <Users className="h-5 w-5 text-green-500" />;
       case 'comentario_recordatorio':
-        return <CheckCircle className="h-5 w-5 text-purple-500" />;
-      default:
-        return <Bell className="h-5 w-5 text-gray-500" />;
+        return <CheckCircle className="h-5 w-5 text-indigo-500" />;
       case 'lead_posible_recontacto':
         return <RefreshCw className="h-5 w-5 text-cyan-500" />;
+      default:
+        return <Bell className="h-5 w-5 text-gray-500" />;
     }
   };
   
@@ -382,7 +429,19 @@ const NotificacionesDropdown: React.FC = () => {
                           </h4>
                           
                           <div className="flex items-center space-x-1 ml-2">
-                            {/* TODAS las notificaciones en el dropdown son NO LEÍDAS, así que siempre mostrar botón */}
+                            {/* Si es cumpleaños, mostrar botón de WhatsApp */}
+                            {notificacion.tipo === 'cumpleanos' && (
+                              <button 
+                                onClick={(e) => enviarWhatsAppCumpleanios(notificacion, e)}
+                                className="p-1 text-green-600 hover:text-green-700 rounded hover:bg-green-50"
+                                title="Felicitar por WhatsApp"
+                                disabled={cargando}
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                            
+                            {/* Botón para marcar como leída */}
                             <button 
                               onClick={(e) => marcarComoLeida(notificacion.id, e)}
                               className="p-1 text-gray-400 hover:text-green-600 rounded hover:bg-gray-100"
@@ -421,40 +480,40 @@ const NotificacionesDropdown: React.FC = () => {
               )}
             </div>
             
-{/* Link para ver todas las notificaciones */}
-{(notificaciones.length > 0 || sinLeer > 0) && (
-  <div className="p-3 border-t bg-gray-50 text-center flex justify-between items-center">
-    <div>
-      <a 
-        href="/notificaciones" 
-        className="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-        onClick={(e) => {
-          e.preventDefault();
-          router.visit('/notificaciones');
-          setMostrarDropdown(false);
-        }}
-      >
-        <Eye className="h-3 w-3" />
-        Ver activas
-      </a>
-    </div>
-    
-    <div>
-      <a 
-        href="/notificaciones/programadas" 
-        className="text-xs text-green-600 hover:text-green-800 hover:underline flex items-center gap-1"
-        onClick={(e) => {
-          e.preventDefault();
-          router.visit('/notificaciones/programadas');
-          setMostrarDropdown(false);
-        }}
-      >
-        <Calendar className="h-3 w-3" />
-        Ver programadas
-      </a>
-    </div>
-  </div>
-)}
+            {/* Link para ver todas las notificaciones */}
+            {(notificaciones.length > 0 || sinLeer > 0) && (
+              <div className="p-3 border-t bg-gray-50 text-center flex justify-between items-center">
+                <div>
+                  <a 
+                    href="/notificaciones" 
+                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.visit('/notificaciones');
+                      setMostrarDropdown(false);
+                    }}
+                  >
+                    <Eye className="h-3 w-3" />
+                    Ver activas
+                  </a>
+                </div>
+                
+                <div>
+                  <a 
+                    href="/notificaciones/programadas" 
+                    className="text-xs text-green-600 hover:text-green-800 hover:underline flex items-center gap-1"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.visit('/notificaciones/programadas');
+                      setMostrarDropdown(false);
+                    }}
+                  >
+                    <Calendar className="h-3 w-3" />
+                    Ver programadas
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Backdrop para cerrar al hacer clic fuera */}

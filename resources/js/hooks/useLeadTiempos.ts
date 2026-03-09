@@ -14,9 +14,9 @@ interface TiempoEstado {
 interface EstadisticasTiempos {
   totalCambios: number;
   totalDias: number;
+  totalHoras: number;
+  totalMinutos: number;
   promedioDias: number;
-  minimoDias: number;
-  maximoDias: number;
 }
 
 export const useLeadTiempos = (leadId: number, puedeVer: boolean) => {
@@ -25,6 +25,35 @@ export const useLeadTiempos = (leadId: number, puedeVer: boolean) => {
   const [error, setError] = useState<string | null>(null);
   const [estadisticas, setEstadisticas] = useState<EstadisticasTiempos | null>(null);
 
+  const calcularEstadisticas = (data: TiempoEstado[]): EstadisticasTiempos | null => {
+    if (data.length === 0) return null;
+    
+    // Calcular tiempo total real en días (con decimales)
+    const fechas = data.map(t => new Date(t.fecha_cambio).getTime());
+    const primeraFecha = Math.min(...fechas);
+    const ultimaFecha = Math.max(...fechas);
+    const diffMs = ultimaFecha - primeraFecha;
+    const diffHoras = diffMs / (1000 * 60 * 60);
+    const totalDiasReales = diffHoras / 24;
+    
+    // Para mostrar en días enteros + horas/minutos
+    const totalDias = Math.floor(totalDiasReales);
+    const restoHoras = (totalDiasReales - totalDias) * 24;
+    const totalHoras = Math.floor(restoHoras);
+    const totalMinutos = Math.floor((restoHoras - totalHoras) * 60);
+    
+    // Calcular promedio usando los días reales
+    const promedioDias = totalDiasReales / data.length;
+    
+    return {
+      totalCambios: data.length,
+      totalDias,
+      totalHoras,
+      totalMinutos,
+      promedioDias: Number(promedioDias.toFixed(1))
+    };
+  };
+
   const cargarTiempos = useCallback(async () => {
     if (!leadId || !puedeVer) return;
     
@@ -32,7 +61,6 @@ export const useLeadTiempos = (leadId: number, puedeVer: boolean) => {
     setError(null);
     
     try {
-      // Usar fetch normal, NO Inertia
       const response = await fetch(`/comercial/leads/${leadId}/tiempos-estados`, {
         headers: {
           'Accept': 'application/json',
@@ -45,11 +73,15 @@ export const useLeadTiempos = (leadId: number, puedeVer: boolean) => {
       }
       
       const data = await response.json();
-      setTiempos(data || []);
       
-      if (data && data.length > 0) {
+      if (Array.isArray(data)) {
+        setTiempos(data);
         setEstadisticas(calcularEstadisticas(data));
+      } else if (data.error) {
+        throw new Error(data.error);
       } else {
+        console.warn('Formato de respuesta inesperado:', data);
+        setTiempos([]);
         setEstadisticas(null);
       }
     } catch (err) {
@@ -62,28 +94,11 @@ export const useLeadTiempos = (leadId: number, puedeVer: boolean) => {
     }
   }, [leadId, puedeVer]);
 
-  const calcularEstadisticas = (data: TiempoEstado[]): EstadisticasTiempos => {
-    const totalCambios = data.length;
-    const totalDias = data.reduce((sum, item) => sum + item.dias, 0);
-    const promedioDias = totalCambios > 0 ? totalDias / totalCambios : 0;
-    const minimoDias = Math.min(...data.map(item => item.dias));
-    const maximoDias = Math.max(...data.map(item => item.dias));
-    
-    return {
-      totalCambios,
-      totalDias,
-      promedioDias: Number(promedioDias.toFixed(1)),
-      minimoDias,
-      maximoDias
-    };
-  };
-
-  // Cargar automáticamente cuando se active
   useEffect(() => {
     if (puedeVer) {
       cargarTiempos();
     }
-  }, [puedeVer, leadId, cargarTiempos]); // Dependencias correctas
+  }, [puedeVer, leadId, cargarTiempos]);
 
   return {
     tiempos,
