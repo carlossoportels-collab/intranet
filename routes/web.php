@@ -292,7 +292,7 @@ Route::prefix('rrhh')->name('rrhh.')->middleware(['auth'])->group(function () {
         
         // ===== LICENCIAS =====
         Route::prefix('licencias')->name('licencias.')->group(function () {
-            Route::get('/', [LicenciasController::class, 'index'])->name('index');
+            Route::get('licencias', [LicenciasController::class, 'index'])->name('licencias');
             Route::get('/crear', [LicenciasController::class, 'create'])->name('create');
             Route::post('/', [LicenciasController::class, 'store'])->name('store');
             Route::get('/{id}', [LicenciasController::class, 'show'])->name('show');
