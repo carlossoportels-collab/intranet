@@ -1,363 +1,520 @@
 // resources/js/Pages/rrhh/Equipos/EquipoComercial.tsx
-import { TrendingUp, Target, Award, DollarSign, Users, BarChart3, Star, TrendingDown } from 'lucide-react';
-import React, { useState } from 'react';
 
+import { router } from '@inertiajs/react';
+import { 
+    Phone, Mail, Calendar, 
+    Users, User, Building,
+    CheckCircle, XCircle, Search, MoreVertical,
+    Briefcase, Edit, Trash2, X,
+    TrendingUp, Target, Award
+} from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+
+import AlertError from '@/components/alert-error';
+import AlertSuccess from '@/components/alert-succes';
 import AppLayout from '@/layouts/app-layout';
 
-interface MiembroComercial {
+interface Comercial {
     id: number;
+    personal_id: number;
+    nombre_completo: string;
     nombre: string;
     apellido: string;
-    puesto: string;
-    nivel: string;
-    experiencia: number; // años
-    ventas_mensuales: number;
-    objetivo_mensual: number;
-    comision: number;
-    cliente_nuevos: number;
-    satisfaccion_cliente: number; // porcentaje
-    skills: string[];
-    estado: string;
-    ultimo_proyecto: string;
+    email: string;
+    telefono: string;
+    fecha_nacimiento: string | null;
+    edad: number | null;
+    compania_id: number;
+    prefijo_id: number;
+    activo: boolean;
+    created: string;
+    ultimo_acceso: string | null;
 }
 
-interface MetaEquipo {
-    mes: string;
-    objetivo: number;
-    alcanzado: number;
-    crecimiento: number;
+interface EquipoComercialProps {
+    comerciales: Comercial[];
+    comercialesPorCompania: Record<string, Comercial[]>;
+    companias: string[];
+    total_comerciales: number;
+    activos: number;
+    con_email: number;
+    con_telefono: number;
 }
 
-export default function EquipoComercial() {
-    const [miembros, setMiembros] = useState<MiembroComercial[]>([
-        { id: 1, nombre: 'María', apellido: 'López', puesto: 'Gerente Comercial', nivel: 'Senior', experiencia: 8, ventas_mensuales: 450000, objetivo_mensual: 400000, comision: 12, cliente_nuevos: 15, satisfaccion_cliente: 95, skills: ['Negociación', 'CRM', 'Liderazgo'], estado: 'Activo', ultimo_proyecto: 'Cuenta Corporativa XYZ' },
-        { id: 2, nombre: 'Juan', apellido: 'Pérez', puesto: 'Ejecutivo Senior', nivel: 'Senior', experiencia: 5, ventas_mensuales: 320000, objetivo_mensual: 300000, comision: 10, cliente_nuevos: 12, satisfaccion_cliente: 92, skills: ['Ventas B2B', 'Presentaciones'], estado: 'Activo', ultimo_proyecto: 'Gobierno Local' },
-        { id: 3, nombre: 'Ana', apellido: 'García', puesto: 'Ejecutivo Junior', nivel: 'Junior', experiencia: 2, ventas_mensuales: 180000, objetivo_mensual: 150000, comision: 7, cliente_nuevos: 8, satisfaccion_cliente: 88, skills: ['Prospección', 'Email Marketing'], estado: 'Activo', ultimo_proyecto: 'PyMEs Sector Retail' },
-        { id: 4, nombre: 'Carlos', apellido: 'Rodríguez', puesto: 'Asesor Comercial', nivel: 'Mid', experiencia: 3, ventas_mensuales: 250000, objetivo_mensual: 220000, comision: 9, cliente_nuevos: 10, satisfaccion_cliente: 90, skills: ['Cierre de Ventas', 'CRM'], estado: 'Activo', ultimo_proyecto: 'Franquicias' },
-        { id: 5, nombre: 'Laura', apellido: 'Fernández', puesto: 'Especialista Digital', nivel: 'Mid', experiencia: 4, ventas_mensuales: 280000, objetivo_mensual: 250000, comision: 8, cliente_nuevos: 9, satisfaccion_cliente: 93, skills: ['Marketing Digital', 'Analytics'], estado: 'Capacitación', ultimo_proyecto: 'E-commerce' },
-    ]);
+export default function EquipoComercial({
+    comerciales = [],
+    comercialesPorCompania = {},
+    companias = [],
+    total_comerciales = 0,
+    activos = 0,
+    con_email = 0,
+    con_telefono = 0,
+}: EquipoComercialProps) {
+    const [filtroCompania, setFiltroCompania] = useState<string>('todas');
+    const [filtroActivo, setFiltroActivo] = useState<string>('todos');
+    const [busqueda, setBusqueda] = useState<string>('');
+    const [menuAbierto, setMenuAbierto] = useState<number | null>(null);
+    const menuRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
-    const [metas, setMetas] = useState<MetaEquipo[]>([
-        { mes: 'Enero', objetivo: 1200000, alcanzado: 1250000, crecimiento: 4.2 },
-        { mes: 'Febrero', objetivo: 1300000, alcanzado: 1280000, crecimiento: -1.5 },
-        { mes: 'Marzo', objetivo: 1400000, alcanzado: 1420000, crecimiento: 1.4 },
-        { mes: 'Abril', objetivo: 1350000, alcanzado: 1380000, crecimiento: 2.2 },
-        { mes: 'Mayo', objetivo: 1450000, alcanzado: 1480000, crecimiento: 2.1 },
-    ]);
+    // ========== FUNCIONES AUXILIARES (declaradas antes de usarlas) ==========
+    const getNombreCompania = (companiaId: number): string => {
+        const companiasMap: Record<number, string> = {
+            1: 'LocalSat',
+            2: 'SmartSat',
+            3: '360',
+        };
+        return companiasMap[companiaId] || 'Sin Compañía';
+    };
 
-    const [filtroNivel, setFiltroNivel] = useState<string>('todos');
-    const [filtroEstado, setFiltroEstado] = useState<string>('todos');
-
-    const filteredMiembros = miembros.filter(m => {
-        if (filtroNivel !== 'todos' && m.nivel !== filtroNivel) return false;
-        if (filtroEstado !== 'todos' && m.estado !== filtroEstado) return false;
-        return true;
-    });
-
-    const getNivelColor = (nivel: string) => {
-        switch (nivel) {
-            case 'Senior': return 'bg-purple-100 text-purple-800';
-            case 'Mid': return 'bg-blue-100 text-blue-800';
-            case 'Junior': return 'bg-green-100 text-green-800';
+    const getCompaniaColor = (companiaId: number): string => {
+        switch(companiaId) {
+            case 1: return 'bg-green-100 text-green-800'; // LocalSat
+            case 2: return 'bg-purple-100 text-purple-800'; // SmartSat
+            case 3: return 'bg-blue-100 text-blue-800'; // 360
             default: return 'bg-gray-100 text-gray-800';
         }
     };
 
-    const getEstadoColor = (estado: string) => {
-        switch (estado) {
-            case 'Activo': return 'bg-green-100 text-green-800';
-            case 'Capacitación': return 'bg-yellow-100 text-yellow-800';
-            case 'Vacaciones': return 'bg-blue-100 text-blue-800';
-            default: return 'bg-gray-100 text-gray-800';
+    const formatFecha = (fecha: string | null) => {
+        if (!fecha) return 'N/A';
+        try {
+            return new Date(fecha).toLocaleDateString('es-AR');
+        } catch {
+            return 'N/A';
         }
     };
 
-    const getRendimientoColor = (ventas: number, objetivo: number) => {
-        const porcentaje = (ventas / objetivo) * 100;
-        if (porcentaje >= 110) return 'bg-green-100 text-green-800';
-        if (porcentaje >= 90) return 'bg-yellow-100 text-yellow-800';
-        return 'bg-red-100 text-red-800';
+    // Cerrar menú al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuAbierto !== null) {
+                const menuElement = menuRefs.current.get(menuAbierto);
+                if (menuElement && !menuElement.contains(event.target as Node)) {
+                    setMenuAbierto(null);
+                }
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [menuAbierto]);
+
+    // ========== MEMOS (usando funciones ya declaradas) ==========
+    // Filtrar comerciales
+    const comercialesFiltrados = useMemo(() => {
+        return comerciales.filter(comercial => {
+            // Filtro por compañía
+            if (filtroCompania !== 'todas') {
+                const nombreCompania = getNombreCompania(comercial.compania_id);
+                if (nombreCompania !== filtroCompania) return false;
+            }
+            
+            // Filtro por activo
+            if (filtroActivo === 'activo' && !comercial.activo) return false;
+            if (filtroActivo === 'inactivo' && comercial.activo) return false;
+            
+            // Filtro por búsqueda
+            if (busqueda) {
+                const searchTerm = busqueda.toLowerCase();
+                return (
+                    comercial.nombre_completo.toLowerCase().includes(searchTerm) ||
+                    comercial.email.toLowerCase().includes(searchTerm) ||
+                    comercial.telefono.includes(searchTerm)
+                );
+            }
+            
+            return true;
+        });
+    }, [comerciales, filtroCompania, filtroActivo, busqueda, getNombreCompania]);
+
+    // Agrupar por compañía después del filtrado
+    const comercialesAgrupados = useMemo(() => {
+        const grupos: Record<string, Comercial[]> = {};
+        
+        comercialesFiltrados.forEach(comercial => {
+            const compania = getNombreCompania(comercial.compania_id);
+            if (!grupos[compania]) {
+                grupos[compania] = [];
+            }
+            grupos[compania].push(comercial);
+        });
+        
+        // Ordenar compañías alfabéticamente
+        return Object.keys(grupos).sort().reduce((obj, key) => {
+            obj[key] = grupos[key];
+            return obj;
+        }, {} as Record<string, Comercial[]>);
+    }, [comercialesFiltrados, getNombreCompania]);
+
+    // Calcular estadísticas
+    const estadisticas = useMemo(() => {
+        const companiasUnicas = new Set(comercialesFiltrados.map(c => getNombreCompania(c.compania_id)));
+        const totalActivos = comercialesFiltrados.filter(c => c.activo).length;
+        const totalInactivos = comercialesFiltrados.length - totalActivos;
+        
+        return {
+            total: comercialesFiltrados.length,
+            companias: companiasUnicas.size,
+            activos: totalActivos,
+            inactivos: totalInactivos,
+            porcentajeActivos: comercialesFiltrados.length > 0 ? 
+                Math.round((totalActivos / comercialesFiltrados.length) * 100) : 0,
+            conEmail: comercialesFiltrados.filter(c => c.email).length,
+            conTelefono: comercialesFiltrados.filter(c => c.telefono).length,
+        };
+    }, [comercialesFiltrados, getNombreCompania]);
+
+    // ========== FUNCIONES DEL MENÚ ==========
+    const handleEditar = (comercial: Comercial) => {
+        router.get(`/rrhh/equipos/comerciales/${comercial.id}/edit`);
+        setMenuAbierto(null);
     };
 
-    const calcularTotalVentas = () => {
-        return miembros.reduce((sum, m) => sum + m.ventas_mensuales, 0);
+    const handleEliminar = (comercial: Comercial) => {
+        if (confirm(`¿Estás seguro de eliminar a ${comercial.nombre_completo}?`)) {
+            router.delete(`/rrhh/equipos/comerciales/${comercial.id}`, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    // Mensaje de éxito viene de flash
+                },
+                onError: (errors) => {
+                    console.error('Error al eliminar:', errors);
+                }
+            });
+        }
+        setMenuAbierto(null);
     };
 
-    const calcularObjetivoTotal = () => {
-        return miembros.reduce((sum, m) => sum + m.objetivo_mensual, 0);
+    const toggleMenu = (comercialId: number) => {
+        setMenuAbierto(menuAbierto === comercialId ? null : comercialId);
     };
 
-    const calcularComisionTotal = () => {
-        return miembros.reduce((sum, m) => sum + (m.ventas_mensuales * m.comision / 100), 0);
+    // Función para establecer la referencia del menú
+    const setMenuRef = (comercialId: number, element: HTMLDivElement | null) => {
+        if (element) {
+            menuRefs.current.set(comercialId, element);
+        } else {
+            menuRefs.current.delete(comercialId);
+        }
     };
 
     return (
         <AppLayout title="Equipo Comercial">
-            <div className="mb-4">
-                <h1 className="text-3xl font-bold text-gray-900">
-                    Equipo Comercial
-                </h1>
-                <p className="mt-1 text-gray-600 text-base">
-                    Gestión y seguimiento del equipo de ventas
-                </p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                            Performance Comercial
-                        </h2>
-                        <p className="text-sm text-gray-600">
-                            Seguimiento de ventas, objetivos y comisiones
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        <button className="px-4 py-2 border border-sat text-sat text-sm rounded hover:bg-sat-50 transition-colors">
-                            Generar Reporte
-                        </button>
-                        <button className="px-4 py-2 bg-sat text-white text-sm rounded hover:bg-sat-600 transition-colors">
-                            + Nuevo Miembro
-                        </button>
+            <div className="max-w-6xl mx-auto">
+                <div className="mb-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                                <Briefcase className="text-sat" size={28} />
+                                Equipo Comercial
+                            </h1>
+                            <p className="mt-1 text-gray-600 text-base">
+                                Gestión del equipo de ventas y comerciales
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => router.get('/rrhh/equipos/comerciales/create')}
+                                className="px-4 py-2 bg-sat text-white text-sm rounded hover:bg-sat-600 transition-colors flex items-center gap-2"
+                            >
+                                <User size={16} />
+                                Nuevo Comercial
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                {/* Team Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-100">
+                {/* Estadísticas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                    <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
                         <div className="flex items-center gap-2 mb-2">
-                            <DollarSign size={20} className="text-blue-600" />
-                            <div className="text-sm font-medium text-blue-700">Ventas Totales</div>
+                            <Users size={20} className="text-blue-600" />
+                            <div className="text-sm font-medium text-gray-700">Total Comerciales</div>
                         </div>
-                        <div className="text-2xl font-bold text-blue-900">
-                            ${calcularTotalVentas().toLocaleString('es-AR')}
-                        </div>
-                        <div className="text-xs text-blue-600 mt-1">
-                            {((calcularTotalVentas() / calcularObjetivoTotal()) * 100).toFixed(1)}% del objetivo
+                        <div className="text-2xl font-bold text-gray-900">{estadisticas.total}</div>
+                        <div className="text-xs text-gray-600 mt-1">
+                            {estadisticas.activos} activos
                         </div>
                     </div>
-                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
+                    
+                    <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
                         <div className="flex items-center gap-2 mb-2">
-                            <Target size={20} className="text-green-600" />
-                            <div className="text-sm font-medium text-green-700">Objetivo Mensual</div>
+                            <Building size={20} className="text-purple-600" />
+                            <div className="text-sm font-medium text-gray-700">Compañías</div>
                         </div>
-                        <div className="text-2xl font-bold text-green-900">
-                            ${calcularObjetivoTotal().toLocaleString('es-AR')}
-                        </div>
-                        <div className="text-xs text-green-600 mt-1">
-                            {miembros.filter(m => m.ventas_mensuales >= m.objetivo_mensual).length}/{miembros.length} cumplen objetivo
+                        <div className="text-2xl font-bold text-gray-900">{estadisticas.companias}</div>
+                        <div className="text-xs text-gray-600 mt-1">
+                            Distribución por compañía
                         </div>
                     </div>
-                    <div className="p-4 bg-gradient-to-r from-purple-50 to-violet-50 rounded-lg border border-purple-100">
+                    
+                    <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
                         <div className="flex items-center gap-2 mb-2">
-                            <Award size={20} className="text-purple-600" />
-                            <div className="text-sm font-medium text-purple-700">Comisiones</div>
+                            <CheckCircle size={20} className="text-green-600" />
+                            <div className="text-sm font-medium text-gray-700">Activos</div>
                         </div>
-                        <div className="text-2xl font-bold text-purple-900">
-                            ${calcularComisionTotal().toLocaleString('es-AR')}
-                        </div>
-                        <div className="text-xs text-purple-600 mt-1">
-                            Promedio: ${(calcularComisionTotal() / miembros.length).toLocaleString('es-AR')}
+                        <div className="text-2xl font-bold text-gray-900">{estadisticas.activos}</div>
+                        <div className="text-xs text-gray-600 mt-1">
+                            {estadisticas.porcentajeActivos}% del total
                         </div>
                     </div>
-                    <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-100">
+                    
+                    <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
                         <div className="flex items-center gap-2 mb-2">
-                            <Users size={20} className="text-orange-600" />
-                            <div className="text-sm font-medium text-orange-700">Clientes Nuevos</div>
+                            <Mail size={20} className="text-amber-600" />
+                            <div className="text-sm font-medium text-gray-700">Con Email</div>
                         </div>
-                        <div className="text-2xl font-bold text-orange-900">
-                            {miembros.reduce((sum, m) => sum + m.cliente_nuevos, 0)}
+                        <div className="text-2xl font-bold text-gray-900">{estadisticas.conEmail}</div>
+                        <div className="text-xs text-gray-600 mt-1">
+                            {Math.round((estadisticas.conEmail / estadisticas.total) * 100) || 0}% registrados
                         </div>
-                        <div className="text-xs text-orange-600 mt-1">
-                            {Math.round(miembros.reduce((sum, m) => sum + m.satisfaccion_cliente, 0) / miembros.length)}% satisfacción
+                    </div>
+                    
+                    <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Phone size={20} className="text-green-600" />
+                            <div className="text-sm font-medium text-gray-700">Con Teléfono</div>
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900">{estadisticas.conTelefono}</div>
+                        <div className="text-xs text-gray-600 mt-1">
+                            {Math.round((estadisticas.conTelefono / estadisticas.total) * 100) || 0}% registrados
                         </div>
                     </div>
                 </div>
 
                 {/* Filtros */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por nivel</label>
-                        <select
-                            value={filtroNivel}
-                            onChange={(e) => setFiltroNivel(e.target.value)}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-sat focus:border-sat"
-                        >
-                            <option value="todos">Todos los niveles</option>
-                            <option value="Senior">Senior</option>
-                            <option value="Mid">Mid</option>
-                            <option value="Junior">Junior</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por estado</label>
-                        <select
-                            value={filtroEstado}
-                            onChange={(e) => setFiltroEstado(e.target.value)}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-sat focus:border-sat"
-                        >
-                            <option value="todos">Todos los estados</option>
-                            <option value="Activo">Activo</option>
-                            <option value="Capacitación">Capacitación</option>
-                            <option value="Vacaciones">Vacaciones</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Acciones</label>
-                        <button className="w-full px-3 py-2 text-sm bg-sat text-white rounded hover:bg-sat-600 transition-colors">
-                            Calcular Comisiones
-                        </button>
-                    </div>
-                </div>
-
-                {/* Team Performance Chart */}
-                <div className="mb-6 p-4 bg-gray-50 rounded border">
-                    <h3 className="font-medium text-gray-900 mb-3">Desempeño por Mes</h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-100">
-                                <tr>
-                                    <th className="py-2 px-3 text-left font-medium text-gray-700">Mes</th>
-                                    <th className="py-2 px-3 text-left font-medium text-gray-700">Objetivo</th>
-                                    <th className="py-2 px-3 text-left font-medium text-gray-700">Alcanzado</th>
-                                    <th className="py-2 px-3 text-left font-medium text-gray-700">% Cumplimiento</th>
-                                    <th className="py-2 px-3 text-left font-medium text-gray-700">Crecimiento</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {metas.map((meta, index) => (
-                                    <tr key={index} className="border-b border-gray-200 last:border-0">
-                                        <td className="py-2 px-3 font-medium">{meta.mes}</td>
-                                        <td className="py-2 px-3">${meta.objetivo.toLocaleString('es-AR')}</td>
-                                        <td className="py-2 px-3">
-                                            <div className="flex items-center gap-2">
-                                                ${meta.alcanzado.toLocaleString('es-AR')}
-                                                <span className={`text-xs px-2 py-0.5 rounded-full ${meta.alcanzado >= meta.objetivo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                    {((meta.alcanzado / meta.objetivo) * 100).toFixed(1)}%
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="py-2 px-3">
-                                            <div className="w-full bg-gray-200 rounded-full h-2">
-                                                <div 
-                                                    className={`h-full rounded-full ${
-                                                        (meta.alcanzado / meta.objetivo) >= 1 ? 'bg-green-500' :
-                                                        (meta.alcanzado / meta.objetivo) >= 0.9 ? 'bg-yellow-500' : 'bg-red-500'
-                                                    }`}
-                                                    style={{ width: `${Math.min((meta.alcanzado / meta.objetivo) * 100, 100)}%` }}
-                                                ></div>
-                                            </div>
-                                        </td>
-                                        <td className="py-2 px-3">
-                                            <div className="flex items-center gap-1">
-                                                {meta.crecimiento > 0 ? (
-                                                    <TrendingUp size={14} className="text-green-600" />
-                                                ) : (
-                                                    <TrendingDown size={14} className="text-red-600" />
-                                                )}
-                                                <span className={meta.crecimiento > 0 ? 'text-green-600' : 'text-red-600'}>
-                                                    {meta.crecimiento > 0 ? '+' : ''}{meta.crecimiento}%
-                                                </span>
-                                            </div>
-                                        </td>
-                                    </tr>
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Buscar comercial
+                            </label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                                <input
+                                    type="text"
+                                    value={busqueda}
+                                    onChange={(e) => setBusqueda(e.target.value)}
+                                    placeholder="Nombre, email, teléfono..."
+                                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded focus:ring-sat focus:border-sat"
+                                />
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Filtrar por compañía
+                            </label>
+                            <select
+                                value={filtroCompania}
+                                onChange={(e) => setFiltroCompania(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-sat focus:border-sat"
+                            >
+                                <option value="todas">Todas las compañías</option>
+                                {companias.map((compania) => (
+                                    <option key={compania} value={compania}>
+                                        {compania}
+                                    </option>
                                 ))}
-                            </tbody>
-                        </table>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Filtrar por estado
+                            </label>
+                            <select
+                                value={filtroActivo}
+                                onChange={(e) => setFiltroActivo(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-sat focus:border-sat"
+                            >
+                                <option value="todos">Todos</option>
+                                <option value="activo">Activos</option>
+                                <option value="inactivo">Inactivos</option>
+                            </select>
+                        </div>
+                        
+                        <div className="flex items-end">
+                            <button
+                                onClick={() => {
+                                    setFiltroCompania('todas');
+                                    setFiltroActivo('todos');
+                                    setBusqueda('');
+                                }}
+                                className="w-full px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+                            >
+                                Limpiar filtros
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                {/* Team Members Table */}
-                <div className="mb-6">
-                    <h3 className="font-medium text-gray-900 mb-3">Miembros del Equipo</h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Comercial</th>
-                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Nivel/Experiencia</th>
-                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Ventas Mensuales</th>
-                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Objetivo</th>
-                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Comisión</th>
-                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Clientes Nuevos</th>
-                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Satisfacción</th>
-                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {filteredMiembros.map((miembro) => (
-                                    <tr key={miembro.id} className="hover:bg-gray-50">
-                                        <td className="py-3 px-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-local flex items-center justify-center text-white font-semibold">
-                                                    {miembro.nombre.charAt(0)}{miembro.apellido.charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <div className="font-medium">{miembro.nombre} {miembro.apellido}</div>
-                                                    <div className="text-xs text-gray-500">{miembro.puesto}</div>
-                                                    <div className={`text-xs px-2 py-0.5 rounded-full ${getEstadoColor(miembro.estado)}`}>
-                                                        {miembro.estado}
+                {/* Contenido principal */}
+                <div className="space-y-8">
+                    {Object.keys(comercialesAgrupados).length === 0 ? (
+                        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+                            <Users size={48} className="mx-auto text-gray-400 mb-4" />
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                No se encontraron comerciales
+                            </h3>
+                            <p className="text-gray-600">
+                                {busqueda || filtroCompania !== 'todas' || filtroActivo !== 'todos'
+                                    ? 'Intenta con otros criterios de búsqueda.'
+                                    : 'No hay comerciales registrados en el sistema.'}
+                            </p>
+                        </div>
+                    ) : (
+                        Object.entries(comercialesAgrupados).map(([compania, comercialesCompania]) => (
+                            <div key={compania} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                {/* Encabezado de compañía */}
+                                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <Building size={20} className="text-sat" />
+                                            <h2 className="text-xl font-bold text-gray-900">
+                                                {compania}
+                                            </h2>
+                                            <span className="px-3 py-1 text-xs font-medium bg-sat-100 text-sat-800 rounded-full">
+                                                {comercialesCompania.length} comercial{comercialesCompania.length !== 1 ? 'es' : ''}
+                                            </span>
+                                        </div>
+                                        <div className="text-sm text-gray-600">
+                                            {comercialesCompania.filter(c => c.activo).length} activos
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Cards de comerciales */}
+                                <div className="p-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {comercialesCompania.map((comercial) => (
+                                            <div 
+                                                key={comercial.id}
+                                                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow relative"
+                                            >
+                                                {/* Encabezado de la card */}
+                                                <div className="flex items-start justify-between mb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-12 w-12 rounded-full bg-local flex items-center justify-center text-white font-bold">
+                                                            {comercial.nombre.charAt(0)}{comercial.apellido.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-bold text-gray-900">
+                                                                {comercial.nombre_completo}
+                                                            </h3>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <span className={`text-xs px-2 py-1 rounded-full ${getCompaniaColor(comercial.compania_id)}`}>
+                                                                    {getNombreCompania(comercial.compania_id)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Botón de menú */}
+                                                    <div className="relative" ref={(el) => setMenuRef(comercial.id, el)}>
+                                                        <button 
+                                                            onClick={() => toggleMenu(comercial.id)}
+                                                            className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
+                                                        >
+                                                            <MoreVertical size={18} />
+                                                        </button>
+                                                        
+                                                        {/* Menú desplegable */}
+                                                        {menuAbierto === comercial.id && (
+                                                            <div className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                                                                <div className="py-1">
+                                                                    <button
+                                                                        onClick={() => handleEditar(comercial)}
+                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                                                    >
+                                                                        <Edit size={14} />
+                                                                        Modificar
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleEliminar(comercial)}
+                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                        Eliminar
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex flex-col gap-1">
-                                                <span className={`px-2 py-1 text-xs rounded-full ${getNivelColor(miembro.nivel)}`}>
-                                                    {miembro.nivel}
-                                                </span>
-                                                <div className="text-xs text-gray-600">{miembro.experiencia} años</div>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="font-bold text-gray-900">
-                                                ${miembro.ventas_mensuales.toLocaleString('es-AR')}
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="space-y-1">
-                                                <div className="text-sm">${miembro.objetivo_mensual.toLocaleString('es-AR')}</div>
-                                                <span className={`px-2 py-1 text-xs rounded-full ${getRendimientoColor(miembro.ventas_mensuales, miembro.objetivo_mensual)}`}>
-                                                    {((miembro.ventas_mensuales / miembro.objetivo_mensual) * 100).toFixed(1)}%
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="font-medium text-green-700">
-                                                ${(miembro.ventas_mensuales * miembro.comision / 100).toLocaleString('es-AR')}
-                                            </div>
-                                            <div className="text-xs text-gray-600">{miembro.comision}%</div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="font-medium">{miembro.cliente_nuevos}</div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-16 bg-gray-200 rounded-full h-2">
-                                                    <div 
-                                                        className={`h-full rounded-full ${
-                                                            miembro.satisfaccion_cliente >= 90 ? 'bg-green-500' :
-                                                            miembro.satisfaccion_cliente >= 80 ? 'bg-yellow-500' : 'bg-red-500'
-                                                        }`}
-                                                        style={{ width: `${miembro.satisfaccion_cliente}%` }}
-                                                    ></div>
+                                                
+                                                {/* Información de contacto */}
+                                                <div className="space-y-3 mb-4">
+                                                    <div className="flex items-center gap-2 text-sm">
+                                                        <span className={`text-xs px-2 py-1 rounded-full ${
+                                                            comercial.activo 
+                                                                ? 'bg-green-100 text-green-800' 
+                                                                : 'bg-red-100 text-red-800'
+                                                        }`}>
+                                                            {comercial.activo ? 'Activo' : 'Inactivo'}
+                                                        </span>
+                                                        {comercial.prefijo_id && (
+                                                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                                                                Prefijo: {comercial.prefijo_id}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {comercial.telefono && (
+                                                        <div className="flex items-center gap-2 text-sm">
+                                                            <Phone size={14} className="text-gray-400" />
+                                                            <span className="text-gray-700">{comercial.telefono}</span>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {comercial.email && (
+                                                        <div className="flex items-center gap-2 text-sm">
+                                                            <Mail size={14} className="text-gray-400" />
+                                                            <span className="text-gray-700 truncate">{comercial.email}</span>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {comercial.edad && (
+                                                        <div className="flex items-center gap-2 text-sm">
+                                                            <Calendar size={14} className="text-gray-400" />
+                                                            <span className="text-gray-700">{comercial.edad} años</span>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {comercial.ultimo_acceso && (
+                                                        <div className="flex items-center gap-2 text-sm">
+                                                            <TrendingUp size={14} className="text-gray-400" />
+                                                            <span className="text-gray-700">Último acceso: {formatFecha(comercial.ultimo_acceso)}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <span className="text-xs font-medium">{miembro.satisfaccion_cliente}%</span>
+                                                
+                                                {/* Botones de acción rápida */}
+                                                <div className="flex gap-2 mt-2">
+                                                    <button 
+                                                        onClick={() => router.get(`/estadisticas/comercial-individual/${comercial.id}`)}
+                                                        className="flex-1 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+                                                    >
+                                                        <TrendingUp size={14} />
+                                                        Ver desempeño
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => router.get(`/comercial/leads?prefijo=${comercial.prefijo_id}`)}
+                                                        className="flex-1 px-3 py-2 text-xs bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors flex items-center justify-center gap-1"
+                                                    >
+                                                        <Target size={14} />
+                                                        Ver leads
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex gap-2">
-                                                <button className="text-sat hover:text-sat-600 text-sm">
-                                                    Detalles
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
         </AppLayout>

@@ -1,5 +1,4 @@
 // resources/js/Components/Notificaciones/NotificacionesDropdown.tsx
-
 import { router, usePage } from '@inertiajs/react';
 import { 
   Bell, 
@@ -16,7 +15,8 @@ import {
   Gift,
   Sparkles,
   MessageCircle,
-  X
+  X,
+  ChevronRight
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
@@ -55,21 +55,21 @@ interface PageProps {
 
 const NotificacionesDropdown: React.FC = () => {
   const toast = useToast();
+  
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [sinLeer, setSinLeer] = useState<number>(0);
   const [mostrarDropdown, setMostrarDropdown] = useState<boolean>(false);
   const [cargando, setCargando] = useState<boolean>(false);
+  const [animando, setAnimando] = useState<boolean>(false);
   
   const { props } = usePage<PageProps>();
   const usuario = props.auth?.user;
   
-  // Cargar notificaciones iniciales
   useEffect(() => {
     if (usuario?.id) {
       cargarNotificaciones();
     }
     
-    // Escuchar eventos de actualización
     const handleActualizacion = () => {
       cargarNotificaciones();
     };
@@ -98,8 +98,6 @@ const NotificacionesDropdown: React.FC = () => {
         
         setNotificaciones(notificacionesActivas);
         setSinLeer(response.data.meta?.total_no_leidas || 0);
-      } else {
-        console.error('Error en respuesta:', response.data);
       }
     } catch (error) {
       console.error('Error cargando notificaciones:', error);
@@ -126,13 +124,11 @@ const NotificacionesDropdown: React.FC = () => {
       if (response.data.success) {
         setNotificaciones(prev => prev.filter(n => n.id !== id));
         setSinLeer(response.data.meta?.total_no_leidas || 0);
-        
-        setTimeout(() => {
-          cargarNotificaciones();
-        }, 300);
+        toast.success('Notificación marcada como leída', 2000);
       }
     } catch (error) {
       console.error('Error marcando como leída:', error);
+      toast.error('Error al marcar la notificación');
     } finally {
       setCargando(false);
     }
@@ -140,21 +136,19 @@ const NotificacionesDropdown: React.FC = () => {
   
   const marcarTodasComoLeidas = async (): Promise<void> => {
     try {
-      setCargando(true);
+      setAnimando(true);
       const response = await notificacionesApi.marcarTodasLeidas();
       
       if (response.data.success) {
         setNotificaciones([]);
         setSinLeer(0);
-        
-        setTimeout(() => {
-          cargarNotificaciones();
-        }, 300);
+        toast.success('Todas las notificaciones fueron leídas', 3000);
       }
     } catch (error) {
       console.error('Error marcando todas como leídas:', error);
+      toast.error('Error al marcar las notificaciones');
     } finally {
-      setCargando(false);
+      setAnimando(false);
     }
   };
   
@@ -179,14 +173,12 @@ const NotificacionesDropdown: React.FC = () => {
         ruta = `/comercial/leads-perdidos/${notificacion.entidad_id}`;
         break;
       case 'personal':
-        // Para cumpleaños, ir a la vista de cumpleaños en lugar de datos personales
-        ruta = `/rrhh/personal/cumpleanos`; // CAMBIADO: Ahora va a cumpleaños
+        ruta = `/rrhh/personal/cumpleanos`;
         break;
       default:
         return;
     }
     
-    // Marcar como leída al navegar
     if (!notificacion.leida) {
       notificacionesApi.marcarLeida(notificacion.id).catch(console.error);
       setNotificaciones(prev => prev.filter(n => n.id !== notificacion.id));
@@ -201,7 +193,6 @@ const NotificacionesDropdown: React.FC = () => {
     e.stopPropagation();
     
     try {
-      // Obtener datos del cumpleañero
       const response = await fetch(`/api/personal/${notificacion.entidad_id}`);
       const data = await response.json();
       
@@ -212,7 +203,6 @@ const NotificacionesDropdown: React.FC = () => {
 
       let telefono = data.telefono.replace(/[\s\-\(\)]/g, '');
       
-      // Formatear número para WhatsApp
       if (!telefono.startsWith('54')) {
         if (telefono.startsWith('15')) {
           telefono = '54' + telefono;
@@ -223,15 +213,16 @@ const NotificacionesDropdown: React.FC = () => {
         }
       }
 
-      const mensaje = `¡Feliz cumpleaños ${data.nombre}!`;
+      const mensaje = `¡Feliz cumpleaños ${data.nombre}! 🎉🎂`;
       
       const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
       window.open(url, '_blank');
       
-      // Opcional: marcar como leída después de felicitar
       await notificacionesApi.marcarLeida(notificacion.id);
       setNotificaciones(prev => prev.filter(n => n.id !== notificacion.id));
       setSinLeer(prev => Math.max(0, prev - 1));
+      
+      toast.success('¡Mensaje enviado!', 2000);
       
     } catch (error) {
       console.error('Error enviando WhatsApp:', error);
@@ -239,53 +230,102 @@ const NotificacionesDropdown: React.FC = () => {
     }
   };
   
-  const getIconoPorTipo = (tipo: string): React.ReactNode => {
+  const getIconoPorTipo = (tipo: string): { icon: React.ReactNode, bg: string } => {
     switch(tipo) {
       case 'cumpleanos':
-        return <Cake className="h-5 w-5 text-pink-500" />;
+        return { 
+          icon: <Cake className="h-4 w-4 text-pink-600" />,
+          bg: 'bg-pink-50'
+        };
       case 'lead_sin_contactar':
-        return <Clock className="h-5 w-5 text-orange-500" />;
+        return { 
+          icon: <Clock className="h-4 w-4 text-orange-600" />,
+          bg: 'bg-orange-50'
+        };
       case 'lead_proximo_contacto':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
+        return { 
+          icon: <AlertCircle className="h-4 w-4 text-red-600" />,
+          bg: 'bg-red-50'
+        };
       case 'presupuesto_por_vencer':
       case 'presupuesto_vencido':
-        return <FileText className="h-5 w-5 text-yellow-500" />;
+        return { 
+          icon: <FileText className="h-4 w-4 text-yellow-600" />,
+          bg: 'bg-yellow-50'
+        };
       case 'contrato_activo':
       case 'contrato_pendiente':
       case 'contrato_instalado':
-        return <FileText className="h-5 w-5 text-blue-500" />;
+        return { 
+          icon: <FileText className="h-4 w-4 text-blue-600" />,
+          bg: 'bg-blue-50'
+        };
       case 'recordatorio_seguimiento':
-        return <Calendar className="h-5 w-5 text-purple-500" />;
+        return { 
+          icon: <Calendar className="h-4 w-4 text-purple-600" />,
+          bg: 'bg-purple-50'
+        };
       case 'asignacion_lead':
-        return <Users className="h-5 w-5 text-green-500" />;
+        return { 
+          icon: <Users className="h-4 w-4 text-green-600" />,
+          bg: 'bg-green-50'
+        };
       case 'comentario_recordatorio':
-        return <CheckCircle className="h-5 w-5 text-indigo-500" />;
+        return { 
+          icon: <CheckCircle className="h-4 w-4 text-indigo-600" />,
+          bg: 'bg-indigo-50'
+        };
       case 'lead_posible_recontacto':
-        return <RefreshCw className="h-5 w-5 text-cyan-500" />;
+        return { 
+          icon: <RefreshCw className="h-4 w-4 text-cyan-600" />,
+          bg: 'bg-cyan-50'
+        };
       default:
-        return <Bell className="h-5 w-5 text-gray-500" />;
+        return { 
+          icon: <Bell className="h-4 w-4 text-gray-600" />,
+          bg: 'bg-gray-50'
+        };
     }
   };
   
-  const getColorPrioridad = (prioridad: string): string => {
+  const getColorPrioridad = (prioridad: string): { bg: string, border: string, text: string } => {
     switch(prioridad) {
       case 'urgente':
-        return 'bg-red-50 border-red-500';
+        return { 
+          bg: 'bg-gradient-to-r from-red-50 to-red-100/50',
+          border: 'border-l-4 border-l-red-500',
+          text: 'text-red-700'
+        };
       case 'alta':
-        return 'bg-orange-50 border-orange-500';
+        return { 
+          bg: 'bg-gradient-to-r from-orange-50 to-orange-100/50',
+          border: 'border-l-4 border-l-orange-500',
+          text: 'text-orange-700'
+        };
       case 'normal':
-        return 'bg-blue-50 border-blue-500';
+        return { 
+          bg: 'bg-gradient-to-r from-blue-50 to-blue-100/50',
+          border: 'border-l-4 border-l-blue-500',
+          text: 'text-blue-700'
+        };
       case 'baja':
-        return 'bg-gray-50 border-gray-400';
+        return { 
+          bg: 'bg-gradient-to-r from-gray-50 to-gray-100/50',
+          border: 'border-l-4 border-l-gray-400',
+          text: 'text-gray-700'
+        };
       default:
-        return 'bg-gray-50 border-gray-300';
+        return { 
+          bg: 'bg-white',
+          border: 'border-l-4 border-l-gray-300',
+          text: 'text-gray-700'
+        };
     }
   };
   
   const formatFecha = (fechaString: string): string => {
     try {
       const fecha = new Date(fechaString);
-      const ahora = new Date();
       
       if (isNaN(fecha.getTime())) {
         return 'Fecha inválida';
@@ -297,25 +337,25 @@ const NotificacionesDropdown: React.FC = () => {
       const fechaComparar = new Date(fecha);
       fechaComparar.setHours(0, 0, 0, 0);
       
-      const ayer = new Date(hoy);
-      ayer.setDate(ayer.getDate() - 1);
+      const diferencia = hoy.getTime() - fechaComparar.getTime();
+      const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
       
-      if (fechaComparar.getTime() === hoy.getTime()) {
+      if (dias === 0) {
         return `Hoy ${fecha.toLocaleTimeString('es-ES', { 
           hour: '2-digit', 
           minute: '2-digit' 
         })}`;
-      } else if (fechaComparar.getTime() === ayer.getTime()) {
+      } else if (dias === 1) {
         return `Ayer ${fecha.toLocaleTimeString('es-ES', { 
           hour: '2-digit', 
           minute: '2-digit' 
         })}`;
+      } else if (dias < 7) {
+        return `Hace ${dias} días`;
       } else {
         return fecha.toLocaleDateString('es-ES', {
           day: '2-digit',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit'
+          month: 'short'
         });
       }
     } catch (error) {
@@ -333,7 +373,6 @@ const NotificacionesDropdown: React.FC = () => {
     }
   };
   
-  // Si no hay usuario, no mostrar nada
   if (!usuario) {
     return null;
   }
@@ -347,13 +386,13 @@ const NotificacionesDropdown: React.FC = () => {
             cargarNotificaciones();
           }
         }}
-        className="relative p-2 text-gray-600 hover:text-sat transition-colors"
+        className="relative p-2 text-gray-600 hover:text-indigo-600 transition-all duration-200 rounded-lg hover:bg-indigo-50"
         title="Notificaciones"
         type="button"
       >
-        <Bell size={22} />
+        <Bell size={20} />
         {sinLeer > 0 && (
-          <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center border-2 border-white">
+          <span className="absolute -top-1 -right-1 h-4 w-4 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] rounded-full flex items-center justify-center border border-white shadow-lg">
             {sinLeer > 9 ? '9+' : sinLeer}
           </span>
         )}
@@ -361,162 +400,169 @@ const NotificacionesDropdown: React.FC = () => {
       
       {mostrarDropdown && (
         <>
-          <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl overflow-hidden z-50 border border-gray-200">
-            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800">Notificaciones</h3>
-                <p className="text-sm text-gray-600">
-                  {sinLeer > 0 ? `${sinLeer} sin leer` : 'Todas leídas'}
-                </p>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                {sinLeer > 0 && (
+          <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl overflow-hidden z-50 border border-gray-200 animate-in slide-in-from-top-2 fade-in duration-200">
+            {/* Header compacto */}
+            <div className="p-3 border-b bg-gradient-to-r from-orange-400 to-orange-500 text-black">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  <h3 className="font-semibold text-sm">Notificaciones</h3>
+                  {sinLeer > 0 && (
+                    <span className="bg-white/20 text-black text-[10px] px-1.5 py-0.5 rounded-full">
+                      {sinLeer} nuevas
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-1">
+                  {sinLeer > 0 && (
+                    <button 
+                      onClick={marcarTodasComoLeidas}
+                      className="p-1 bg-white/20 hover:bg-white/30 rounded text-black text-xs transition-colors"
+                      title="Marcar todas como leídas"
+                      disabled={animando}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  
                   <button 
-                    onClick={marcarTodasComoLeidas}
-                    className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded text-sm flex items-center gap-1"
-                    title="Marcar todas como leídas"
+                    onClick={() => cargarNotificaciones()}
+                    className={`p-1 bg-white/20 hover:bg-white/30 rounded text-black transition-colors ${cargando ? 'animate-spin' : ''}`}
+                    title="Actualizar"
                     disabled={cargando}
                   >
-                    <Check className="h-4 w-4" />
-                    <span>Marcar todas</span>
+                    <RefreshCw className="h-3.5 w-3.5" />
                   </button>
-                )}
-                
-                <button 
-                  onClick={() => cargarNotificaciones()}
-                  className={`p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded ${cargando ? 'animate-spin' : ''}`}
-                  title="Actualizar"
-                  disabled={cargando}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </button>
+                </div>
               </div>
             </div>
             
-            <div className="max-h-96 overflow-y-auto">
+            {/* Lista de notificaciones - sin scroll horizontal */}
+            <div className="max-h-96 overflow-y-auto overflow-x-hidden">
               {notificaciones.length === 0 ? (
-                <div className="p-8 text-center">
-                  <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No hay notificaciones nuevas</p>
-                  <p className="text-sm text-gray-400 mt-1">
-                    {sinLeer === 0 
-                      ? 'Todas las notificaciones están leídas' 
-                      : 'Las notificaciones aparecerán en su fecha programada'
-                    }
+                <div className="p-6 text-center">
+                  <div className="bg-indigo-50 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-2">
+                    <Bell className="h-5 w-5 text-indigo-400" />
+                  </div>
+                  <p className="text-gray-600 text-sm font-medium">¡Todo despejado!</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    No hay notificaciones nuevas
                   </p>
                 </div>
               ) : (
-                notificaciones.map((notificacion) => (
-                  <div 
-                    key={notificacion.id}
-                    className={`p-4 border-b hover:bg-gray-50 cursor-pointer transition-colors ${
-                      !notificacion.leida ? 'bg-blue-50' : ''
-                    } ${getColorPrioridad(notificacion.prioridad)} border-l-4`}
-                    onClick={() => navegarAEntidad(notificacion)}
-                  >
-                    <div className="flex items-start">
-                      <div className="mr-3 mt-1">
-                        {getIconoPorTipo(notificacion.tipo)}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start">
-                          <h4 className={`font-medium truncate ${
-                            !notificacion.leida ? 'text-blue-700' : 'text-gray-700'
-                          }`}>
-                            {notificacion.titulo}
-                          </h4>
-                          
-                          <div className="flex items-center space-x-1 ml-2">
-                            {/* Si es cumpleaños, mostrar botón de WhatsApp */}
-                            {notificacion.tipo === 'cumpleanos' && (
-                              <button 
-                                onClick={(e) => enviarWhatsAppCumpleanios(notificacion, e)}
-                                className="p-1 text-green-600 hover:text-green-700 rounded hover:bg-green-50"
-                                title="Felicitar por WhatsApp"
-                                disabled={cargando}
-                              >
-                                <MessageCircle className="h-4 w-4" />
-                              </button>
-                            )}
-                            
-                            {/* Botón para marcar como leída */}
-                            <button 
-                              onClick={(e) => marcarComoLeida(notificacion.id, e)}
-                              className="p-1 text-gray-400 hover:text-green-600 rounded hover:bg-gray-100"
-                              title="Marcar como leída"
-                              disabled={cargando}
-                            >
-                              <Check className="h-4 w-4" />
-                            </button>
+                notificaciones.map((notificacion, index) => {
+                  const icono = getIconoPorTipo(notificacion.tipo);
+                  const prioridad = getColorPrioridad(notificacion.prioridad);
+                  
+                  return (
+                    <div 
+                      key={notificacion.id}
+                      className={`
+                        relative group cursor-pointer transition-all duration-200
+                        ${prioridad.bg} ${prioridad.border}
+                        hover:shadow-md
+                        ${index < notificaciones.length - 1 ? 'border-b border-gray-100' : ''}
+                      `}
+                      onClick={() => navegarAEntidad(notificacion)}
+                    >
+                      <div className="p-3">
+                        <div className="flex items-start gap-2">
+                          {/* Icono más pequeño */}
+                          <div className={`${icono.bg} p-1.5 rounded-lg flex-shrink-0`}>
+                            {icono.icon}
                           </div>
-                        </div>
-                        
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                          {notificacion.mensaje}
-                        </p>
-                        
-                        <div className="flex justify-between items-center mt-2">
-                          <span className="text-xs text-gray-500">
-                            {formatFecha(notificacion.fecha_notificacion)}
-                          </span>
                           
-                          {notificacion.prioridad === 'urgente' && (
-                            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
-                              Urgente
-                            </span>
-                          )}
-                          {notificacion.prioridad === 'alta' && (
-                            <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
-                              Alta
-                            </span>
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start gap-1">
+                              <h4 className={`font-medium text-xs truncate ${prioridad.text}`}>
+                                {notificacion.titulo}
+                              </h4>
+                              
+                              <div className="flex items-center gap-0.5 flex-shrink-0">
+                                {notificacion.tipo === 'cumpleanos' && (
+                                  <button 
+                                    onClick={(e) => enviarWhatsAppCumpleanios(notificacion, e)}
+                                    className="p-1 text-green-600 hover:text-green-700 rounded hover:bg-green-100 transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Felicitar por WhatsApp"
+                                  >
+                                    <MessageCircle className="h-3 w-3" />
+                                  </button>
+                                )}
+                                
+                                <button 
+                                  onClick={(e) => marcarComoLeida(notificacion.id, e)}
+                                  className="p-1 text-gray-400 hover:text-green-600 rounded hover:bg-green-50 transition-colors opacity-0 group-hover:opacity-100"
+                                  title="Marcar como leída"
+                                >
+                                  <Check className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <p className="text-xs text-gray-600 mt-0.5 line-clamp-2 break-words">
+                              {notificacion.mensaje}
+                            </p>
+                            
+                            <div className="flex justify-between items-center mt-1">
+                              <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                <Clock className="h-2.5 w-2.5" />
+                                {formatFecha(notificacion.fecha_notificacion)}
+                              </span>
+                              
+                              {notificacion.prioridad === 'urgente' && (
+                                <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">
+                                  Urgente
+                                </span>
+                              )}
+                              {notificacion.prioridad === 'alta' && (
+                                <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">
+                                  Alta
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
             
-            {/* Link para ver todas las notificaciones */}
+            {/* Footer compacto */}
             {(notificaciones.length > 0 || sinLeer > 0) && (
-              <div className="p-3 border-t bg-gray-50 text-center flex justify-between items-center">
-                <div>
-                  <a 
-                    href="/notificaciones" 
-                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      router.visit('/notificaciones');
-                      setMostrarDropdown(false);
-                    }}
-                  >
-                    <Eye className="h-3 w-3" />
-                    Ver activas
-                  </a>
-                </div>
+              <div className="p-2 border-t bg-gray-50 grid grid-cols-2 gap-1">
+                <a 
+                  href="/notificaciones" 
+                  className="text-xs text-center text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    router.visit('/notificaciones');
+                    setMostrarDropdown(false);
+                  }}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Ver activas
+                </a>
                 
-                <div>
-                  <a 
-                    href="/notificaciones/programadas" 
-                    className="text-xs text-green-600 hover:text-green-800 hover:underline flex items-center gap-1"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      router.visit('/notificaciones/programadas');
-                      setMostrarDropdown(false);
-                    }}
-                  >
-                    <Calendar className="h-3 w-3" />
-                    Ver programadas
-                  </a>
-                </div>
+                <a 
+                  href="/notificaciones/programadas" 
+                  className="text-xs text-center text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    router.visit('/notificaciones/programadas');
+                    setMostrarDropdown(false);
+                  }}
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  Programadas
+                </a>
               </div>
             )}
           </div>
           
-          {/* Backdrop para cerrar al hacer clic fuera */}
+          {/* Backdrop */}
           <div 
             className="fixed inset-0 z-40"
             onClick={() => setMostrarDropdown(false)}

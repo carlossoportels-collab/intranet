@@ -55,7 +55,7 @@ class LeadController extends Controller
     /**
      * Almacenar nuevo lead - VERSIÓN PARA INERTIA
      */
-    public function store(StoreLeadRequest $request): RedirectResponse
+    public function store(StoreLeadRequest $request)
     {
         try {
             $leadData = LeadData::fromRequest(
@@ -87,7 +87,6 @@ class LeadController extends Controller
                 ->withInput();
         }
     }
-
     /**
      * Verificar qué datos faltan para generar un contrato
      */

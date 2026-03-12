@@ -93,13 +93,15 @@ class LeadCommentNotificationService
         }
     }
     
-    public function eliminarNotificacionesPendientes(int $leadId, int $usuarioId): int
+    public function eliminarNotificacionesPendientes(int $leadId, int $usuarioId, ?int $excluirComentarioId = null): int
     {
         try {
-            $eliminadas = DB::table('notificaciones')
+            // 1. Eliminar notificaciones de lead sin contactar (SIEMPRE)
+            $eliminadasLead = DB::table('notificaciones')
                 ->where('usuario_id', $usuarioId)
-                ->whereIn('tipo', ['comentario_recordatorio', 'lead_sin_contactar'])
                 ->where('entidad_id', $leadId)
+                ->where('entidad_tipo', 'lead')
+                ->where('tipo', 'lead_sin_contactar')
                 ->where('leida', false)
                 ->whereNull('deleted_at')
                 ->update([
@@ -107,15 +109,42 @@ class LeadCommentNotificationService
                     'deleted_by' => $usuarioId
                 ]);
             
-            Log::info('Notificaciones eliminadas por rechazo:', [
+            // 2. Eliminar SOLO los recordatorios de comentarios ANTERIORES
+            $comentariosIds = DB::table('comentarios')
+                ->where('lead_id', $leadId)
+                ->whereNull('deleted_at')
+                ->when($excluirComentarioId, function($query) use ($excluirComentarioId) {
+                    return $query->where('id', '!=', $excluirComentarioId);
+                })
+                ->pluck('id')
+                ->toArray();
+            
+            $eliminadosComentarios = 0;
+            if (!empty($comentariosIds)) {
+                $eliminadosComentarios = DB::table('notificaciones')
+                    ->where('usuario_id', $usuarioId)
+                    ->where('tipo', 'comentario_recordatorio')
+                    ->whereIn('entidad_id', $comentariosIds)
+                    ->where('entidad_tipo', 'comentario')
+                    ->where('fecha_notificacion', '>', now()) // Solo los FUTUROS
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'deleted_at' => now(),
+                        'deleted_by' => $usuarioId
+                    ]);
+            }
+            
+            Log::info('Notificaciones eliminadas', [
                 'lead_id' => $leadId,
-                'eliminadas' => $eliminadas
+                'usuario_id' => $usuarioId,
+                'lead_sin_contactar' => $eliminadasLead,
+                'recordatorios_anteriores_eliminados' => $eliminadosComentarios
             ]);
             
-            return $eliminadas;
+            return $eliminadasLead + $eliminadosComentarios;
             
         } catch (\Exception $e) {
-            Log::error('Error eliminando notificaciones por rechazo:', [
+            Log::error('Error eliminando notificaciones:', [
                 'lead_id' => $leadId,
                 'error' => $e->getMessage()
             ]);

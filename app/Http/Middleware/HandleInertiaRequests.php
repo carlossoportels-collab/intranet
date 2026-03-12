@@ -153,6 +153,8 @@ class HandleInertiaRequests extends Middleware
         $shared['flash'] = [
             'success' => fn () => $request->session()->get('success'),
             'error' => fn () => $request->session()->get('error'),
+            'lead_id' => fn () => $request->session()->get('lead_id'),
+            'nota_agregada' => fn () => $request->session()->get('nota_agregada'),
         ];
         
         return $shared;

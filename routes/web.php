@@ -9,6 +9,7 @@ use App\Http\Controllers\Comercial\ActividadController;
 use App\Http\Controllers\Comercial\ContactosController;
 use App\Http\Controllers\Comercial\PresupuestosController;
 use App\Http\Controllers\Comercial\RecordatoriosController;
+use App\Http\Controllers\Comercial\LeadContactController;
 use App\Http\Controllers\Comercial\ProspectosController;
 use App\Http\Controllers\Comercial\LeadController;
 use App\Http\Controllers\Comercial\MotivoPerdidaController;
@@ -34,6 +35,7 @@ use App\Http\Controllers\CondComerciales\NovedadesController;
 use App\Http\Controllers\CondComerciales\ReenviosActivosController;
 use App\Http\Controllers\RRHH\Equipos\EquipoComercialController;
 use App\Http\Controllers\RRHH\Equipos\EquipoTecnicoController;
+use App\Http\Controllers\RRHH\Equipos\ComercialController;
 use App\Http\Controllers\RRHH\Personal\CumpleanosController;
 use App\Http\Controllers\RRHH\Personal\DatosPersonalesController;
 use App\Http\Controllers\RRHH\Personal\LicenciasController;
@@ -43,6 +45,8 @@ use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\PresupuestoLegacyController;
 use App\Http\Controllers\ContratoLegacyController;
 use App\Http\Controllers\Comercial\DocumentacionController;
+use App\Http\Controllers\Estadisticas\ComercialGrupalController;
+use App\Http\Controllers\Estadisticas\ComercialIndividualController;
 
 // ==================== NUEVOS CONTROLADORES PARA CONTRATOS ====================
 use App\Http\Controllers\Comercial\Utils\TipoResponsabilidadController;
@@ -77,12 +81,12 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         Route::get('/convenios', [ConveniosVigentesController::class, 'index'])->name('comercial.convenios');
         Route::get('/novedades', [NovedadesController::class, 'index'])->name('comercial.novedades');
         Route::get('/reenvios', [ReenviosActivosController::class, 'index'])->name('comercial.reenvios');
-                // Rutas para documentación
+        
+        // Rutas para documentación
         Route::get('/documentacion', [DocumentacionController::class, 'index'])->name('documentacion.index');
         Route::get('/documentacion/browse', [DocumentacionController::class, 'browse'])->name('documentacion.browse');
         Route::get('/documentacion/download', [DocumentacionController::class, 'download'])->name('documentacion.download');
 
-        
         // ========== ENDPOINTS API (SIN PARÁMETROS) ==========
         Route::get('/motivos-perdida-activos', [MotivoPerdidaController::class, 'getMotivosActivos']);
         Route::get('/localidades/buscar', [LocalidadController::class, 'buscar'])->name('comercial.localidades.buscar');
@@ -147,10 +151,10 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             
             // Rutas para contrato desde empresa existente
             Route::get('/desde-empresa/{empresaId}', [App\Http\Controllers\Comercial\ContratoController::class, 'createFromEmpresa'])
-                ->name('comercial.contratos.desde-empresa');  // GET para mostrar formulario
+                ->name('comercial.contratos.desde-empresa');
             
             Route::post('/desde-empresa', [App\Http\Controllers\Comercial\ContratoController::class, 'storeFromEmpresa'])
-                ->name('comercial.contratos.store-from-empresa');  // ← POST para guardar (FALTABA)
+                ->name('comercial.contratos.store-from-empresa');
         });
                 
         // ========== CUENTAS ==========
@@ -173,10 +177,13 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::get('/cambio-razon-social/empresa/{id}/completa', [CambioRazonSocialController::class, 'getEmpresaDataCompleta'])->name('comercial.cuentas.cambio-razon-social.empresa-completa');
             Route::get('/cambio-razon-social/{id}', [CambioRazonSocialController::class, 'show'])->name('comercial.cuentas.cambio-razon-social.show');
             
-            // Rutas GET para datos de titularidad (si las necesitas)
+            // Rutas GET para datos de titularidad
             Route::get('/cambio-titularidad/empresa/{id}/vehiculos', [CambioTitularidadController::class, 'getVehiculosEmpresa'])->name('comercial.cuentas.cambio-titularidad.vehiculos');
             Route::get('/cambio-titularidad/{id}', [CambioTitularidadController::class, 'show'])->name('comercial.cuentas.cambio-titularidad.show');
         });
+        
+        
+
         // ========== RUTAS CON PARÁMETROS LEAD (AL FINAL) ==========
         Route::prefix('leads/{lead}')->group(function () {
             Route::get('/', [LeadController::class, 'show'])->name('comercial.leads.show');
@@ -186,7 +193,6 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::get('/comentarios-modal-data', [ProspectosController::class, 'comentariosModalData'])->name('leads.comentarios-modal-data');
             Route::get('/datos-alta', [App\Http\Controllers\Comercial\Utils\LeadDataController::class, 'getDatosAlta']);
             
-            // 🔹 RUTA CORREGIDA - Usamos {lead} pero con el modelo importado en el controlador
             Route::get('/verificar-datos-contrato', [LeadController::class, 'verificarDatosContrato'])->name('comercial.leads.verificar-datos-contrato');
         });
 
@@ -203,6 +209,11 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::get('/modal-seguimiento', [LeadsPerdidosController::class, 'modalSeguimiento'])->name('leads-perdidos.modal-seguimiento');
             Route::post('/seguimiento', [LeadsPerdidosController::class, 'procesarSeguimiento'])->name('leads-perdidos.seguimiento');
         });
+
+                // ========== RUTA PARA WHATSAPP TRACKING (AL FINAL) ==========
+    Route::get('/lead/{lead}/contactar-whatsapp', [LeadContactController::class, 'contactarWhatsApp'])
+        ->name('comercial.lead.contactar-whatsapp');
+
     });
     
     // ==================== CONFIGURACIÓN ====================
@@ -259,77 +270,68 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         });
     });
     
-// ==================== RRHH ====================
-Route::prefix('rrhh')->name('rrhh.')->middleware(['auth'])->group(function () {
-    
-    // ===== EQUIPOS =====
-    Route::prefix('equipos')->name('equipos.')->group(function () {
-        // Vista principal del equipo técnico
-        Route::get('/tecnico', [EquipoTecnicoController::class, 'index'])->name('tecnico');
+    // ==================== RRHH ====================
+    Route::prefix('rrhh')->name('rrhh.')->group(function () {
         
-        // CRUD de técnicos
-        Route::prefix('tecnicos')->name('tecnicos.')->group(function () {
-            Route::get('/create', [TecnicoController::class, 'create'])->name('create');
-            Route::post('/', [TecnicoController::class, 'store'])->name('store');
-            Route::get('/{tecnico}/edit', [TecnicoController::class, 'edit'])->name('edit');
-            Route::put('/{tecnico}', [TecnicoController::class, 'update'])->name('update');
-            Route::delete('/{tecnico}', [TecnicoController::class, 'destroy'])->name('destroy');
+        // ===== EQUIPOS =====
+        Route::prefix('equipos')->name('equipos.')->group(function () {
+            // Equipo Técnico
+            Route::get('/tecnico', [EquipoTecnicoController::class, 'index'])->name('tecnico');
+            
+            // Equipo Comercial
+            Route::get('/comercial', [EquipoComercialController::class, 'index'])->name('comercial');
+            
+            // CRUD de técnicos
+            Route::prefix('tecnicos')->name('tecnicos.')->group(function () {
+                Route::get('/create', [TecnicoController::class, 'create'])->name('create');
+                Route::post('/', [TecnicoController::class, 'store'])->name('store');
+                Route::get('/{tecnico}/edit', [TecnicoController::class, 'edit'])->name('edit');
+                Route::put('/{tecnico}', [TecnicoController::class, 'update'])->name('update');
+                Route::delete('/{tecnico}', [TecnicoController::class, 'destroy'])->name('destroy');
+            });
+
+            // CRUD de comerciales
+            Route::prefix('comerciales')->name('comerciales.')->group(function () {
+                Route::get('/create', [ComercialController::class, 'create'])->name('create');
+                Route::post('/', [ComercialController::class, 'store'])->name('store');
+                Route::get('/{comercial}/edit', [ComercialController::class, 'edit'])->name('edit');
+                Route::put('/{comercial}', [ComercialController::class, 'update'])->name('update');
+                Route::delete('/{comercial}', [ComercialController::class, 'destroy'])->name('destroy');
+            });
+        });
+        
+        // ===== PERSONAL =====
+        Route::prefix('personal')->name('personal.')->group(function () {
+            // Datos personales
+            Route::get('/datos', [DatosPersonalesController::class, 'index'])->name('datos');
+            Route::get('/datos/crear', [DatosPersonalesController::class, 'create'])->name('datos.create');
+            Route::post('/datos', [DatosPersonalesController::class, 'store'])->name('datos.store');
+            Route::get('/datos/{id}/editar', [DatosPersonalesController::class, 'edit'])->name('datos.edit');
+            Route::put('/datos/{id}', [DatosPersonalesController::class, 'update'])->name('datos.update');
+            Route::delete('/datos/{id}', [DatosPersonalesController::class, 'destroy'])->name('datos.destroy');
+            
+            // Cumpleaños
+            Route::get('/cumpleanos', [CumpleanosController::class, 'index'])->name('cumpleanos');
+            
+            // Licencias
+            Route::prefix('licencias')->name('licencias.')->group(function () {
+                Route::get('/', [LicenciasController::class, 'index'])->name('index');
+                Route::get('/crear', [LicenciasController::class, 'create'])->name('create');
+                Route::post('/', [LicenciasController::class, 'store'])->name('store');
+                Route::get('/{id}', [LicenciasController::class, 'show'])->name('show');
+                Route::get('/{id}/editar', [LicenciasController::class, 'edit'])->name('edit');
+                Route::put('/{id}', [LicenciasController::class, 'update'])->name('update');
+                Route::delete('/{id}', [LicenciasController::class, 'destroy'])->name('destroy');
+            });
         });
     });
-    
-    // ===== PERSONAL =====
-    Route::prefix('personal')->name('personal.')->group(function () {
-        // Datos personales
-        Route::get('/datos', [DatosPersonalesController::class, 'index'])->name('datos');
-        Route::get('/datos/crear', [DatosPersonalesController::class, 'create'])->name('datos.create');
-        Route::post('/datos', [DatosPersonalesController::class, 'store'])->name('datos.store');
-        Route::get('/datos/{id}/editar', [DatosPersonalesController::class, 'edit'])->name('datos.edit');
-        Route::put('/datos/{id}', [DatosPersonalesController::class, 'update'])->name('datos.update');
-        Route::delete('/datos/{id}', [DatosPersonalesController::class, 'destroy'])->name('datos.destroy');
-        
-        // Cumpleaños
-        Route::get('/cumpleanos', [CumpleanosController::class, 'index'])->name('cumpleanos');
-        
-        // ===== LICENCIAS =====
-        Route::prefix('licencias')->name('licencias.')->group(function () {
-            Route::get('licencias', [LicenciasController::class, 'index'])->name('licencias');
-            Route::get('/crear', [LicenciasController::class, 'create'])->name('create');
-            Route::post('/', [LicenciasController::class, 'store'])->name('store');
-            Route::get('/{id}', [LicenciasController::class, 'show'])->name('show');
-            Route::get('/{id}/editar', [LicenciasController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [LicenciasController::class, 'update'])->name('update');
-            Route::delete('/{id}', [LicenciasController::class, 'destroy'])->name('destroy');
-        });
+
+    // ==================== ESTADÍSTICAS ====================
+    Route::prefix('estadisticas')->name('estadisticas.')->group(function () {
+        Route::get('/comercial-grupal', [ComercialGrupalController::class, 'index'])->name('comercial-grupal');
+        Route::get('/comercial-individual/{id}', [ComercialIndividualController::class, 'show'])->name('comercial-individual');
     });
-});
 
-  //   Route::prefix('estadisticas')->name('estadisticas.')->group(function () {
-     //    Route::get('/comercial-grupal', [App\Http\Controllers\Estadisticas\ComercialGrupalController::class, 'index'])->name('comercial-grupal');
-     //    Route::get('/comercial-individual/{id}', [App\Http\Controllers\Estadisticas\ComercialIndividualController::class, 'show'])->name('comercial-individual');
-  //   });
-
-// ===== ENDPOINTS API (fuera del prefijo rrhh pero con auth) =====
-Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
-    // Búsqueda de personal para modales
-    Route::get('/personal/buscar', [DatosPersonalesController::class, 'buscar'])->name('personal.buscar');
-    
-    // Obtener datos de un empleado por ID para cumpleaños y WhatsApp
-    Route::get('/personal/{id}', function ($id) {
-        $personal = App\Models\Personal::find($id);
-        if (!$personal) {
-            return response()->json(['error' => 'Personal no encontrado'], 404);
-        }
-        return response()->json([
-            'id' => $personal->id,
-            'nombre' => $personal->nombre,
-            'apellido' => $personal->apellido,
-            'nombre_completo' => $personal->nombre_completo,
-            'telefono' => $personal->telefono,
-            'email' => $personal->email,
-        ]);
-    })->name('personal.show');
-});
-    
     // ==================== NOTIFICACIONES ====================
     Route::prefix('notificaciones')->group(function () {
         Route::get('/', [NotificacionController::class, 'index'])->name('notificaciones.index');
@@ -351,7 +353,7 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     });
     
     // ==================== CONTRATOS LEGACY ====================
-    Route::prefix('contratos-legacy')->middleware(['auth'])->group(function () {
+    Route::prefix('contratos-legacy')->group(function () {
         Route::get('/{id}/pdf', [ContratoLegacyController::class, 'verPdf'])->name('contratos-legacy.pdf');
         Route::get('/{id}/descargar', [ContratoLegacyController::class, 'descargarPdf'])->name('contratos-legacy.descargar');
     });
@@ -360,4 +362,25 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     Route::fallback(function () {
         return Inertia::render('Errors/404');
     });
+});
+
+// ===== ENDPOINTS API (fuera del prefijo rrhh pero con auth) =====
+Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
+    // Búsqueda de personal para modales
+    Route::get('/personal/buscar', [DatosPersonalesController::class, 'buscar'])->name('personal.buscar');
+    // Obtener datos de un empleado por ID para cumpleaños y WhatsApp
+    Route::get('/personal/{id}', function ($id) {
+        $personal = App\Models\Personal::find($id);
+        if (!$personal) {
+            return response()->json(['error' => 'Personal no encontrado'], 404);
+        }
+        return response()->json([
+            'id' => $personal->id,
+            'nombre' => $personal->nombre,
+            'apellido' => $personal->apellido,
+            'nombre_completo' => $personal->nombre_completo,
+            'telefono' => $personal->telefono,
+            'email' => $personal->email,
+        ]);
+    })->name('personal.show');
 });

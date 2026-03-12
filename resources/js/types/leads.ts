@@ -34,11 +34,23 @@ export interface Provincia {
     nombre: string;
 }
 
+export interface Personal {
+    id: number;
+    nombre: string;
+    apellido: string;
+    email?: string;
+    telefono?: string;
+    nombre_completo?: string;
+}
+
 export interface Comercial {
     id: number;
     prefijo_id: number;
     nombre: string;
     email: string;
+    telefono?: string; // Podemos agregarlo directamente si viene del backend
+    personal?: Personal; // O podemos usar la relación
+    personal_id?: number;
 }
 
 export interface Lead {

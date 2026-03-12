@@ -1,6 +1,5 @@
 // resources/js/hooks/useToast.ts
-import { useState, useCallback } from 'react';
-
+import { useState, useCallback, useRef } from 'react';
 import { ToastType } from '@/components/ui/toast';
 
 interface ToastConfig {
@@ -12,40 +11,67 @@ interface ToastConfig {
 
 export const useToast = () => {
     const [toast, setToast] = useState<ToastConfig & { id: number } | null>(null);
-    const [toastId, setToastId] = useState(0);
+    const toastIdRef = useRef(0);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const showToast = useCallback((config: ToastConfig) => {
-        const id = toastId + 1;
-        setToastId(id);
+        // Limpiar timeout anterior si existe
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
+
+        const id = ++toastIdRef.current;
         setToast({ ...config, id });
         
-        // Auto remove toast after duration
+        // Auto remove toast after duration (si duration no es 0)
         if (config.duration !== 0) {
-            const duration = config.duration || 3000;
-            setTimeout(() => {
+            const duration = config.duration || 4000;
+            timeoutRef.current = setTimeout(() => {
                 setToast(current => current?.id === id ? null : current);
+                timeoutRef.current = null;
             }, duration);
         }
-    }, [toastId]);
+    }, []);
 
     const hideToast = useCallback(() => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
         setToast(null);
     }, []);
 
-    const showSuccess = useCallback((message: string, duration?: number) => {
-        showToast({ message, type: 'success', duration });
+    const showSuccess = useCallback((
+        message: string, 
+        duration?: number, 
+        position?: ToastConfig['position']
+    ) => {
+        showToast({ message, type: 'success', duration, position });
     }, [showToast]);
 
-    const showError = useCallback((message: string, duration?: number) => {
-        showToast({ message, type: 'error', duration: duration || 5000 });
+    const showError = useCallback((
+        message: string, 
+        duration?: number, 
+        position?: ToastConfig['position']
+    ) => {
+        showToast({ message, type: 'error', duration: duration || 5000, position });
     }, [showToast]);
 
-    const showInfo = useCallback((message: string, duration?: number) => {
-        showToast({ message, type: 'info', duration });
+    const showInfo = useCallback((
+        message: string, 
+        duration?: number, 
+        position?: ToastConfig['position']
+    ) => {
+        showToast({ message, type: 'info', duration, position });
     }, [showToast]);
 
-    const showWarning = useCallback((message: string, duration?: number) => {
-        showToast({ message, type: 'warning', duration });
+    const showWarning = useCallback((
+        message: string, 
+        duration?: number, 
+        position?: ToastConfig['position']
+    ) => {
+        showToast({ message, type: 'warning', duration, position });
     }, [showToast]);
 
     return {

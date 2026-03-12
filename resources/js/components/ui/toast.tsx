@@ -22,125 +22,154 @@ const Toast: React.FC<ToastProps> = ({
     showClose = true
 }) => {
     const [isVisible, setIsVisible] = useState(true);
+    const [isExiting, setIsExiting] = useState(false);
 
-    // Auto-close after duration
     useEffect(() => {
         if (duration > 0) {
             const timer = setTimeout(() => {
-                setIsVisible(false);
-                if (onClose) setTimeout(onClose, 300); // Wait for animation
+                handleClose();
             }, duration);
 
             return () => clearTimeout(timer);
         }
-    }, [duration, onClose]);
+    }, [duration]);
 
-    // Handle manual close
     const handleClose = () => {
-        setIsVisible(false);
-        if (onClose) setTimeout(onClose, 300);
+        setIsExiting(true);
+        setTimeout(() => {
+            setIsVisible(false);
+            if (onClose) onClose();
+        }, 200);
     };
 
-    // Get icon based on type
-    const getIcon = () => {
+    // Configuración simplificada: color solo para elementos visuales
+    const getToastConfig = () => {
         switch (type) {
             case 'success':
-                return <CheckCircle className="h-5 w-5 text-green-600" />;
+                return {
+                    icon: CheckCircle,
+                    iconBg: 'bg-emerald-500',
+                    iconColor: 'text-white',
+                    progressBar: 'bg-emerald-500',
+                    shadow: 'shadow-lg shadow-emerald-500/20',
+                    border: 'border-emerald-200',
+                    bg: 'bg-white'
+                };
             case 'error':
-                return <XCircle className="h-5 w-5 text-red-600" />;
+                return {
+                    icon: XCircle,
+                    iconBg: 'bg-rose-500',
+                    iconColor: 'text-white',
+                    progressBar: 'bg-rose-500',
+                    shadow: 'shadow-lg shadow-rose-500/20',
+                    border: 'border-rose-200',
+                    bg: 'bg-white'
+                };
             case 'warning':
-                return <AlertCircle className="h-5 w-5 text-yellow-600" />;
+                return {
+                    icon: AlertCircle,
+                    iconBg: 'bg-amber-500',
+                    iconColor: 'text-white',
+                    progressBar: 'bg-amber-500',
+                    shadow: 'shadow-lg shadow-amber-500/20',
+                    border: 'border-amber-200',
+                    bg: 'bg-white'
+                };
             case 'info':
-                return <Info className="h-5 w-5 text-blue-600" />;
+                return {
+                    icon: Info,
+                    iconBg: 'bg-sky-500',
+                    iconColor: 'text-white',
+                    progressBar: 'bg-sky-500',
+                    shadow: 'shadow-lg shadow-sky-500/20',
+                    border: 'border-sky-200',
+                    bg: 'bg-white'
+                };
             default:
-                return <CheckCircle className="h-5 w-5 text-green-600" />;
+                return {
+                    icon: CheckCircle,
+                    iconBg: 'bg-emerald-500',
+                    iconColor: 'text-white',
+                    progressBar: 'bg-emerald-500',
+                    shadow: 'shadow-lg shadow-emerald-500/20',
+                    border: 'border-emerald-200',
+                    bg: 'bg-white'
+                };
         }
     };
 
-    // Get styles based on type
-    const getStyles = () => {
-        switch (type) {
-            case 'success':
-                return 'bg-white border-green-200 text-green-800';
-            case 'error':
-                return 'bg-white border-red-200 text-red-800';
-            case 'warning':
-                return 'bg-white border-yellow-200 text-yellow-800';
-            case 'info':
-                return 'bg-white border-blue-200 text-blue-800';
-            default:
-                return 'bg-white border-green-200 text-green-800';
-        }
-    };
+    const config = getToastConfig();
+    const Icon = config.icon;
 
-    // Get icon background based on type
-    const getIconBg = () => {
-        switch (type) {
-            case 'success':
-                return 'bg-green-100';
-            case 'error':
-                return 'bg-red-100';
-            case 'warning':
-                return 'bg-yellow-100';
-            case 'info':
-                return 'bg-blue-100';
-            default:
-                return 'bg-green-100';
-        }
-    };
-
-    // Get title based on type
-    const getTitle = () => {
-        switch (type) {
-            case 'success':
-                return '¡Éxito!';
-            case 'error':
-                return 'Error';
-            case 'warning':
-                return 'Advertencia';
-            case 'info':
-                return 'Información';
-            default:
-                return 'Éxito';
-        }
-    };
-
-    // Get position classes
     const getPositionClasses = () => {
         switch (position) {
             case 'top-right':
-                return 'top-4 right-4';
+                return 'top-6 right-6';
             case 'top-center':
-                return 'top-4 left-1/2 transform -translate-x-1/2';
+                return 'top-6 left-1/2 -translate-x-1/2';
             case 'bottom-right':
-                return 'bottom-4 right-4';
+                return 'bottom-6 right-6';
             case 'bottom-center':
-                return 'bottom-4 left-1/2 transform -translate-x-1/2';
+                return 'bottom-6 left-1/2 -translate-x-1/2';
             default:
-                return 'top-4 left-1/2 transform -translate-x-1/2';
+                return 'top-6 left-1/2 -translate-x-1/2';
         }
     };
 
     if (!isVisible) return null;
 
     return (
-        <div className={`fixed z-[9999] ${getPositionClasses()} animate-in fade-in-0 zoom-in-95 duration-300`}>
-            <div className={`flex items-start gap-3 p-4 rounded-lg shadow-xl border max-w-md ${getStyles()}`}>
-                <div className={`p-2 ${getIconBg()} rounded-full`}>
-                    {getIcon()}
+        <div 
+            className={`fixed z-[9999] ${getPositionClasses()} 
+                transition-all duration-300 ease-[cubic-bezier(0.68,-0.55,0.265,1.55)]
+                ${isExiting 
+                    ? 'opacity-0 scale-75 translate-y-0' 
+                    : 'opacity-100 scale-100 translate-y-0'
+                }
+            `}
+        >
+            <div className={`
+                relative overflow-hidden
+                flex items-start gap-3.5 
+                ${config.bg} ${config.border} border
+                rounded-2xl ${config.shadow}
+                min-w-[320px] max-w-md p-4
+            `}>
+                {/* Icono de color sólido */}
+                <div className={`
+                    relative flex-shrink-0 p-2.5 rounded-xl
+                    ${config.iconBg} shadow-inner
+                `}>
+                    <Icon className={`h-5 w-5 ${config.iconColor}`} />
                 </div>
-                <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm mb-1">{getTitle()}</div>
-                    <div className="text-sm text-gray-700 break-words">{message}</div>
+
+                {/* Contenido con texto 100% oscuro y legible */}
+                <div className="flex-1 min-w-0 pt-0.5">
+                    <div className="text-sm text-slate-700 break-words leading-relaxed font-medium">
+                        {message}
+                    </div>
                 </div>
+
+                {/* Botón cerrar en gris neutro */}
                 {showClose && (
                     <button
                         onClick={handleClose}
-                        className="text-gray-400 hover:text-gray-600 ml-2 flex-shrink-0"
-                        aria-label="Cerrar notificación"
+                        className="flex-shrink-0 p-1.5 rounded-lg hover:bg-slate-100 transition-colors group mt-0.5"
+                        aria-label="Cerrar"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                     </button>
+                )}
+
+                {/* Barra de progreso con el color correspondiente */}
+                {duration > 0 && (
+                    <div 
+                        className={`absolute bottom-0 left-0 h-1 ${config.progressBar} opacity-50`}
+                        style={{
+                            width: '100%',
+                            animation: `shrinkWidth ${duration}ms linear forwards`
+                        }}
+                    />
                 )}
             </div>
         </div>
