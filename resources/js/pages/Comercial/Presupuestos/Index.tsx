@@ -7,7 +7,6 @@ import { PresupuestoFilterBar } from '@/components/presupuestos/PresupuestoFilte
 import Pagination from '@/components/ui/Pagination';
 import AppLayout from '@/layouts/app-layout';
 
-
 interface Presupuesto {
     id: number;
     referencia: string;
@@ -20,7 +19,7 @@ interface Presupuesto {
         nombre_completo: string;
         email: string;
         telefono?: string;
-    };
+    } | null; // Puede ser null
     prefijo?: {
         id: number;
         codigo: string;
@@ -189,6 +188,21 @@ export default function PresupuestosIndex({
         setExpandedMobileCard(expandedMobileCard === id ? null : id);
     };
 
+    // Función para obtener nombre del lead de forma segura
+    const getLeadNombre = (lead: Presupuesto['lead']) => {
+        return lead?.nombre_completo || 'Lead eliminado';
+    };
+
+    // Función para obtener email del lead de forma segura
+    const getLeadEmail = (lead: Presupuesto['lead']) => {
+        return lead?.email || 'Email no disponible';
+    };
+
+    // Función para obtener teléfono del lead de forma segura
+    const getLeadTelefono = (lead: Presupuesto['lead']) => {
+        return lead?.telefono || 'Teléfono no disponible';
+    };
+
     return (
         <AppLayout title="Presupuestos">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
@@ -318,7 +332,7 @@ export default function PresupuestosIndex({
                                                 {presupuesto.referencia}
                                             </td>
                                             <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-gray-500">
-                                                {presupuesto.lead.nombre_completo}
+                                                {getLeadNombre(presupuesto.lead)}
                                             </td>
                                             <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-gray-500">
                                                 {presupuesto.cantidad_vehiculos}
@@ -395,7 +409,7 @@ export default function PresupuestosIndex({
                                                 </span>
                                             </div>
                                             <p className="text-sm text-gray-600 font-medium">
-                                                {presupuesto.lead.nombre_completo}
+                                                {getLeadNombre(presupuesto.lead)}
                                             </p>
                                             {presupuesto.promocion && (
                                                 <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs">
@@ -444,16 +458,16 @@ export default function PresupuestosIndex({
                                                     <p className="text-xs text-gray-500 mb-1">Válido hasta</p>
                                                     <p className="text-sm text-gray-900">{formatDate(presupuesto.validez)}</p>
                                                 </div>
-                                                {presupuesto.lead.email && (
+                                                {presupuesto.lead?.email && (
                                                     <div className="col-span-2">
                                                         <p className="text-xs text-gray-500 mb-1">Email</p>
-                                                        <p className="text-sm text-gray-900">{presupuesto.lead.email}</p>
+                                                        <p className="text-sm text-gray-900">{getLeadEmail(presupuesto.lead)}</p>
                                                     </div>
                                                 )}
-                                                {presupuesto.lead.telefono && (
+                                                {presupuesto.lead?.telefono && (
                                                     <div className="col-span-2">
                                                         <p className="text-xs text-gray-500 mb-1">Teléfono</p>
-                                                        <p className="text-sm text-gray-900">{presupuesto.lead.telefono}</p>
+                                                        <p className="text-sm text-gray-900">{getLeadTelefono(presupuesto.lead)}</p>
                                                     </div>
                                                 )}
                                             </div>

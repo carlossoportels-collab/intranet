@@ -163,7 +163,7 @@ export default function MetodoPagoSection({
                                     onChange={(e) => setDatosCbu({...datosCbu, nombre_banco: e.target.value})}
                                     maxLength={100}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
-                                    placeholder="Ej: Banco Galicia, Mercado Pago, Ualá, etc."
+                                    placeholder="Ej: Banco Galicia, Banco Frances, etc."
                                     required
                                 />
                             </div>
@@ -265,7 +265,7 @@ export default function MetodoPagoSection({
                                     onChange={(e) => setDatosTarjeta({...datosTarjeta, tarjeta_banco: e.target.value})}
                                     maxLength={100}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
-                                    placeholder="Ej: Banco Galicia, Brubank, etc."
+                                    placeholder="Ej: Banco Galicia, Banco Santander, etc."
                                     required
                                 />
                             </div>

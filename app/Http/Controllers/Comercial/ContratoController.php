@@ -425,24 +425,114 @@ public function store(Request $request)
         return redirect()->back()->with('error', 'Error al generar contrato: ' . $e->getMessage());
     }
 }
-    /**
-     * Mostrar un contrato específico
-     */
-    public function show($id)
-    {
-        $contrato = Contrato::with([
-            'vehiculos',
-            'debitoCbu',
-            'debitoTarjeta',
-            'estado',
-            'empresa',
-            'presupuesto'
-        ])->findOrFail($id);
-        $contrato->numero_contrato = str_pad($contrato->id, 8, '0', STR_PAD_LEFT);
-        return Inertia::render('Comercial/Contratos/Show', [
-            'contrato' => $contrato
-        ]);
+/**
+ * Mostrar un contrato específico
+ */
+public function show($id)
+{
+    $contrato = Contrato::with([
+        'vehiculos',
+        'debitoCbu',
+        'debitoTarjeta',
+        'estado',
+        'empresa',
+        'presupuesto' => function($query) {
+            $query->with([
+                'lead', // Mantenemos lead
+                'tasa', // Producto de instalación/tasa
+                'abono', // Producto de abono
+                'promocion', // Promoción si aplica
+                'agregados' => function($q) {
+                    $q->with([
+                        'productoServicio' => function($pq) {
+                            $pq->with('tipo'); // Cargar el tipo del producto
+                        }
+                    ]);
+                }
+            ]);
+        }
+    ])->findOrFail($id);
+    
+    $contrato->numero_contrato = str_pad($contrato->id, 8, '0', STR_PAD_LEFT);
+    
+    // ===== AGREGAR DATOS DEL LEAD =====
+    $contrato->lead_es_cliente = false;
+    $contrato->lead_nombre_completo = '';
+    
+    if ($contrato->presupuesto && $contrato->presupuesto->lead) {
+        $lead = $contrato->presupuesto->lead;
+        $contrato->lead_es_cliente = (bool) $lead->es_cliente;
+        $contrato->lead_nombre_completo = $lead->nombre_completo ?? '';
     }
+    
+    // ===== AGREGAR DATOS DEL COMERCIAL Y COMPAÑÍA =====
+    $contrato->vendedor_email = '';
+    $contrato->vendedor_telefono = '';
+    $contrato->compania_id = 1;
+    $contrato->compania_nombre = 'LOCALSAT';
+    $contrato->plataforma_id = $contrato->empresa->plataforma_id ?? 1;
+    
+    if ($contrato->presupuesto && $contrato->presupuesto->prefijo) {
+        $comercial = $contrato->presupuesto->prefijo->comercial;
+        
+        if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
+            $comercial = $comercial->first();
+        }
+        
+        if ($comercial) {
+            if ($comercial->personal) {
+                $contrato->vendedor_email = $comercial->personal->email ?? '';
+                $contrato->vendedor_telefono = $comercial->personal->telefono ?? '';
+            }
+            
+            $contrato->compania_id = $comercial->compania_id ?? 1;
+            
+            if ($comercial->compania) {
+                $contrato->compania_nombre = $comercial->compania->nombre ?? 'LOCALSAT';
+            }
+        }
+    }
+    
+    // ===== NUEVO: HIDRATAR PRODUCTOS PARA EL FRONTEND =====
+    if ($contrato->presupuesto && $contrato->presupuesto->agregados) {
+        foreach ($contrato->presupuesto->agregados as $agregado) {
+            // Asegurarnos de que cada agregado tenga la información completa del producto
+            if ($agregado->productoServicio) {
+                $agregado->producto_codigo = $agregado->productoServicio->codigopro ?? 'XXXX';
+                $agregado->producto_nombre = $agregado->productoServicio->nombre ?? 'Sin nombre';
+                $agregado->tipo_nombre = $agregado->productoServicio->tipo?->nombre_tipo_abono ?? 'Otros';
+                
+                // Log para debug (opcional, lo puedes quitar después)
+                \Log::info('Producto agregado:', [
+                    'id' => $agregado->id,
+                    'codigo' => $agregado->producto_codigo,
+                    'nombre' => $agregado->producto_nombre,
+                    'tipo' => $agregado->tipo_nombre,
+                    'valor' => $agregado->valor,
+                    'cantidad' => $agregado->cantidad,
+                    'bonificacion' => $agregado->bonificacion,
+                    'subtotal' => $agregado->subtotal
+                ]);
+            }
+        }
+    }
+    
+    // Hidratar tasa si existe
+    if ($contrato->presupuesto && $contrato->presupuesto->tasa) {
+        $contrato->presupuesto->tasa_codigo = $contrato->presupuesto->tasa->codigopro ?? 'TASA';
+        $contrato->presupuesto->tasa_nombre = $contrato->presupuesto->tasa->nombre ?? 'Tasa/Instalación';
+    }
+    
+    // Hidratar abono si existe
+    if ($contrato->presupuesto && $contrato->presupuesto->abono) {
+        $contrato->presupuesto->abono_codigo = $contrato->presupuesto->abono->codigopro ?? 'ABONO';
+        $contrato->presupuesto->abono_nombre = $contrato->presupuesto->abono->nombre ?? 'Abono mensual';
+    }
+    
+    return Inertia::render('Comercial/Contratos/Show', [
+        'contrato' => $contrato
+    ]);
+}
 
     /**
      * Generar PDF del contrato
@@ -1065,6 +1155,183 @@ public function createFromLead($presupuestoId)
         ]);
         
         return redirect()->back()->with('error', 'Error al preparar el contrato: ' . $e->getMessage());
+    }
+}
+
+// app/Http/Controllers/Comercial/ContratoController.php
+
+/**
+ * Generar PDF temporal para enviar por email
+ */
+public function generarPdfTemp(Request $request, $id)
+{
+    \Log::info('========== GENERAR PDF TEMP CONTRATO ==========');
+    \Log::info('Contrato ID: ' . $id);
+    
+    try {
+        $contrato = Contrato::with([
+            'vehiculos',
+            'debitoCbu',
+            'debitoTarjeta',
+            'estado',
+            'empresa',
+            'presupuesto' => function($query) {
+                $query->with([
+                    'tasa',
+                    'abono',
+                    'promocion.productos',
+                    'agregados' => function($q) {
+                        $q->with('productoServicio.tipo');
+                    }
+                ]);
+            }
+        ])->findOrFail($id);
+
+        // HIDRATAR MANUALMENTE LOS AGREGADOS CON NOMBRES DE PRODUCTOS
+        if ($contrato->presupuesto && $contrato->presupuesto->agregados) {
+            foreach ($contrato->presupuesto->agregados as $agregado) {
+                $producto = \App\Models\ProductoServicio::with('tipo')->find($agregado->prd_servicio_id);
+                $agregado->producto_nombre = $producto ? $producto->nombre : 'Producto #' . $agregado->prd_servicio_id;
+                $agregado->tipo_id = $producto?->tipo_id;
+                $agregado->tipo_nombre = $producto?->tipo?->nombre_tipo_abono ?? '';
+                $agregado->producto_data = $producto;
+            }
+        }
+
+        // HIDRATAR TASA SI ES NECESARIO
+        if ($contrato->presupuesto && $contrato->presupuesto->tasa_id && !$contrato->presupuesto->tasa) {
+            $tasa = \App\Models\ProductoServicio::find($contrato->presupuesto->tasa_id);
+            $contrato->presupuesto->tasa = $tasa;
+        }
+
+        // HIDRATAR ABONO SI ES NECESARIO
+        if ($contrato->presupuesto && $contrato->presupuesto->abono_id && !$contrato->presupuesto->abono) {
+            $abono = \App\Models\ProductoServicio::find($contrato->presupuesto->abono_id);
+            $contrato->presupuesto->abono = $abono;
+        }
+
+        // Determinar la compañía
+        $compania = [
+            'id' => 1,
+            'nombre' => 'LOCALSAT',
+            'logo' => public_path('images/logos/logo.png')
+        ];
+
+        if ($contrato->presupuesto && $contrato->presupuesto->prefijo) {
+            $comercial = $contrato->presupuesto->prefijo->comercial;
+            if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
+                $comercial = $comercial->first();
+            }
+            if ($comercial && $comercial->compania_id) {
+                $companiaId = $comercial->compania_id;
+                $compania = [
+                    'id' => $companiaId,
+                    'nombre' => match($companiaId) {
+                        1 => 'LOCALSAT',
+                        2 => 'SMARTSAT',
+                        3 => '360 SAT',
+                        default => 'LOCALSAT'
+                    },
+                    'logo' => public_path(match($companiaId) {
+                        1 => 'images/logos/logo.png',
+                        2 => 'images/logos/logosmart.png',
+                        3 => 'images/logos/360-logo.webp',
+                        default => 'images/logos/logo.png'
+                    })
+                ];
+            }
+        }
+
+        // Generar PDF
+        $pdf = Pdf::loadView('pdf.contrato', [
+            'contrato' => $contrato,
+            'compania' => $compania
+        ])
+        ->setPaper('A4')
+        ->setOptions([
+            'defaultFont' => 'sans-serif',
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true,
+            'chroot' => public_path(),
+        ]);
+
+        // ===== AGREGAR DATOS DEL COMERCIAL Y COMPAÑÍA =====
+$contrato->vendedor_email = '';
+$contrato->vendedor_telefono = '';
+$contrato->compania_id = 1;
+$contrato->compania_nombre = 'LOCALSAT';
+$contrato->plataforma_id = $contrato->empresa->plataforma_id ?? 1;
+
+if ($contrato->presupuesto && $contrato->presupuesto->prefijo) {
+    $comercial = $contrato->presupuesto->prefijo->comercial;
+    
+    if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
+        $comercial = $comercial->first();
+    }
+    
+    if ($comercial) {
+        if ($comercial->personal) {
+            $contrato->vendedor_email = $comercial->personal->email ?? '';
+            $contrato->vendedor_telefono = $comercial->personal->telefono ?? '';
+        }
+        
+        $contrato->compania_id = $comercial->compania_id ?? 1;
+        
+        if ($comercial->compania) {
+            $contrato->compania_nombre = $comercial->compania->nombre ?? 'LOCALSAT';
+        }
+    }
+}
+
+        // Guardar en storage temporal
+        $filename = "contrato-{$contrato->id}-" . time() . ".pdf";
+        $path = storage_path("app/temp/{$filename}");
+        
+        if (!file_exists(storage_path('app/temp'))) {
+            mkdir(storage_path('app/temp'), 0755, true);
+        }
+        
+        file_put_contents($path, $pdf->output());
+        
+        // Limpiar archivos temporales viejos
+        $this->limpiarArchivosTemporales();
+
+        $numeroContrato = str_pad($contrato->id, 8, '0', STR_PAD_LEFT);
+
+        return redirect()->back()->with('pdfData', [
+            'success' => true,
+            'url' => "/temp/contrato/{$contrato->id}?v=" . time(),
+            'filename' => "Contrato_{$numeroContrato}.pdf"
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('❌ Error generando PDF temporal:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return redirect()->back()->with('pdfData', [
+            'success' => false,
+            'error' => 'Error al generar el PDF: ' . $e->getMessage()
+        ]);
+    }
+}
+
+/**
+ * Limpiar archivos temporales antiguos
+ */
+private function limpiarArchivosTemporales()
+{
+    $tempDir = storage_path('app/temp');
+    if (!file_exists($tempDir)) return;
+    
+    $archivos = glob($tempDir . '/*.pdf');
+    $now = time();
+    
+    foreach ($archivos as $archivo) {
+        if (is_file($archivo) && $now - filemtime($archivo) > 600) { // 10 minutos
+            unlink($archivo);
+        }
     }
 }
 

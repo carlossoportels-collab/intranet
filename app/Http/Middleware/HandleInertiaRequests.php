@@ -155,6 +155,7 @@ class HandleInertiaRequests extends Middleware
             'error' => fn () => $request->session()->get('error'),
             'lead_id' => fn () => $request->session()->get('lead_id'),
             'nota_agregada' => fn () => $request->session()->get('nota_agregada'),
+            'pdfData' => fn () => $request->session()->get('pdfData'),
         ];
         
         return $shared;

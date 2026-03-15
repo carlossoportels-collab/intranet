@@ -31,6 +31,8 @@ interface Props {
 
 export default function PresupuestosShow({ presupuesto }: Props) {
     const data = usePresupuestoData(presupuesto);
+    const companiaNombre = presupuesto.compania?.nombre || 'LOCALSAT';
+    const companiaId = presupuesto.compania?.id || 1;
 
     const mensajeWhatsApp = useWhatsAppMessage({
         presupuesto,
@@ -97,6 +99,12 @@ export default function PresupuestosShow({ presupuesto }: Props) {
                             tieneTelefono={!!presupuesto.lead?.telefono}
                             mensajeWhatsApp={mensajeWhatsApp}
                             telefono={presupuesto.lead?.telefono}
+                            leadNombre={presupuesto.lead?.nombre_completo || ''}
+                            leadEmail={presupuesto.lead?.email || ''}
+                            comercialEmail={presupuesto.comercial_email || ''} // ← Usar la propiedad que agregamos
+                            comercialNombre={presupuesto.nombre_comercial || ''}
+                            companiaId={presupuesto.compania_id || 1} // ← Usar la propiedad que agregamos
+                            companiaNombre={presupuesto.compania_nombre || 'LOCALSAT'} // ← Usar la propiedad que agregamos
                         />
                     </div>
                 </div>

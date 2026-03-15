@@ -1,12 +1,13 @@
 // resources/js/hooks/useToast.ts
 import { useState, useCallback, useRef } from 'react';
-import { ToastType } from '@/components/ui/toast';
+import { ToastType, ToastAction } from '@/components/ui/toast';
 
 interface ToastConfig {
     message: string;
     type?: ToastType;
     duration?: number;
     position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center';
+    action?: ToastAction;
 }
 
 export const useToast = () => {
@@ -15,7 +16,6 @@ export const useToast = () => {
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const showToast = useCallback((config: ToastConfig) => {
-        // Limpiar timeout anterior si existe
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
@@ -24,7 +24,6 @@ export const useToast = () => {
         const id = ++toastIdRef.current;
         setToast({ ...config, id });
         
-        // Auto remove toast after duration (si duration no es 0)
         if (config.duration !== 0) {
             const duration = config.duration || 4000;
             timeoutRef.current = setTimeout(() => {
@@ -45,33 +44,37 @@ export const useToast = () => {
     const showSuccess = useCallback((
         message: string, 
         duration?: number, 
-        position?: ToastConfig['position']
+        position?: ToastConfig['position'],
+        action?: ToastAction
     ) => {
-        showToast({ message, type: 'success', duration, position });
+        showToast({ message, type: 'success', duration, position, action });
     }, [showToast]);
 
     const showError = useCallback((
         message: string, 
         duration?: number, 
-        position?: ToastConfig['position']
+        position?: ToastConfig['position'],
+        action?: ToastAction
     ) => {
-        showToast({ message, type: 'error', duration: duration || 5000, position });
+        showToast({ message, type: 'error', duration: duration || 5000, position, action });
     }, [showToast]);
 
     const showInfo = useCallback((
         message: string, 
         duration?: number, 
-        position?: ToastConfig['position']
+        position?: ToastConfig['position'],
+        action?: ToastAction
     ) => {
-        showToast({ message, type: 'info', duration, position });
+        showToast({ message, type: 'info', duration, position, action });
     }, [showToast]);
 
     const showWarning = useCallback((
         message: string, 
         duration?: number, 
-        position?: ToastConfig['position']
+        position?: ToastConfig['position'],
+        action?: ToastAction
     ) => {
-        showToast({ message, type: 'warning', duration, position });
+        showToast({ message, type: 'warning', duration, position, action });
     }, [showToast]);
 
     return {

@@ -11,6 +11,7 @@ use App\Services\Lead\LeadStatisticsService;
 use App\Services\Lead\LeadQueryService;
 use App\Services\Lead\LeadPresupuestoLegacyService;
 use App\Services\Presupuesto\PresupuestoNotificationService;
+use App\Services\Error\ErrorNotificationService; // 🔥 NUEVO: Importar el servicio de errores
 use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
@@ -27,7 +28,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(PresupuestoNotificationService::class);
         $this->app->singleton(\App\Services\Lead\LeadDetailsService::class);
         
-        // 🔥 NUEVO: Registrar paquetes de desarrollo SOLO en local
+        // 🔥 NUEVO: Registrar el servicio de notificaciones de error
+        $this->app->singleton(ErrorNotificationService::class);
+        
+        // Registrar paquetes de desarrollo SOLO en local
         if ($this->app->environment('local')) {
             $this->registerDevelopmentProviders();
         }
@@ -75,9 +79,6 @@ class AppServiceProvider extends ServiceProvider
     {
         $providers = [
             \BeyondCode\QueryDetector\QueryDetectorServiceProvider::class,
-            // Si tienes otros providers de desarrollo, agrégalos aquí:
-            // \Barryvdh\Debugbar\ServiceProvider::class,
-            // \Laravel\Telescope\TelescopeServiceProvider::class,
         ];
         
         foreach ($providers as $provider) {

@@ -2,7 +2,7 @@
 import { router } from '@inertiajs/react';
 import React, { useState, useEffect } from 'react';
 
-import DownloadModal from '@/components/Modals/DownloadModal';
+import DownloadModal from '@/components/Modals/DownloadTarifasModal';
 import { SpecialPriceButton } from '@/components/ui/SpecialPriceButton';
 import AppLayout from '@/layouts/app-layout';
 import { sendWhatsApp, createPriceQueryMessage } from '@/utils/whatsapp.utils';

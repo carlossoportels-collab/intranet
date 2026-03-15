@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Auth/LoginController.php
 
 namespace App\Http\Controllers\Auth;
 
@@ -7,122 +8,189 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia; 
+use Inertia\Inertia;
+use App\Traits\LogsLoginAttempts;
+use App\Services\Security\SecurityNotificationService;
 
 class LoginController extends Controller
 {
+    use LogsLoginAttempts;
+
+    protected $securityNotification;
+
+    public function __construct(SecurityNotificationService $securityNotification)
+    {
+        $this->securityNotification = $securityNotification;
+    }
+
     public function show()
     {
         return inertia('Auth/Login');
     }
 
-   public function login(Request $request)
-{
-    $request->validate([
-        'acceso' => 'required|string',
-        'password' => 'required|string',
-    ]);
+    public function login(Request $request)
+    {
+        $ip = $request->ip();
+        
+        // Verificar si la IP está bloqueada
+        if ($this->isIpBlocked($ip)) {
+            return back()->withErrors([
+                'acceso' => 'Demasiados intentos fallidos. Intenta nuevamente en 60 minutos.'
+            ]);
+        }
 
-    if (Auth::attempt([
-        'nombre_usuario' => $request->acceso,
-        'password' => $request->password,
-        'activo' => 1
-    ], $request->boolean('remember'))) {
-        
-        $usuario = Auth::user();
-        $usuario->ultimo_acceso = now();
-        $usuario->save();
-        
-        // Obtener datos COMPLETOS de la compañía
-        $companiaData = $this->getCompaniaNombre($usuario);
-        $nombreCompleto = $this->getNombreCompleto($usuario);
-        
-        // Guardar en sesión para la página de bienvenida
-        $request->session()->put('welcome_data', [
-            'compania' => $companiaData['nombre'],
-            'logo' => $companiaData['logo'],
-            'colores' => $companiaData['colores'],
-            'nombre' => $nombreCompleto,
-            'rol_id' => $usuario->rol_id,
+        // Rate limiting
+        if (!$this->checkRateLimit($ip, 10, 15)) {
+            $this->blockIp($ip, 60);
+            
+            // NOTIFICACIÓN: IP bloqueada por rate limiting
+            $this->securityNotification->notifyIpBlocked(
+                $ip,
+                'Excedió el límite de intentos (10 en 15 minutos)',
+                now()->addMinutes(60)
+            );
+            
+            return back()->withErrors([
+                'acceso' => 'Demasiados intentos fallidos. IP bloqueada por 60 minutos.'
+            ]);
+        }
+
+        $request->validate([
+            'acceso' => 'required|string|max:255',
+            'password' => 'required|string|max:255',
         ]);
-        
-        // Redirigir a la página de bienvenida
-        return redirect()->route('welcome');
-    }
-    
-    return back()->withErrors(['acceso' => 'Credenciales incorrectas.']);
-}
 
-    /**
-     * Obtener nombre de la compañía según compañia_id
-     */
-private function getCompaniaNombre($usuario)
-{
-    // Obtener datos comerciales del usuario
-    $comercial = DB::table('comercial')
-        ->where('personal_id', $usuario->personal_id)
-        ->first();
-    
-    if (!$comercial || !$comercial->compania_id) {
-        return [
-            'nombre' => 'Intranet',
-            'logo' => 'logo.webp',
+        $acceso = strip_tags($request->acceso);
+        $password = strip_tags($request->password);
+
+        // Detectar intentos sospechosos
+        if ($this->isSuspicious($acceso)) {
+            $this->logLoginAttempt($acceso, false, ['suspicious' => true]);
+            $this->blockIp($ip, 120); // Bloquear por 2 horas
+            
+            // NOTIFICACIÓN: Actividad sospechosa detectada
+            $this->securityNotification->notifySuspiciousActivity(
+                $acceso,
+                $ip,
+                $request->userAgent(),
+                'Patrón de SQL injection detectado'
+            );
+            
+            return back()->withErrors([
+                'acceso' => 'Actividad sospechosa detectada. Acceso bloqueado.'
+            ]);
+        }
+
+        if (Auth::attempt([
+            'nombre_usuario' => $acceso,
+            'password' => $password,
+            'activo' => 1
+        ], $request->boolean('remember'))) {
+            
+            $usuario = Auth::user();
+            $usuario->ultimo_acceso = now();
+            $usuario->save();
+            
+            $this->logLoginAttempt($acceso, true, ['user_id' => $usuario->id]);
+            
+            $companiaData = $this->getCompaniaNombre($usuario);
+            $nombreCompleto = $this->getNombreCompleto($usuario);
+            
+            $request->session()->put('welcome_data', [
+                'compania' => $companiaData['nombre'],
+                'logo' => $companiaData['logo'],
+                'colores' => $companiaData['colores'],
+                'nombre' => $nombreCompleto,
+                'rol_id' => $usuario->rol_id,
+            ]);
+            
+            return redirect()->route('welcome');
+        }
+        
+        // Registrar intento fallido
+        $attempt = $this->logLoginAttempt($acceso, false);
+        
+        // Verificar si hay múltiples intentos fallidos desde la misma IP
+        $failedAttempts = DB::table('login_attempts')
+            ->where('ip', $ip)
+            ->where('success', false)
+            ->where('created_at', '>=', now()->subHours(1))
+            ->count();
+        
+        if ($failedAttempts >= 5) {
+            // NOTIFICACIÓN: Múltiples intentos fallidos
+            $this->securityNotification->notifyMultipleFailedAttempts(
+                $acceso,
+                $ip,
+                $failedAttempts
+            );
+        }
+        
+        return back()->withErrors([
+            'acceso' => 'Credenciales incorrectas.'
+        ]);
+    }
+
+    private function getCompaniaNombre($usuario)
+    {
+        $comercial = DB::table('comercial')
+            ->where('personal_id', $usuario->personal_id)
+            ->first();
+        
+        if (!$comercial || !$comercial->compania_id) {
+            return [
+                'nombre' => 'Intranet',
+                'logo' => 'logo.webp',
+                'colores' => [
+                    'primary' => '#fa6400',
+                    'secondary' => '#3b3b3d',
+                ]
+            ];
+        }
+        
+        $companias = [
+            1 => [
+                'nombre' => 'LocalSat',
+                'logo' => 'logo.webp',
+                'colores' => [
+                    'primary' => '#fa6400',
+                    'secondary' => '#3b3b3d',
+                ]
+            ],
+            2 => [
+                'nombre' => 'SmartSat',
+                'logo' => 'logosmart.png',
+                'colores' => [
+                    'primary' => '#eb9b11',
+                    'secondary' => '#3b3b3d',
+                ]
+            ],
+            3 => [
+                'nombre' => '360',
+                'logo' => '360-logo.webp',
+                'colores' => [
+                    'primary' => '#fa6400',
+                    'secondary' => '#3b3b3d',
+                ]
+            ],
+        ];
+        
+        return $companias[$comercial->compania_id] ?? [
+            'nombre' => 'Compañía ' . $comercial->compania_id,
+            'logo' => 'logo-generic.webp',
             'colores' => [
-                'primary' => '#fa6400',    // RGB 59,59,61
-                'secondary' => '#3b3b3d',   // RGB 250,100,0
+                'primary' => '#fa6400',
+                'secondary' => '#3b3b3d',
             ]
         ];
     }
-    
-    // Definir información por compañía
-    $companias = [
-        1 => [ // LocalSat
-            'nombre' => 'LocalSat',
-            'logo' => 'logo.webp',
-            'colores' => [
-                'primary' => '#fa6400',    // RGB 59,59,61
-                'secondary' => '#3b3b3d',   // RGB 250,100,0
-            ]
-        ],
-        2 => [ // SmartSat
-            'nombre' => 'SmartSat',
-            'logo' => 'logosmart.png',
-            'colores' => [
-                'primary' => '#eb9b11',    // RGB 59,59,61
-                'secondary' => '#3b3b3d',   // RGB 235,155,17
-            ]
-        ],
-        3 => [ // 360
-            'nombre' => '360',
-            'logo' => '360-logo.webp',
-            'colores' => [
-                'primary' => '#fa6400',    // RGB 59,59,61 (usando LocalSat)
-                'secondary' => '#3b3b3d',   // RGB 250,100,0 (usando LocalSat)
-            ]
-        ],
-    ];
-    
-    return $companias[$comercial->compania_id] ?? [
-        'nombre' => 'Compañía ' . $comercial->compania_id,
-        'logo' => 'logo-generic.webp',
-        'colores' => [
-            'primary' => '#fa6400',
-            'secondary' => '#3b3b3d',
-        ]
-    ];
-}
 
-    /**
-     * Obtener nombre completo del usuario
-     */
     private function getNombreCompleto($usuario)
     {
-        // Obtener datos del personal
         $personal = DB::table('personal')
             ->where('id', $usuario->personal_id)
             ->first();
         
-        // Si tenemos datos de personal, usarlos
         if ($personal && $personal->nombre) {
             $nombre = trim($personal->nombre);
             $apellido = $personal->apellido ? trim($personal->apellido) : '';
@@ -130,13 +198,9 @@ private function getCompaniaNombre($usuario)
             return $apellido ? "$nombre $apellido" : $nombre;
         }
         
-        // Fallback al nombre de usuario
         return $usuario->nombre_usuario;
     }
 
-    /**
-     * Página de bienvenida con animación
-     */
     public function welcome(Request $request)
     {
         $welcomeData = $request->session()->get('welcome_data');
@@ -147,7 +211,7 @@ private function getCompaniaNombre($usuario)
         
         $request->session()->forget('welcome_data');
         
-        $redirectTo = $welcomeData['rol_id'] == 5 ? route('comercial.prospectos') : route('comercial.prospectos');
+        $redirectTo = route('comercial.prospectos');
         
         return inertia('Auth/Welcome', [
             'compania' => $welcomeData['compania'],

@@ -344,45 +344,6 @@ public function update(Request $request, $id)
 }
     
     /**
-     * Convertir lead en cliente
-     */
-    public function convertirEnCliente($id)
-    {
-        try {
-            $lead = Lead::findOrFail($id);
-            
-            if ($lead->es_cliente == 1) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'El lead ya es cliente'
-                ], 400);
-            }
-            
-            $lead->update([
-                'es_cliente' => 1,
-                'modified' => now(),
-                'modified_by' => auth()->id(),
-            ]);
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Lead convertido en cliente exitosamente'
-            ]);
-            
-        } catch (\Exception $e) {
-            Log::error('Error convirtiendo lead en cliente:', [
-                'error' => $e->getMessage(),
-                'lead_id' => $id
-            ]);
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al convertir lead en cliente'
-            ], 500);
-        }
-    }
-    
-    /**
      * Obtener datos del usuario
      */
     private function getUsuarioData($usuario): array

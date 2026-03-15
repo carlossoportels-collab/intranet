@@ -47,6 +47,7 @@ use App\Http\Controllers\ContratoLegacyController;
 use App\Http\Controllers\Comercial\DocumentacionController;
 use App\Http\Controllers\Estadisticas\ComercialGrupalController;
 use App\Http\Controllers\Estadisticas\ComercialIndividualController;
+use App\Http\Controllers\Comercial\ContratoController;
 
 // ==================== NUEVOS CONTROLADORES PARA CONTRATOS ====================
 use App\Http\Controllers\Comercial\Utils\TipoResponsabilidadController;
@@ -55,7 +56,6 @@ use App\Http\Controllers\Comercial\Utils\PaisController;
 use App\Http\Controllers\Comercial\Utils\CategoriaFiscalController;
 use App\Http\Controllers\Comercial\Utils\PlataformaController;
 use App\Http\Controllers\Comercial\Utils\RubroController;
-use App\Http\Controllers\Comercial\Utils\ContratoController;
 use App\Http\Controllers\Comercial\Utils\LeadDataController;
 use App\Http\Controllers\Comercial\Utils\NacionalidadController;
 
@@ -106,6 +106,11 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         Route::delete('/presupuestos/{presupuesto}', [PresupuestosController::class, 'destroy'])->name('comercial.presupuestos.destroy');
         Route::get('/presupuestos/{presupuesto}/pdf', [PresupuestosController::class, 'generarPdf'])->name('comercial.presupuestos.pdf');
         Route::post('/presupuestos/{presupuesto}/enviar-email', [PresupuestosController::class, 'enviarEmail'])->name('comercial.presupuestos.enviar-email');
+        
+        // ========== NUEVA RUTA PARA GENERAR PDF TEMPORAL ==========
+        Route::post('/presupuestos/{presupuesto}/generar-pdf-temp', [PresupuestosController::class, 'generarPdfTemp'])
+            ->name('comercial.presupuestos.generar-pdf-temp');
+            
 
         // ========== API PARA ENVÍO DE EMAILS ==========
         Route::prefix('api')->group(function () {
@@ -143,17 +148,20 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         
         // ========== CONTRATOS ==========
         Route::prefix('contratos')->group(function () {
-            Route::get('/', [App\Http\Controllers\Comercial\ContratoController::class, 'index'])->name('comercial.contratos.index');
-            Route::get('/crear/{presupuestoId}', [App\Http\Controllers\Comercial\ContratoController::class, 'create'])->name('comercial.contratos.create');
-            Route::post('/', [App\Http\Controllers\Comercial\ContratoController::class, 'store'])->name('comercial.contratos.store');
-            Route::get('/{id}/pdf', [App\Http\Controllers\Comercial\ContratoController::class, 'generarPdf'])->name('comercial.contratos.pdf');
-            Route::get('/{id}', [App\Http\Controllers\Comercial\ContratoController::class, 'show'])->name('comercial.contratos.show');
+            Route::get('/', [ContratoController::class, 'index'])->name('comercial.contratos.index');
+            Route::get('/crear/{presupuestoId}', [ContratoController::class, 'create'])->name('comercial.contratos.create');
+            Route::post('/', [ContratoController::class, 'store'])->name('comercial.contratos.store');
+            Route::get('/{id}/pdf', [ContratoController::class, 'generarPdf'])->name('comercial.contratos.pdf');
+            Route::get('/{id}', [ContratoController::class, 'show'])->name('comercial.contratos.show');
+            
+            // Ruta para generar PDF temporal
+            Route::post('/{contrato}/generar-pdf-temp', [ContratoController::class, 'generarPdfTemp'])->name('comercial.contratos.generar-pdf-temp');
             
             // Rutas para contrato desde empresa existente
-            Route::get('/desde-empresa/{empresaId}', [App\Http\Controllers\Comercial\ContratoController::class, 'createFromEmpresa'])
+            Route::get('/desde-empresa/{empresaId}', [ContratoController::class, 'createFromEmpresa'])
                 ->name('comercial.contratos.desde-empresa');
             
-            Route::post('/desde-empresa', [App\Http\Controllers\Comercial\ContratoController::class, 'storeFromEmpresa'])
+            Route::post('/desde-empresa', [ContratoController::class, 'storeFromEmpresa'])
                 ->name('comercial.contratos.store-from-empresa');
         });
                 
@@ -181,10 +189,12 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::get('/cambio-titularidad/empresa/{id}/vehiculos', [CambioTitularidadController::class, 'getVehiculosEmpresa'])->name('comercial.cuentas.cambio-titularidad.vehiculos');
             Route::get('/cambio-titularidad/{id}', [CambioTitularidadController::class, 'show'])->name('comercial.cuentas.cambio-titularidad.show');
         });
-        
-        
 
-        // ========== RUTAS CON PARÁMETROS LEAD (AL FINAL) ==========
+        // ========== RUTA PARA WHATSAPP TRACKING ==========
+        Route::get('/lead/{lead}/contactar-whatsapp', [LeadContactController::class, 'contactarWhatsApp'])
+            ->name('comercial.lead.contactar-whatsapp');
+
+        // ========== RUTAS CON PARÁMETROS LEAD ==========
         Route::prefix('leads/{lead}')->group(function () {
             Route::get('/', [LeadController::class, 'show'])->name('comercial.leads.show');
             Route::put('/', [ProspectosController::class, 'update'])->name('leads.update');
@@ -192,7 +202,6 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::get('/tiempos-estados', [ProspectosController::class, 'tiemposEntreEstados'])->name('leads.tiempos-estados');
             Route::get('/comentarios-modal-data', [ProspectosController::class, 'comentariosModalData'])->name('leads.comentarios-modal-data');
             Route::get('/datos-alta', [App\Http\Controllers\Comercial\Utils\LeadDataController::class, 'getDatosAlta']);
-            
             Route::get('/verificar-datos-contrato', [LeadController::class, 'verificarDatosContrato'])->name('comercial.leads.verificar-datos-contrato');
         });
 
@@ -209,11 +218,6 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::get('/modal-seguimiento', [LeadsPerdidosController::class, 'modalSeguimiento'])->name('leads-perdidos.modal-seguimiento');
             Route::post('/seguimiento', [LeadsPerdidosController::class, 'procesarSeguimiento'])->name('leads-perdidos.seguimiento');
         });
-
-                // ========== RUTA PARA WHATSAPP TRACKING (AL FINAL) ==========
-    Route::get('/lead/{lead}/contactar-whatsapp', [LeadContactController::class, 'contactarWhatsApp'])
-        ->name('comercial.lead.contactar-whatsapp');
-
     });
     
     // ==================== CONFIGURACIÓN ====================
@@ -358,11 +362,53 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         Route::get('/{id}/descargar', [ContratoLegacyController::class, 'descargarPdf'])->name('contratos-legacy.descargar');
     });
 
-    // ==================== FALLBACK ====================
-    Route::fallback(function () {
-        return Inertia::render('Errors/404');
-    });
+
 });
+
+// ===== RUTAS PÚBLICAS TEMPORALES (FUERA DEL GRUPO AUTH) =====
+Route::get('/temp/presupuesto/{id}', function ($id) {
+    $path = storage_path("app/temp/presupuesto-{$id}-*.pdf");
+    $archivos = glob($path);
+    
+    if (empty($archivos)) {
+        abort(404, 'Archivo no encontrado');
+    }
+    
+    // Tomar el archivo más reciente
+    $archivo = $archivos[0];
+    
+    // Verificar que tenga menos de 10 minutos
+    if (filemtime($archivo) < now()->subMinutes(10)->timestamp) {
+        unlink($archivo); // Eliminar archivo expirado
+        abort(404, 'Link expirado');
+    }
+    
+    return response()->file($archivo, [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => 'inline; filename="presupuesto.pdf"'
+    ]);
+})->name('temp.presupuesto');
+
+Route::get('/temp/contrato/{id}', function ($id) {
+    $path = storage_path("app/temp/contrato-{$id}-*.pdf");
+    $archivos = glob($path);
+    
+    if (empty($archivos)) {
+        abort(404, 'Archivo no encontrado');
+    }
+    
+    $archivo = $archivos[0];
+    
+    if (filemtime($archivo) < now()->subMinutes(10)->timestamp) {
+        unlink($archivo);
+        abort(404, 'Link expirado');
+    }
+    
+    return response()->file($archivo, [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => 'inline; filename="contrato.pdf"'
+    ]);
+})->name('temp.contrato');
 
 // ===== ENDPOINTS API (fuera del prefijo rrhh pero con auth) =====
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {

@@ -16,8 +16,8 @@ class Kernel extends ConsoleKernel
         // Verificación de notificaciones cada hora (de 9 AM a 7 PM)
         $schedule->command('notificaciones:verificar')
             ->hourly()
-            ->between('9:00', '19:00')
-            ->weekdays();
+            ->between('7:00', '19:00')
+            ->daily();
         
         // Limpiar notificaciones antiguas (más de 30 días) cada domingo a las 3 AM
         $schedule->command('notificaciones:limpiar')

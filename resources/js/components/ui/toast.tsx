@@ -4,6 +4,11 @@ import React, { useEffect, useState } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
+export interface ToastAction {
+    label: string;
+    onClick: () => void;
+}
+
 export interface ToastProps {
     message: string;
     type?: ToastType;
@@ -11,6 +16,7 @@ export interface ToastProps {
     position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center';
     onClose?: () => void;
     showClose?: boolean;
+    action?: ToastAction;
 }
 
 const Toast: React.FC<ToastProps> = ({
@@ -19,7 +25,8 @@ const Toast: React.FC<ToastProps> = ({
     duration = 3000,
     position = 'top-center',
     onClose,
-    showClose = true
+    showClose = true,
+    action
 }) => {
     const [isVisible, setIsVisible] = useState(true);
     const [isExiting, setIsExiting] = useState(false);
@@ -42,7 +49,6 @@ const Toast: React.FC<ToastProps> = ({
         }, 200);
     };
 
-    // Configuración simplificada: color solo para elementos visuales
     const getToastConfig = () => {
         switch (type) {
             case 'success':
@@ -53,7 +59,8 @@ const Toast: React.FC<ToastProps> = ({
                     progressBar: 'bg-emerald-500',
                     shadow: 'shadow-lg shadow-emerald-500/20',
                     border: 'border-emerald-200',
-                    bg: 'bg-white'
+                    bg: 'bg-white',
+                    actionBg: 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700'
                 };
             case 'error':
                 return {
@@ -63,7 +70,8 @@ const Toast: React.FC<ToastProps> = ({
                     progressBar: 'bg-rose-500',
                     shadow: 'shadow-lg shadow-rose-500/20',
                     border: 'border-rose-200',
-                    bg: 'bg-white'
+                    bg: 'bg-white',
+                    actionBg: 'bg-rose-100 hover:bg-rose-200 text-rose-700'
                 };
             case 'warning':
                 return {
@@ -73,7 +81,8 @@ const Toast: React.FC<ToastProps> = ({
                     progressBar: 'bg-amber-500',
                     shadow: 'shadow-lg shadow-amber-500/20',
                     border: 'border-amber-200',
-                    bg: 'bg-white'
+                    bg: 'bg-white',
+                    actionBg: 'bg-amber-100 hover:bg-amber-200 text-amber-700'
                 };
             case 'info':
                 return {
@@ -83,7 +92,8 @@ const Toast: React.FC<ToastProps> = ({
                     progressBar: 'bg-sky-500',
                     shadow: 'shadow-lg shadow-sky-500/20',
                     border: 'border-sky-200',
-                    bg: 'bg-white'
+                    bg: 'bg-white',
+                    actionBg: 'bg-sky-100 hover:bg-sky-200 text-sky-700'
                 };
             default:
                 return {
@@ -93,7 +103,8 @@ const Toast: React.FC<ToastProps> = ({
                     progressBar: 'bg-emerald-500',
                     shadow: 'shadow-lg shadow-emerald-500/20',
                     border: 'border-emerald-200',
-                    bg: 'bg-white'
+                    bg: 'bg-white',
+                    actionBg: 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700'
                 };
         }
     };
@@ -135,7 +146,6 @@ const Toast: React.FC<ToastProps> = ({
                 rounded-2xl ${config.shadow}
                 min-w-[320px] max-w-md p-4
             `}>
-                {/* Icono de color sólido */}
                 <div className={`
                     relative flex-shrink-0 p-2.5 rounded-xl
                     ${config.iconBg} shadow-inner
@@ -143,14 +153,24 @@ const Toast: React.FC<ToastProps> = ({
                     <Icon className={`h-5 w-5 ${config.iconColor}`} />
                 </div>
 
-                {/* Contenido con texto 100% oscuro y legible */}
                 <div className="flex-1 min-w-0 pt-0.5">
                     <div className="text-sm text-slate-700 break-words leading-relaxed font-medium">
                         {message}
                     </div>
+                    
+                    {action && (
+                        <button
+                            onClick={() => {
+                                action.onClick();
+                                handleClose();
+                            }}
+                            className={`mt-2 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${config.actionBg}`}
+                        >
+                            {action.label}
+                        </button>
+                    )}
                 </div>
 
-                {/* Botón cerrar en gris neutro */}
                 {showClose && (
                     <button
                         onClick={handleClose}
@@ -161,7 +181,6 @@ const Toast: React.FC<ToastProps> = ({
                     </button>
                 )}
 
-                {/* Barra de progreso con el color correspondiente */}
                 {duration > 0 && (
                     <div 
                         className={`absolute bottom-0 left-0 h-1 ${config.progressBar} opacity-50`}

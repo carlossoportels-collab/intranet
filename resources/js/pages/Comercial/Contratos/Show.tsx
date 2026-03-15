@@ -1,8 +1,10 @@
 // resources/js/Pages/Comercial/Contratos/Show.tsx
 
 import { Head, router } from '@inertiajs/react';
-import { ArrowLeft, FileText, Calendar, User, Building, Truck, CreditCard, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, User, Building, Truck, CreditCard, Download, ChevronDown, ChevronUp, Mail, Send, Building2 } from 'lucide-react';
 import React, { useState } from 'react';
+import EnviarContratoEmailModal from '@/components/Modals/Emails/EnviarContratoEmailModal';
+import EnviarEmailAdministracionModal from '@/components/Modals/Emails/EnviarEmailAdministracionModal'; // Nuevo modal
 
 import { Amount } from '@/components/ui/Amount';
 import { DataCard } from '@/components/ui/DataCard';
@@ -11,12 +13,20 @@ import { SensitiveData } from '@/components/ui/SensitiveData';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/utils/formatters';
+import { useToast } from '@/contexts/ToastContext';
 
 interface Props {
     contrato: any;
 }
 
 export default function ContratoShow({ contrato }: Props) {
+    const toast = useToast();
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    const [showEmailAdminModal, setShowEmailAdminModal] = useState(false); // Nuevo estado
+    const [showOpcionesEmail, setShowOpcionesEmail] = useState(false); // Estado para el menú de opciones
+    const [generandoPDF, setGenerandoPDF] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
     const [showMobileDetails, setShowMobileDetails] = useState<Record<string, boolean>>({
         cliente: false,
         empresa: false,
@@ -24,16 +34,65 @@ export default function ContratoShow({ contrato }: Props) {
         vehiculos: false
     });
 
+    console.log('📦 Contrato completo:', contrato);
+    console.log('🔍 lead_es_cliente:', contrato.lead_es_cliente);
+
     const getEstadoColor = (estadoId?: number) => {
         switch(estadoId) {
-            case 1: return 'green'; // activo
-            case 2: return 'yellow'; // vencido
-            case 3: return 'blue'; // aprobado
-            case 4: return 'red'; // rechazado
-            case 5: return 'orange'; // pendiente
-            case 6: return 'purple'; // instalado
+            case 1: return 'green';
+            case 2: return 'yellow';
+            case 3: return 'blue';
+            case 4: return 'red';
+            case 5: return 'orange';
+            case 6: return 'purple';
             default: return 'gray';
         }
+    };
+
+    const generarPDFTemporal = async (): Promise<string | null> => {
+        return new Promise((resolve) => {
+            router.post(`/comercial/contratos/${contrato.id}/generar-pdf-temp`, {}, {
+                preserveState: true,
+                preserveScroll: true,
+                onSuccess: (page: any) => {
+                    const flash = page.props.flash as any;
+                    const data = flash?.pdfData || page.props?.pdfData;
+                    if (data?.success && data.url) {
+                        resolve(data.url);
+                    } else {
+                        toast.error(data?.error || 'Error al generar PDF');
+                        resolve(null);
+                    }
+                },
+                onError: () => {
+                    toast.error('Error al generar el PDF');
+                    resolve(null);
+                }
+            });
+        });
+    };
+
+const handleOpenEmailOptions = async () => {
+    setGenerandoPDF(true);
+    toast.info('Preparando PDF...');
+    
+    const url = await generarPDFTemporal();
+    if (url) {
+        setPdfUrl(url);
+        // 🔥 CAMBIO: Siempre mostrar opciones, sin importar si es cliente o lead
+        setShowOpcionesEmail(true);
+    }
+    setGenerandoPDF(false);
+};
+
+    const handleSendToCliente = () => {
+        setShowOpcionesEmail(false);
+        setShowEmailModal(true);
+    };
+
+    const handleSendToAdministracion = () => {
+        setShowOpcionesEmail(false);
+        setShowEmailAdminModal(true);
     };
 
     const handleDescargarPDF = () => {
@@ -73,6 +132,16 @@ export default function ContratoShow({ contrato }: Props) {
                                 status={contrato.estado?.nombre || 'Sin estado'} 
                                 color={getEstadoColor(contrato.estado_id)}
                             />
+                            {/* Badge para mostrar si es cliente o lead */}
+                            {contrato.lead_es_cliente ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                    Cliente
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    Lead
+                                </span>
+                            )}
                         </div>
                     </div>
                     
@@ -91,8 +160,91 @@ export default function ContratoShow({ contrato }: Props) {
                             <Download className="h-4 w-4" />
                             <span className="sm:inline">Descargar PDF</span>
                         </button>
+                        <button
+                            onClick={handleOpenEmailOptions}
+                            disabled={generandoPDF}
+                            className="px-3 sm:px-4 py-2 bg-blue-600 text-white text-sm sm:text-base rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {generandoPDF ? (
+                                <>
+                                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                                    <span>Generando...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Mail className="h-4 w-4" />
+                                    <span>Email</span>
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
+
+                {/* Modal de opciones para clientes */}
+                    {showOpcionesEmail && (
+                        <>
+                            <div className="fixed inset-0 bg-black/60 z-[99990]" onClick={() => setShowOpcionesEmail(false)} />
+                            <div className="fixed inset-0 flex items-center justify-center p-8 z-[99995] pointer-events-none">
+                                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto border border-gray-100">
+                                    <div className="p-6 border-b border-gray-200">
+                                        <h3 className="text-xl font-semibold text-gray-900">¿A quién querés enviar el email?</h3>
+                                    </div>
+                                    <div className="p-6 space-y-4">
+                                        <button
+                                            onClick={handleSendToCliente}
+                                            className="w-full p-4 border-2 border-blue-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-blue-100 rounded-xl group-hover:bg-blue-200">
+                                                    <Send className="h-6 w-6 text-blue-600" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <h4 className="font-medium text-gray-900">Enviar al Cliente</h4>
+                                                    <p className="text-sm text-gray-500 mt-1">
+                                                        {contrato.cliente_email || 'No tiene email'}
+                                                    </p>
+                                                    {/* Mostrar si es lead o cliente */}
+                                                    {!contrato.lead_es_cliente && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 mt-2 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                            Incluye mensaje de bienvenida
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </button>
+                                        
+                                        <button
+                                            onClick={handleSendToAdministracion}
+                                            className="w-full p-4 border-2 border-purple-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-purple-100 rounded-xl group-hover:bg-purple-200">
+                                                    <Building2 className="h-6 w-6 text-purple-600" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <h4 className="font-medium text-gray-900">Enviar a Administración</h4>
+                                                    <p className="text-sm text-gray-500 mt-1">
+                                                        gfaure@localsat.com.ar
+                                                    </p>
+                                                    <p className="text-xs text-gray-400 mt-1">
+                                                        Incluye todos los datos del {contrato.lead_es_cliente ? 'cliente' : 'nuevo lead'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div className="p-6 border-t border-gray-200 bg-gray-50">
+                                        <button
+                                            onClick={() => setShowOpcionesEmail(false)}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
 
                 {/* Información General - Mobile */}
                 <div className="block lg:hidden mb-4">
@@ -105,6 +257,7 @@ export default function ContratoShow({ contrato }: Props) {
                         </div>
                     </DataCard>
                 </div>
+
 
                 {/* Información General - Desktop */}
                 <div className="hidden lg:grid lg:grid-cols-3 gap-6 mb-6">
@@ -445,6 +598,43 @@ export default function ContratoShow({ contrato }: Props) {
                     </DataCard>
                 )}
             </div>
+               {pdfUrl && (
+                <EnviarContratoEmailModal
+                    isOpen={showEmailModal}
+                    onClose={() => {
+                        setShowEmailModal(false);
+                        setPdfUrl(null);
+                    }}
+                    contrato={contrato}
+                    comercialNombre={contrato.vendedor_nombre || ''}
+                    comercialEmail={contrato.vendedor_email || ''}  // ← Usar vendedor_email
+                    comercialTelefono={contrato.vendedor_telefono || ''}  // ← Usar vendedor_telefono
+                    companiaId={contrato.compania_id || 1}
+                    companiaNombre={contrato.compania_nombre || 'LOCALSAT'}
+                    plataforma={contrato.empresa_plataforma || 'ALPHA'}
+                    pdfUrl={pdfUrl}
+                    leadEsCliente={contrato.lead_es_cliente}
+                />
+            )}
+                 {/* Modal para administración (nuevo) */}
+                {pdfUrl && (
+                    <EnviarEmailAdministracionModal
+                        isOpen={showEmailAdminModal}
+                        onClose={() => {
+                            setShowEmailAdminModal(false);
+                            setPdfUrl(null);
+                        }}
+                        contrato={contrato}
+                        comercialNombre={contrato.vendedor_nombre || ''}
+                        comercialEmail={contrato.vendedor_email || ''}
+                        comercialTelefono={contrato.vendedor_telefono || ''}
+                        companiaId={contrato.compania_id || 1}
+                        companiaNombre={contrato.compania_nombre || 'LOCALSAT'}
+                        plataforma={contrato.empresa_plataforma || 'ALPHA'}
+                        pdfUrl={pdfUrl}
+                        leadEsCliente={contrato.lead_es_cliente}
+                    />
+                )}
         </AppLayout>
     );
 }

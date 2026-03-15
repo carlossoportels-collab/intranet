@@ -1,6 +1,6 @@
 // resources/js/contexts/ToastContext.tsx
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
-import Toast, { ToastType } from '@/components/ui/toast';
+import Toast, { ToastType, ToastAction } from '@/components/ui/toast';
 
 interface ToastMessage {
     id: number;
@@ -8,14 +8,15 @@ interface ToastMessage {
     type: ToastType;
     duration?: number;
     position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center';
+    action?: ToastAction;
 }
 
 interface ToastContextType {
-    showToast: (message: string, type?: ToastType, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center') => void;
-    success: (message: string, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center') => void;
-    error: (message: string, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center') => void;
-    info: (message: string, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center') => void;
-    warning: (message: string, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center') => void;
+    showToast: (message: string, type?: ToastType, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center', action?: ToastAction) => void;
+    success: (message: string, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center', action?: ToastAction) => void;
+    error: (message: string, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center', action?: ToastAction) => void;
+    info: (message: string, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center', action?: ToastAction) => void;
+    warning: (message: string, duration?: number, position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center', action?: ToastAction) => void;
     clearToasts: () => void;
 }
 
@@ -30,7 +31,6 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const removeToast = useCallback((id: number) => {
         setToasts(prev => prev.filter(toast => toast.id !== id));
         
-        // Clear timeout if exists
         if (timeoutsRef.current[id]) {
             clearTimeout(timeoutsRef.current[id]);
             delete timeoutsRef.current[id];
@@ -41,13 +41,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         message: string, 
         type: ToastType = 'info', 
         duration = 4000,
-        position: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center' = 'top-center'
+        position: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center' = 'top-center',
+        action?: ToastAction
     ) => {
         const id = ++toastId;
         
-        setToasts(prev => [...prev, { id, message, type, duration, position }]);
+        setToasts(prev => [...prev, { id, message, type, duration, position, action }]);
 
-        // Auto-remove after duration
         if (duration > 0) {
             const timeout = setTimeout(() => {
                 removeToast(id);
@@ -58,7 +58,6 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, [removeToast]);
 
     const clearToasts = useCallback(() => {
-        // Clear all timeouts
         Object.values(timeoutsRef.current).forEach(timeout => clearTimeout(timeout));
         timeoutsRef.current = {};
         setToasts([]);
@@ -67,33 +66,37 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const success = useCallback((
         message: string, 
         duration?: number,
-        position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center'
+        position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center',
+        action?: ToastAction
     ) => {
-        showToast(message, 'success', duration, position);
+        showToast(message, 'success', duration, position, action);
     }, [showToast]);
 
     const error = useCallback((
         message: string, 
         duration?: number,
-        position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center'
+        position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center',
+        action?: ToastAction
     ) => {
-        showToast(message, 'error', duration || 5000, position);
+        showToast(message, 'error', duration || 5000, position, action);
     }, [showToast]);
 
     const info = useCallback((
         message: string, 
         duration?: number,
-        position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center'
+        position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center',
+        action?: ToastAction
     ) => {
-        showToast(message, 'info', duration, position);
+        showToast(message, 'info', duration, position, action);
     }, [showToast]);
 
     const warning = useCallback((
         message: string, 
         duration?: number,
-        position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center'
+        position?: 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center',
+        action?: ToastAction
     ) => {
-        showToast(message, 'warning', duration, position);
+        showToast(message, 'warning', duration, position, action);
     }, [showToast]);
 
     // Agrupar toasts por posición
@@ -115,7 +118,6 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }}>
             {children}
             
-            {/* Renderizar toasts agrupados por posición */}
             {Object.entries(toastsByPosition).map(([position, positionToasts]) => (
                 <div
                     key={position}
@@ -129,7 +131,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                         w-full max-w-md
                     `}
                 >
-                    {positionToasts.map((toast, index) => (
+                    {positionToasts.map((toast) => (
                         <div 
                             key={toast.id} 
                             className="pointer-events-auto"
@@ -141,6 +143,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                                 position={toast.position}
                                 onClose={() => removeToast(toast.id)}
                                 showClose
+                                action={toast.action}
                             />
                         </div>
                     ))}

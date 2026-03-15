@@ -86,8 +86,9 @@ class Paso3EmpresaController extends Controller
                 }
             }
 
-            $lead->update([
-                'es_cliente' => true,
+            $presupuesto->update([
+                'estado_id' => 3, 
+                'modified' => now(),
                 'modified_by' => auth()->id(),
             ]);
 
@@ -96,11 +97,15 @@ class Paso3EmpresaController extends Controller
             session()->forget(['contacto_id', 'responsable_3_id', 'responsable_4_id', 'responsable_5_id']);
 
             return redirect()->route('comercial.contratos.create', ['presupuestoId' => $presupuesto->id])
-                ->with('success', 'Empresa creada exitosamente. Complete los datos del contrato.');
+                ->with('success', 'Empresa creada exitosamente. Complete los datos del contrato.')
+                ->with('lead_id', $lead->id); 
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error paso 3:', ['error' => $e->getMessage()]);
+            Log::error('Error paso 3:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return redirect()->back()->with('error', 'Error al crear empresa: ' . $e->getMessage());
         }
     }

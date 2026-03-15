@@ -1,39 +1,44 @@
 <?php
-// app/Exceptions/Handler.php
 
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
+use App\Services\Error\ErrorNotificationService;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
-use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class Handler extends ExceptionHandler
 {
-    /**
-     * The list of the inputs that are never flashed to the session on validation exceptions.
-     *
-     * @var array<int, string>
-     */
     protected $dontFlash = [
         'current_password',
         'password',
         'password_confirmation',
     ];
 
-    /**
-     * Register the exception handling callbacks for the application.
-     */
+    protected $errorNotificationService;
+
+    public function __construct(ErrorNotificationService $errorNotificationService)
+    {
+        parent::__construct(app());
+        $this->errorNotificationService = $errorNotificationService;
+    }
+
     public function register(): void
     {
         $this->reportable(function (Throwable $e) {
-            //
+            // Enviar notificación solo para errores 500 en producción
+            if ($this->shouldReport($e) && app()->environment('production')) {
+                try {
+                    $this->errorNotificationService->notifyError500($e, request());
+                } catch (\Exception $notificationError) {
+                    // Si falla la notificación, al menos loguearlo
+                    Log::error('Error al enviar notificación de error: ' . $notificationError->getMessage());
+                }
+            }
         });
     }
 
-    /**
-     * Render an exception into an HTTP response.
-     */
     public function render($request, Throwable $exception)
     {
         // Si es una excepción HTTP
@@ -51,27 +56,24 @@ class Handler extends ExceptionHandler
 
             // Si tenemos una página personalizada para este código
             if (isset($errorPages[$statusCode])) {
-                return Inertia::render($errorPages[$statusCode], [
+                return response()->view($errorPages[$statusCode], [
                     'status' => $statusCode,
                     'message' => $exception->getMessage() ?: $this->getDefaultMessage($statusCode),
-                ])->toResponse($request)->setStatusCode($statusCode);
+                ], $statusCode);
             }
         }
 
         // Para errores 500 en producción, mostrar página personalizada
         if (app()->environment('production') && !$this->isHttpException($exception)) {
-            return Inertia::render('Errors/500', [
+            return response()->view('Errors/500', [
                 'status' => 500,
-                'message' => 'Ha ocurrido un error interno en el servidor.',
-            ])->toResponse($request)->setStatusCode(500);
+                'message' => 'Ha ocurrido un error interno en el servidor. Nuestro equipo ha sido notificado.',
+            ], 500);
         }
 
         return parent::render($request, $exception);
     }
 
-    /**
-     * Obtener mensaje por defecto para cada código de error
-     */
     private function getDefaultMessage(int $statusCode): string
     {
         return match ($statusCode) {

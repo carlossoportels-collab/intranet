@@ -18,7 +18,9 @@ import {
   Menu,
   X as XIcon,
   Square,
-  CheckSquare
+  CheckSquare,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import React, { useState } from 'react';
 
@@ -72,6 +74,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [mensajeExpandido, setMensajeExpandido] = useState<number | null>(null);
   
   // Estados para selección múltiple
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -355,6 +358,12 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     router.visit(ruta);
   };
 
+  // Toggle expandir mensaje
+  const toggleExpandirMensaje = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMensajeExpandido(mensajeExpandido === id ? null : id);
+  };
+
   // Funciones auxiliares
   const getIconoPorTipo = (tipo: string) => {
     switch(tipo) {
@@ -379,6 +388,8 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
         return <CheckCircle className="h-5 w-5 text-indigo-500" />;
       case 'lead_posible_recontacto':
         return <RefreshCw className="h-5 w-5 text-cyan-500" />;
+      case 'actividad_sospechosa':
+        return <AlertCircle className="h-5 w-5 text-red-600" />;
       default:
         return <Bell className="h-5 w-5 text-gray-500" />;
     }
@@ -544,6 +555,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                   <option value="comentario_recordatorio">Recordatorio</option>
                   <option value="lead_posible_recontacto">Posible recontacto lead</option>
                   <option value="cumpleanos">Cumpleaños</option>
+                  <option value="actividad_sospechosa">⚠️ Actividad sospechosa</option>
                 </select>
               </div>
               
@@ -717,7 +729,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <h3 className={`font-medium truncate ${
+                              <h3 className={`font-medium ${
                                 !notificacion.leida ? 'text-blue-700' : 'text-gray-700'
                               }`}>
                                 {notificacion.titulo}
@@ -726,9 +738,29 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                                 <span className="inline-block h-2 w-2 rounded-full bg-blue-500 flex-shrink-0"></span>
                               )}
                             </div>
-                            <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">
-                              {notificacion.mensaje}
-                            </p>
+                            
+                            {/* Mensaje - SIN line-clamp, con opción de expandir */}
+                            <div className="relative">
+                              <p className={`text-xs sm:text-sm text-gray-600 whitespace-pre-wrap ${
+                                mensajeExpandido === notificacion.id ? '' : 'max-h-20 overflow-hidden'
+                              }`}>
+                                {notificacion.mensaje}
+                              </p>
+                              
+                              {/* Botón para expandir/colapsar si el mensaje es largo */}
+                              {notificacion.mensaje.length > 150 && (
+                                <button
+                                  onClick={(e) => toggleExpandirMensaje(notificacion.id, e)}
+                                  className="mt-1 text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                >
+                                  {mensajeExpandido === notificacion.id ? (
+                                    <>Ver menos <Minimize2 className="h-3 w-3" /></>
+                                  ) : (
+                                    <>Ver mensaje completo <Maximize2 className="h-3 w-3" /></>
+                                  )}
+                                </button>
+                              )}
+                            </div>
                           </div>
                           
                           <div className="flex items-center justify-between sm:justify-end gap-2">
