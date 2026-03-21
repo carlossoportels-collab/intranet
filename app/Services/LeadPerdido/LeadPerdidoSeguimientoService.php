@@ -1,4 +1,5 @@
 <?php
+// app/Services/LeadPerdido/LeadPerdidoSeguimientoService.php
 
 namespace App\Services\LeadPerdido;
 
@@ -6,11 +7,14 @@ use App\Models\Lead;
 use App\Models\Comentario;
 use App\Models\TipoComentario;
 use App\DTOs\SeguimientoPerdidoData;
+use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class LeadPerdidoSeguimientoService
 {
+    use HasPermisosService; // 🔥 AGREGAR TRAIT
+
     protected LeadPerdidoNotificationService $notificationService;
     protected LeadPerdidoStateService $stateService;
 
@@ -20,6 +24,7 @@ class LeadPerdidoSeguimientoService
     ) {
         $this->notificationService = $notificationService;
         $this->stateService = $stateService;
+        $this->initializePermisoService(); // 🔥 INICIALIZAR
     }
 
     /**
@@ -123,7 +128,7 @@ class LeadPerdidoSeguimientoService
             return;
         }
 
-        $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+        $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
         
         if (empty($prefijosPermitidos) || !in_array($lead->prefijo_id, $prefijosPermitidos)) {
             abort(403, 'No tiene permisos para acceder a este recurso');

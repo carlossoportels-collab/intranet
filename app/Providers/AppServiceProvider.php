@@ -10,6 +10,8 @@ use Illuminate\Validation\Rules\Password;
 use App\Services\Lead\LeadStatisticsService;
 use App\Services\Lead\LeadQueryService;
 use App\Services\Lead\LeadPresupuestoLegacyService;
+use App\Services\Lead\LeadDetailsService;
+use App\Services\PermisoService;
 use App\Services\Presupuesto\PresupuestoNotificationService;
 use App\Services\Error\ErrorNotificationService; // 🔥 NUEVO: Importar el servicio de errores
 use Illuminate\Support\Facades\URL;
@@ -26,7 +28,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(LeadQueryService::class);
         $this->app->singleton(LeadPresupuestoLegacyService::class);
         $this->app->singleton(PresupuestoNotificationService::class);
-        $this->app->singleton(\App\Services\Lead\LeadDetailsService::class);
+        $this->app->singleton(LeadDetailsService::class);
+        $this->app->singleton(PermisoService::class);
         
         // 🔥 NUEVO: Registrar el servicio de notificaciones de error
         $this->app->singleton(ErrorNotificationService::class);

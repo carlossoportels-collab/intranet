@@ -1,6 +1,9 @@
 // resources/js/Pages/Comercial/Cuentas/Detalles.tsx
-import { Head } from '@inertiajs/react';
+
+import { Head, router } from '@inertiajs/react';
+
 import React, { useState, useMemo, useEffect } from 'react';
+import { Filter, X } from 'lucide-react';
 
 import AppLayout from '@/layouts/app-layout';
 import { Empresa, DetallesCuentasProps } from '@/types/cuentas';
@@ -8,19 +11,32 @@ import { Empresa, DetallesCuentasProps } from '@/types/cuentas';
 // Componentes UI
 import SelectPerPage from '@/components/ui/SelectPerPage';
 import BuscadorModerno from '@/components/ui/BuscadorModerno';
-import Pagination from '@/components/ui/Pagination'; // 👈 Importamos el global
+import Pagination from '@/components/ui/Pagination';
+import { ComercialFilter } from '@/components/cuentas/ComercialFilter';
 
 // Componentes de Cuentas
 import FilaEmpresaCompacta from '@/components/cuentas/FilaEmpresaCompacta';
 import DetalleEmpresaCompacto from '@/components/cuentas/DetalleEmpresaCompacto';
 import ListaVehiculosConAbonos from '@/components/cuentas/ListaVehiculosConAbonos';
+import EstadisticasAbonosCards from '@/components/cuentas/EstadisticasAbonosCards';
 
-export default function DetallesCuentas({ empresas, estadisticas, usuario }: DetallesCuentasProps) {
+export default function DetallesCuentas({ 
+    empresas, 
+    estadisticas, 
+    estadisticas_abonos, 
+    comerciales, 
+    usuario,
+    prefijosFiltro = [],
+    filters 
+}: DetallesCuentasProps)  {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
     const [itemsPerPage, setItemsPerPage] = useState(15);
     const [currentPage, setCurrentPage] = useState(1);
     const [showDetail, setShowDetail] = useState(false);
+    const [comercialFilter, setComercialFilter] = useState<number | null>(filters?.comercial_id || null);
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
+    
 
     // Efecto para manejar la apertura/cierre del detalle
     useEffect(() => {
@@ -39,26 +55,41 @@ export default function DetallesCuentas({ empresas, estadisticas, usuario }: Det
 
     // Filtrar empresas
     const empresasFiltradas = useMemo(() => {
-        let resultado = empresas;
+        let resultado = [...empresas];
         
+        // Filtro por comercial (basado en prefijo_id)
+        if (comercialFilter) {
+            const comercial = comerciales.find(c => c.id === comercialFilter);
+            if (comercial) {
+                resultado = resultado.filter(empresa => 
+                    empresa.prefijo_id === comercial.prefijo_id
+                );
+            }
+        }
+        
+        // Filtro por texto
         if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase();
             resultado = resultado.filter(empresa =>
-                (empresa.nombre_fantasia?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                (empresa.razon_social?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                (empresa.cuit || '').includes(searchTerm) ||
-                (empresa.codigo_alfa_empresa?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                (empresa.nombre_fantasia?.toLowerCase() || '').includes(term) ||
+                (empresa.razon_social?.toLowerCase() || '').includes(term) ||
+                (empresa.cuit || '').includes(term) ||
+                (empresa.codigo_alfa_empresa?.toLowerCase() || '').includes(term)
             );
         }
         
         return resultado;
-    }, [empresas, searchTerm]);
+    }, [empresas, comercialFilter, searchTerm, comerciales]);
 
-    // Paginación de empresas
+    // Paginación
     const totalItems = empresasFiltradas.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const empresasPaginated = empresasFiltradas.slice(startIndex, endIndex);
+
+    // Verificar si hay filtros activos
+    const hayFiltrosActivos = searchTerm !== '' || comercialFilter !== null;
 
     // Handlers
     const handleSearch = (value: string) => {
@@ -72,6 +103,35 @@ export default function DetallesCuentas({ empresas, estadisticas, usuario }: Det
         setCurrentPage(1);
         setSelectedEmpresa(null);
     };
+
+const handleComercialFilter = (comercialId: number | null) => {
+    setComercialFilter(comercialId);
+    setCurrentPage(1);
+    setSelectedEmpresa(null);
+    
+    // Usar la URL completa con el prefijo 'comercial'
+    router.get('/comercial/cuentas', 
+        { comercial_id: comercialId },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true
+        }
+    );
+};
+
+const clearAllFilters = () => {
+    setSearchTerm('');
+    setComercialFilter(null);
+    setCurrentPage(1);
+    setSelectedEmpresa(null);
+    
+    router.get('/comercial/cuentas', {}, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+};
 
     const selectEmpresa = (empresa: Empresa) => {
         setSelectedEmpresa(empresa);
@@ -107,26 +167,109 @@ export default function DetallesCuentas({ empresas, estadisticas, usuario }: Det
                     </span>
                 </div>
                 
-                {/* Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                    {/* ... tus stats ... */}
+                 {/* Stats de empresas */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-sm text-gray-500">Total Empresas</div>
+                        <div className="text-2xl font-bold">{estadisticas.total}</div>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-sm text-gray-500">Total Abonos</div>
+                        <div className="text-2xl font-bold">{estadisticas.abonos}</div>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-sm text-gray-500">Nuevas (30d)</div>
+                        <div className="text-2xl font-bold">{estadisticas.nuevas}</div>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-sm text-gray-500">Vehículos</div>
+                        <div className="text-2xl font-bold">{totalVehiculos}</div>
+                    </div>
                 </div>
             </div>
 
-            {/* Buscador y controles */}
-            <div className="mb-4 flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
-                    <BuscadorModerno
-                        value={searchTerm}
-                        onChange={handleSearch}
-                        onClear={clearSearch}
-                        placeholder="Buscar por nombre, CUIT o código..."
-                        showResultsCount
-                        resultsCount={empresasFiltradas.length}
-                        totalCount={empresas.length}
+            {/* Estadísticas de abonos */}
+            {estadisticas_abonos.tipos_principales.length > 0 && (
+                <div className="mb-6">
+                    <EstadisticasAbonosCards
+                        tiposPrincipales={estadisticas_abonos.tipos_principales}
+                        totalAbonos={estadisticas_abonos.total_abonos}
+                        totalMonto={estadisticas_abonos.total_monto}
+                        puedeVerMontos={usuario.puede_ver_montos}
                     />
                 </div>
-                <div className="flex items-center justify-between sm:justify-end gap-2">
+            )}
+
+            {/* Mobile Toggle */}
+            <div className="mb-4 flex justify-between items-center md:hidden">
+                <button
+                    onClick={() => setShowMobileFilters(!showMobileFilters)}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm"
+                >
+                    <Filter className="h-4 w-4" />
+                    Filtros
+                    {hayFiltrosActivos && (
+                        <span className="ml-1 w-2 h-2 bg-sat rounded-full"></span>
+                    )}
+                </button>
+                {hayFiltrosActivos && (
+                    <button
+                        onClick={clearAllFilters}
+                        className="text-sm text-red-600 flex items-center gap-1"
+                    >
+                        <X className="h-4 w-4" />
+                        Limpiar
+                    </button>
+                )}
+            </div>
+
+            {/* Filtros y buscador */}
+            <div className={`${showMobileFilters ? 'block' : 'hidden md:block'} mb-4`}>
+                <div className="flex flex-col md:flex-row gap-3">
+                    {/* Buscador */}
+                    <div className="flex-1">
+                        <BuscadorModerno
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            onClear={clearSearch}
+                            placeholder="Buscar por nombre, CUIT o código..."
+                            showResultsCount
+                            resultsCount={empresasFiltradas.length}
+                            totalCount={empresas.length}
+                        />
+                    </div>
+                    
+                    {/* Filtro por comercial */}
+                    <div className="w-full md:w-64">
+                        <ComercialFilter
+                            comerciales={comerciales}
+                            prefijosFiltro={prefijosFiltro}
+                            value={comercialFilter}
+                            onChange={handleComercialFilter}
+                            usuarioEsComercial={!usuario.ve_todas_cuentas}
+                            prefijoUsuario={usuario.prefijo_usuario}
+                        />
+                    </div>
+
+                    {/* Selector de items por página (móvil) */}
+                    <div className="flex md:hidden items-center justify-between gap-2">
+                        <span className="text-xs sm:text-sm text-slate-500 whitespace-nowrap">
+                            {startIndex + 1}-{Math.min(endIndex, totalItems)} de {totalItems}
+                        </span>
+                        <SelectPerPage 
+                            value={itemsPerPage}
+                            onChange={(value) => {
+                                setItemsPerPage(value);
+                                setCurrentPage(1);
+                            }}
+                            options={[15, 30, 50, 100]}
+                            className="text-xs sm:text-sm"
+                        />
+                    </div>
+                </div>
+
+                {/* Controles de paginación desktop */}
+                <div className="hidden md:flex items-center justify-end gap-2 mt-3">
                     <span className="text-xs sm:text-sm text-slate-500 whitespace-nowrap">
                         {startIndex + 1}-{Math.min(endIndex, totalItems)} de {totalItems}
                     </span>
@@ -161,9 +304,9 @@ export default function DetallesCuentas({ empresas, estadisticas, usuario }: Det
                 {empresasPaginated.length === 0 ? (
                     <div className="text-center py-8">
                         <p className="text-sm text-gray-500">No hay empresas encontradas</p>
-                        {searchTerm && (
-                            <button onClick={clearSearch} className="mt-2 text-xs text-blue-600 hover:underline">
-                                Limpiar búsqueda
+                        {hayFiltrosActivos && (
+                            <button onClick={clearAllFilters} className="mt-2 text-xs text-blue-600 hover:underline">
+                                Limpiar filtros
                             </button>
                         )}
                     </div>
@@ -179,7 +322,7 @@ export default function DetallesCuentas({ empresas, estadisticas, usuario }: Det
                 )}
             </div>
 
-            {/* Paginación - Usando el componente global */}
+            {/* Paginación */}
             {totalPages > 1 && (
                 <Pagination
                     currentPage={currentPage}
@@ -192,19 +335,16 @@ export default function DetallesCuentas({ empresas, estadisticas, usuario }: Det
                 />
             )}
 
-            {/* MODAL CENTRADO - Detalle de empresa */}
+            {/* Modal de detalle */}
             {selectedEmpresa && (
                 <>
-                    {/* Overlay */}
                     <div 
                         className="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
                         onClick={closeDetail}
                     />
                     
-                    {/* Modal */}
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-slideUp">
-                            {/* Header */}
                             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-indigo-100 rounded-lg">
@@ -226,7 +366,6 @@ export default function DetallesCuentas({ empresas, estadisticas, usuario }: Det
                                 </button>
                             </div>
 
-                            {/* Contenido */}
                             <div className="p-6">
                                 <DetalleEmpresaCompacto empresa={selectedEmpresa} />
                                 <div className="mt-6">
@@ -237,8 +376,6 @@ export default function DetallesCuentas({ empresas, estadisticas, usuario }: Det
                     </div>
                 </>
             )}
-
-
         </AppLayout>
     );
 }

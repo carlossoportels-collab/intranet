@@ -1,9 +1,10 @@
 <?php
-// app/Http/Controllers/RRHH/Equipos/TecnicoController.php
+// app/Http/Controllers/rrhh/Equipos/TecnicoController.php
 
 namespace App\Http\Controllers\rrhh\Equipos;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use App\Models\Tecnico;
 use App\Models\Personal;
@@ -13,11 +14,21 @@ use Illuminate\Support\Facades\Validator;
 
 class TecnicoController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     /**
      * Mostrar formulario para crear nuevo técnico
      */
     public function create()
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+        
         \Log::info('Accediendo a create técnico');
         
         // Obtener personal disponible que no sea técnico
@@ -48,7 +59,7 @@ class TecnicoController extends Controller
         ]);
     }
     
-        private function getUserId()
+    private function getUserId()
     {
         $user = auth()->user();
         return $user ? $user->id : null;
@@ -59,6 +70,9 @@ class TecnicoController extends Controller
      */
     public function store(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+        
         \Log::info('=== STORE TÉCNICO ===');
         \Log::info('Request data:', $request->all());
         \Log::info('User ID:', ['user_id' => auth()->id()]);
@@ -142,6 +156,9 @@ class TecnicoController extends Controller
      */
     public function edit($id)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+        
         \Log::info('=== EDIT TÉCNICO ===');
         \Log::info('ID recibido:', ['id' => $id]);
         
@@ -179,6 +196,9 @@ class TecnicoController extends Controller
      */
     public function update(Request $request, $id)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+        
         \Log::info('=== UPDATE TÉCNICO ===');
         \Log::info('ID:', ['id' => $id]);
         \Log::info('Request data:', $request->all());
@@ -259,6 +279,9 @@ class TecnicoController extends Controller
      */
     public function destroy($id)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+        
         \Log::info('=== DESTROY TÉCNICO ===');
         \Log::info('ID:', ['id' => $id]);
         \Log::info('Auth ID:', ['auth_id' => auth()->id()]);

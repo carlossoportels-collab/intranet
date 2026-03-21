@@ -1,16 +1,24 @@
 <?php
+// app/Services/LeadPerdido/LeadPerdidoQueryService.php
 
 namespace App\Services\LeadPerdido;
 
 use App\Models\Lead;
 use App\Models\SeguimientoPerdida;
 use App\Models\Usuario;
-use App\Helpers\PermissionHelper;
+use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class LeadPerdidoQueryService
 {
+    use HasPermisosService; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializePermisoService(); // 🔥 INICIALIZAR
+    }
+
     /**
      * Obtener listado paginado de leads perdidos con filtros
      */
@@ -55,7 +63,7 @@ class LeadPerdidoQueryService
             return;
         }
 
-        $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+        $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
         
         if (empty($prefijosPermitidos)) {
             $query->whereRaw('1 = 0');

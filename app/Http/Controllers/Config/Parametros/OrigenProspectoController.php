@@ -1,8 +1,10 @@
 <?php
+// app/Http/Controllers/Config/Parametros/OrigenProspectoController.php
 
 namespace App\Http\Controllers\Config\Parametros;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable;
 use App\Models\OrigenContacto;
 use App\Models\Lead;
 use Inertia\Inertia;
@@ -10,9 +12,18 @@ use Illuminate\Support\Facades\DB;
 
 class OrigenProspectoController extends Controller
 {
+    use Authorizable;
+
+    public function __construct()
+    {
+        $this->initializeAuthorization();
+    }
+
     public function index()
     {
-        // Obtener todos los orígenes
+        // 🔥 VERIFICAR PERMISO BASE
+        $this->authorizePermiso(config('permisos.VER_CONFIGURACION'));
+        
         $origenes = OrigenContacto::orderBy('nombre')
             ->get()
             ->map(function ($origen) {
@@ -26,7 +37,6 @@ class OrigenProspectoController extends Controller
                 ];
             });
 
-        // Estadísticas de efectividad basadas en leads
         $efectividadPorOrigen = Lead::select(
                 'origen_id',
                 DB::raw('COUNT(*) as total_leads'),
@@ -37,7 +47,6 @@ class OrigenProspectoController extends Controller
             ->get()
             ->keyBy('origen_id');
 
-        // Totales globales
         $totalLeadsConOrigen = Lead::whereNotNull('origen_id')->count();
         $totalClientesConOrigen = Lead::whereNotNull('origen_id')
             ->where('es_cliente', 1)
@@ -47,7 +56,6 @@ class OrigenProspectoController extends Controller
             ? round(($totalClientesConOrigen / $totalLeadsConOrigen) * 100) 
             : 0;
 
-        // Combinar orígenes con estadísticas
         $origenesConEfectividad = $origenes->map(function ($origen) use ($efectividadPorOrigen) {
             $stats = $efectividadPorOrigen->get($origen['id']);
             $totalLeads = $stats->total_leads ?? 0;
@@ -64,10 +72,9 @@ class OrigenProspectoController extends Controller
             ]);
         });
 
-        // SOLO orígenes con leads para mostrar en la tabla
         $origenesConLeads = $origenesConEfectividad->filter(function ($item) {
             return $item['total_leads'] > 0;
-        })->values(); // reindexar
+        })->values();
 
         return Inertia::render('Config/Parametros/OrigenProspecto', [
             'origenesProspecto' => $origenesConLeads,

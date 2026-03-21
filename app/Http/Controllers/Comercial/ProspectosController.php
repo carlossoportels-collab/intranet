@@ -8,21 +8,23 @@ use App\Services\Lead\LeadStatisticsService;
 use App\Services\Lead\LeadCommentService;
 use App\Models\Lead;
 use App\Models\EstadoLead;
-use App\Models\OrigenContacto;
 use App\Models\TipoComentario;
-use App\Models\Usuario;
-use App\Helpers\PermissionHelper;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
+use App\Traits\Authorizable;
 
 class ProspectosController extends Controller
 {
+    use Authorizable;
+
     public function __construct(
         private LeadFilterService $filterService,
         private LeadStatisticsService $statsService,
         private LeadCommentService $commentService
-    ) {}
+    ) {
+        $this->initializeAuthorization();
+    }
     
     public function index(Request $request)
     {
@@ -32,6 +34,9 @@ class ProspectosController extends Controller
         }
         
         $usuario = auth()->user();
+        
+        // Verificar permiso para ver prospectos
+        $this->authorizePermiso(config('permisos.VER_PROSPECTOS'));
         
         // Construir query base
         $query = $this->filterService->getQueryBase();
@@ -48,11 +53,11 @@ class ProspectosController extends Controller
         }
         
         // Aplicar filtros
-        $filters = $request->only(['search', 'estado_id', 'origen_id', 'fecha_inicio', 'fecha_fin']);
+        $filters = $request->only(['search', 'estado_id', 'origen_id', 'fecha_inicio', 'fecha_fim']);
         $this->filterService->aplicarFiltros($query, $filters);
         
-        // Aplicar permisos
-        $this->filterService->aplicarPermisos($query, $usuario);
+        // Aplicar permisos de prefijos (usando el trait)
+        $this->applyPrefijoFilter($query, $usuario);
         
         // Obtener leads paginados
         $leads = $query->orderBy('created', 'desc')
@@ -89,7 +94,7 @@ class ProspectosController extends Controller
             'presupuestosPorLead' => $presupuestosPorLead,
             'prefijosFiltro' => $prefijosFiltro,
             'prefijoUsuario' => $prefijoUsuario,
-            'filters' => $request->only(['search', 'estado_id', 'origen_id', 'prefijo_id', 'fecha_inicio', 'fecha_fin']),
+            'filters' => $request->only(['search', 'estado_id', 'origen_id', 'prefijo_id', 'fecha_inicio', 'fecha_fim']),
         ]);
     }
     
@@ -99,6 +104,11 @@ class ProspectosController extends Controller
     public function comentarios($id)
     {
         try {
+            $lead = Lead::findOrFail($id);
+            
+            // Verificar acceso al lead
+            $this->authorizeLeadAccess($lead, config('permisos.VER_PROSPECTOS'));
+            
             $datos = $this->commentService->getComentariosLead($id);
             
             // Si es AJAX
@@ -119,11 +129,12 @@ class ProspectosController extends Controller
             ]));
             
         } catch (\Exception $e) {
-            if (request()->expectsJson()) {
-                return response()->json(['error' => $e->getMessage()], 400);
-            }
-            return redirect()->route('comercial.prospectos.index')
-                ->with('error', $e->getMessage());
+            Log::error('Error en comentarios:', [
+                'lead_id' => $id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return $this->errorResponse($e->getMessage(), 400);
         }
     }
     
@@ -145,13 +156,18 @@ class ProspectosController extends Controller
         ]);
         
         try {
+            $lead = Lead::findOrFail($id);
+            
+            // Verificar acceso al lead y permiso para gestionar leads
+            $this->authorizeLeadModification($lead);
+            
             $resultado = $this->commentService->crearComentario(
                 $request->all(),
                 $id,
                 auth()->id()
             );
             
-            return redirect()->back()->with('success', $resultado['mensaje']);
+            return $this->successResponse($resultado['mensaje']);
             
         } catch (\Exception $e) {
             Log::error('Error al guardar comentario:', [
@@ -160,7 +176,7 @@ class ProspectosController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             
-            return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
+            return $this->errorResponse('Error: ' . $e->getMessage(), 500);
         }
     }
     
@@ -169,100 +185,118 @@ class ProspectosController extends Controller
      */
     public function comentariosModalData($id)
     {
-        $lead = Lead::findOrFail($id);
-        
-        // Contar comentarios existentes
-        $comentariosExistentes = \App\Models\Comentario::where('lead_id', $id)
-            ->whereNull('deleted_at')
-            ->count();
-        
-        // Obtener estados lead
-        $estadosLead = EstadoLead::where('activo', 1)->get();
-        
-        return response()->json([
-            'lead' => [
-                'id' => $lead->id,
-                'nombre_completo' => $lead->nombre_completo,
-                'estado_lead_id' => $lead->estado_lead_id,
-            ],
-            'comentariosExistentes' => $comentariosExistentes,
-            'estadosLead' => $estadosLead,
-        ]);
+        try {
+            $lead = Lead::findOrFail($id);
+            
+            // Verificar acceso al lead
+            $this->authorizeLeadAccess($lead, config('permisos.VER_PROSPECTOS'));
+            
+            // Contar comentarios existentes
+            $comentariosExistentes = \App\Models\Comentario::where('lead_id', $id)
+                ->whereNull('deleted_at')
+                ->count();
+            
+            // Obtener estados lead
+            $estadosLead = EstadoLead::where('activo', 1)->get();
+            
+            return response()->json([
+                'lead' => [
+                    'id' => $lead->id,
+                    'nombre_completo' => $lead->nombre_completo,
+                    'estado_lead_id' => $lead->estado_lead_id,
+                ],
+                'comentariosExistentes' => $comentariosExistentes,
+                'estadosLead' => $estadosLead,
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error en comentariosModalData:', [
+                'lead_id' => $id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
     }
     
-/**
- * Obtener tipos de comentario para clientes
- */
-public function tiposComentarioCliente()
-{
-    try {
-        $tipos = TipoComentario::where('es_activo', 1)
-            ->where(function($query) {
-                $query->where('aplica_a', 'cliente')
-                      ->orWhere('aplica_a', 'ambos');
-            })
-            ->get();
-        
-        return response()->json($tipos);
-    } catch (\Exception $e) {
-        Log::error('Error cargando tipos de comentario para cliente:', [
-            'error' => $e->getMessage()
-        ]);
-        return response()->json(['error' => 'Error al cargar tipos'], 500);
+    /**
+     * Obtener tipos de comentario para clientes
+     */
+    public function tiposComentarioCliente()
+    {
+        try {
+            $tipos = TipoComentario::where('es_activo', 1)
+                ->where(function($query) {
+                    $query->where('aplica_a', 'cliente')
+                          ->orWhere('aplica_a', 'ambos');
+                })
+                ->get();
+            
+            return response()->json($tipos);
+        } catch (\Exception $e) {
+            Log::error('Error cargando tipos de comentario para cliente:', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['error' => 'Error al cargar tipos'], 500);
+        }
     }
-}
 
-/**
- * Obtener tipos de comentario para recontacto (estados final_negativo)
- */
-public function tiposComentarioRecontacto()
-{
-    try {
-        $tipos = TipoComentario::where('es_activo', 1)
-            ->where(function($query) {
-                $query->where('aplica_a', 'recontacto')
-                      ->orWhere('aplica_a', 'ambos');
-            })
-            ->get();
-        
-        return response()->json($tipos);
-    } catch (\Exception $e) {
-        Log::error('Error cargando tipos de comentario para recontacto:', [
-            'error' => $e->getMessage()
-        ]);
-        return response()->json(['error' => 'Error al cargar tipos'], 500);
+    /**
+     * Obtener tipos de comentario para recontacto (estados final_negativo)
+     */
+    public function tiposComentarioRecontacto()
+    {
+        try {
+            $tipos = TipoComentario::where('es_activo', 1)
+                ->where(function($query) {
+                    $query->where('aplica_a', 'recontacto')
+                          ->orWhere('aplica_a', 'ambos');
+                })
+                ->get();
+            
+            return response()->json($tipos);
+        } catch (\Exception $e) {
+            Log::error('Error cargando tipos de comentario para recontacto:', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['error' => 'Error al cargar tipos'], 500);
+        }
     }
-}
 
-/**
- * Obtener tipos de comentario para leads normales
- */
-public function tiposComentarioLead()
-{
-    try {
-        $tipos = TipoComentario::where('es_activo', 1)
-            ->where(function($query) {
-                $query->where('aplica_a', 'lead')
-                      ->orWhere('aplica_a', 'ambos');
-            })
-            ->get();
-        
-        return response()->json($tipos);
-    } catch (\Exception $e) {
-        Log::error('Error cargando tipos de comentario para lead:', [
-            'error' => $e->getMessage()
-        ]);
-        return response()->json(['error' => 'Error al cargar tipos'], 500);
+    /**
+     * Obtener tipos de comentario para leads normales
+     */
+    public function tiposComentarioLead()
+    {
+        try {
+            $tipos = TipoComentario::where('es_activo', 1)
+                ->where(function($query) {
+                    $query->where('aplica_a', 'lead')
+                          ->orWhere('aplica_a', 'ambos');
+                })
+                ->get();
+            
+            return response()->json($tipos);
+        } catch (\Exception $e) {
+            Log::error('Error cargando tipos de comentario para lead:', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['error' => 'Error al cargar tipos'], 500);
+        }
     }
-}
+    
     /**
      * Método para obtener tiempos entre estados
      */
     public function tiemposEntreEstados($id)
     {
         try {
-            // Reutilizar el servicio que ya tenemos
             $lead = Lead::findOrFail($id);
+            
+            // Verificar acceso al lead
+            $this->authorizeLeadAccess($lead, config('permisos.VER_PROSPECTOS'));
+            
+            // Reutilizar el servicio que ya tenemos
             $datosDashboard = app(\App\Services\Lead\LeadDetailsService::class)
                 ->getLeadDashboardData($id, auth()->id());
             
@@ -281,67 +315,69 @@ public function tiposComentarioLead()
         }
     }
     
-/**
- * Editar lead
- */
-public function edit($id)
-{
-    $lead = Lead::findOrFail($id);
-    
-    // ELIMINADA la restricción de cliente
-    
-    return Inertia::render('Comercial/LeadEdit', [
-        'lead' => $lead,
-    ]);
-}
-
-/**
- * Actualizar lead
- */
-public function update(Request $request, $id)
-{
-    $lead = Lead::find($id);
-    
-    if (!$lead) {
-        return $this->handleErrorResponse('Lead no encontrado', 404);
+    /**
+     * Editar lead
+     */
+    public function edit($id)
+    {
+        $lead = Lead::findOrFail($id);
+        
+        // Verificar acceso al lead y permiso para gestionar
+        $this->authorizeLeadModification($lead);
+        
+        return Inertia::render('Comercial/LeadEdit', [
+            'lead' => $lead,
+        ]);
     }
-    
-    // ELIMINADA la restricción de cliente
-    
-    $validated = $request->validate([
-        'prefijo_id' => 'nullable|integer',
-        'nombre_completo' => 'required|string|max:100',
-        'genero' => 'required|in:masculino,femenino,otro,no_especifica',
-        'telefono' => 'nullable|string|max:20',
-        'email' => 'nullable|email|max:150',
-        'localidad_id' => 'nullable|integer|exists:localidades,id',
-        'rubro_id' => 'nullable|integer|exists:rubros,id',
-        'origen_id' => 'nullable|integer|exists:origenes_contacto,id',
-    ]);
-    
-    try {
-        // Limpiar datos
-        foreach (['prefijo_id', 'localidad_id', 'rubro_id', 'origen_id'] as $field) {
-            $validated[$field] = !empty($validated[$field]) ? $validated[$field] : null;
+
+    /**
+     * Actualizar lead
+     */
+    public function update(Request $request, $id)
+    {
+        $lead = Lead::find($id);
+        
+        if (!$lead) {
+            return $this->errorResponse('Lead no encontrado', 404);
         }
         
-        $lead->update([
-            ...$validated,
-            'modified' => now(),
-            'modified_by' => auth()->id(),
+        // Verificar acceso al lead y permiso para gestionar
+        $this->authorizeLeadModification($lead);
+        
+        $validated = $request->validate([
+            'prefijo_id' => 'nullable|integer',
+            'nombre_completo' => 'required|string|max:100',
+            'genero' => 'required|in:masculino,femenino,otro,no_especifica',
+            'telefono' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:150',
+            'localidad_id' => 'nullable|integer|exists:localidades,id',
+            'rubro_id' => 'nullable|integer|exists:rubros,id',
+            'origen_id' => 'nullable|integer|exists:origenes_contacto,id',
         ]);
         
-        return $this->handleSuccessResponse('Lead actualizado exitosamente', $id);
-        
-    } catch (\Exception $e) {
-        Log::error('Error actualizando lead:', [
-            'error' => $e->getMessage(),
-            'lead_id' => $id,
-        ]);
-        
-        return $this->handleErrorResponse('Error al actualizar el lead: ' . $e->getMessage(), 500);
+        try {
+            // Limpiar datos
+            foreach (['prefijo_id', 'localidad_id', 'rubro_id', 'origen_id'] as $field) {
+                $validated[$field] = !empty($validated[$field]) ? $validated[$field] : null;
+            }
+            
+            $lead->update([
+                ...$validated,
+                'modified' => now(),
+                'modified_by' => auth()->id(),
+            ]);
+            
+            return $this->successResponse('Lead actualizado exitosamente', ['lead_id' => $id]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error actualizando lead:', [
+                'error' => $e->getMessage(),
+                'lead_id' => $id,
+            ]);
+            
+            return $this->errorResponse('Error al actualizar el lead: ' . $e->getMessage(), 500);
+        }
     }
-}
     
     /**
      * Obtener datos del usuario
@@ -354,7 +390,8 @@ public function update(Request $request, $id)
         $cantidadPrefijos = 0;
         
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosAsignados = PermissionHelper::getPrefijosPermitidos($usuario->id);
+            // 🔥 CAMBIO: Usar permisoService en lugar de prefijoService
+            $prefijosAsignados = $this->permisoService->getPrefijosPermitidos($usuario->id) ?? [];
             $cantidadPrefijos = count($prefijosAsignados);
         }
         
@@ -385,39 +422,5 @@ public function update(Request $request, $id)
         }
         
         return $data;
-    }
-    
-    /**
-     * Manejar respuesta de error
-     */
-    private function handleErrorResponse(string $message, int $status = 400)
-    {
-        if (request()->header('X-Inertia')) {
-            return back()->withErrors(['lead_update' => $message]);
-        }
-        
-        return response()->json([
-            'success' => false,
-            'message' => $message
-        ], $status);
-    }
-    
-    /**
-     * Manejar respuesta de éxito
-     */
-    private function handleSuccessResponse(string $message, int $leadId = null)
-    {
-        if (request()->header('X-Inertia')) {
-            $response = redirect()->back()->with('success', $message);
-            if ($leadId) {
-                $response->with('updatedLeadId', $leadId);
-            }
-            return $response;
-        }
-        
-        return response()->json([
-            'success' => true,
-            'message' => $message
-        ]);
     }
 }

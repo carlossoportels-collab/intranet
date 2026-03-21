@@ -4,29 +4,39 @@
 namespace App\Http\Controllers\CondComerciales;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use App\Models\ProductoServicio;
 use App\Models\TipoPrdSrv;
-use App\Helpers\PermissionHelper;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class TarifasConsultaController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     public function index()
     {
+        // 🔥 VERIFICAR PERMISO DE CONSULTA
+        $this->authorizePermiso(config('permisos.VER_TARIFAS_CONSULTA'));
+        
         $usuario = Auth::user();
         
-        // Obtener compañías permitidas para el usuario
-        $companiasPermitidas = PermissionHelper::getCompaniasPermitidas();
-        $puedeVerTodas = PermissionHelper::puedeVerTodos();
+        // Obtener compañías permitidas para el usuario USANDO EL TRAIT
+        $companiasPermitidas = $this->getCompaniasPermitidas();
+        $puedeVerTodas = $this->canViewAllRecords();
         
         // Query base para productos y servicios activos
         $query = ProductoServicio::where('es_activo', 1)
             ->with('tipo');
         
-        // Aplicar filtro por compañía usando el helper
-        $query = PermissionHelper::aplicarFiltroCompania($query);
+        // Aplicar filtro por compañía usando EL TRAIT
+        $query = $this->applyCompaniaFilter($query);
         
         // Ejecutar query y ordenar
         $productosServicios = $query->orderBy('codigopro')
@@ -59,7 +69,6 @@ class TarifasConsultaController extends Controller
         // Si NO puede ver todas las compañías, filtramos los tipos
         // para mostrar solo aquellos que tienen productos de su compañía
         if (!$puedeVerTodas && !empty($companiasPermitidas)) {
-            // CORREGIDO: Cambiamos 'productosServicios' por 'productos'
             $tiposQuery->whereHas('productos', function($q) use ($companiasPermitidas) {
                 $q->whereIn('compania_id', $companiasPermitidas)
                   ->where('es_activo', 1);
@@ -74,7 +83,7 @@ class TarifasConsultaController extends Controller
         if (!$puedeVerTodas && !empty($companiasPermitidas)) {
             $companiaUsuario = DB::table('companias')
                 ->where('id', $companiasPermitidas[0])
-                ->first();
+                ->first(['id', 'nombre']);
         }
 
         return Inertia::render('CondComerciales/TarifasConsulta', [
@@ -86,7 +95,6 @@ class TarifasConsultaController extends Controller
                 'compania_actual' => $companiaUsuario ? [
                     'id' => $companiaUsuario->id,
                     'nombre' => $companiaUsuario->nombre ?? 'Compañía',
-                    'logo' => $companiaUsuario->logo ?? null,
                 ] : null,
             ],
         ]);

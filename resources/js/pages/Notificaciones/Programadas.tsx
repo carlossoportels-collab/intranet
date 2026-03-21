@@ -206,11 +206,13 @@ export default function Programadas({
     }
   };
 
+  
+
   return (
     <AppLayout title="Notificaciones Programadas">
       <Head title="Notificaciones Programadas" />
       
-      <div className="max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-4 lg:px-8">
+      <div className="px-4 sm:px-6 lg:px-8">
         {/* Header - Responsive */}
         <div className="mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
@@ -218,16 +220,16 @@ export default function Programadas({
               <div className="flex-1 sm:flex-none">
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
                   <Calendar className="h-5 w-5 sm:h-6 sm:w-6" />
-                  Notificaciones Programadas
+                  Recordatorios Programados
                 </h1>
                 <p className="text-gray-600 mt-1 text-sm sm:text-base">
                   {estadisticas.total > 0 
-                    ? `${estadisticas.total} notificación(es) programada(s)` 
-                    : 'No hay notificaciones programadas'
+                    ? `${estadisticas.total} recordatorio(s) programado(s)` 
+                    : 'No hay recordatorios programadas'
                   }
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  * Solo se muestran notificaciones con fecha programada futura
+                  * Solo se muestran recordatorios con fecha programada futura
                 </p>
               </div>
               
@@ -521,7 +523,7 @@ export default function Programadas({
                 <div className="px-4 py-3 border-t border-gray-200">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
-                      Mostrando {notificaciones.length} de {meta.total} notificaciones
+                      Mostrando {notificaciones.length} de {meta.total} recordatorios
                     </div>
                     
                     <div className="flex justify-center flex-wrap gap-1">
@@ -566,7 +568,7 @@ export default function Programadas({
         {/* Información adicional */}
         <div className="mt-4 sm:mt-6 text-xs sm:text-sm text-gray-500 text-center sm:text-left">
           <p>
-            <strong>Nota:</strong> Las notificaciones programadas se convertirán en notificaciones activas 
+            <strong>Nota:</strong> Los recordatorios programados se convertirán en notificaciones activas 
             cuando llegue su fecha programada. Puedes ver las notificaciones activas en{' '}
             <button 
               onClick={() => router.visit('/notificaciones')}

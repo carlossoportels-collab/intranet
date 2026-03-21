@@ -1,19 +1,19 @@
-// SidebarNav.tsx - Versión modificada
+// SidebarNav.tsx - Versión con permisos y filtrado por usuarios
 import { Link } from '@inertiajs/react';
 import { 
     ChevronDown, ChevronRight, 
-    DollarSign, FileText, Building, 
+    FileText, Building, 
     Settings, Users, Tag,
     Briefcase, FileCheck, Bell, Calendar,
-    CreditCard, Truck, Package, 
-    UserCog, Wallet, FileQuestion, Megaphone,
+    CreditCard, Package, 
+    UserCog, FileQuestion, Megaphone,
     Cog, CreditCard as CreditCardIcon, 
     Lightbulb, Target, Layers,
     Cake, FileSignature, User, Wrench, 
     Briefcase as BriefcaseIcon, Shield,
-    Folder, FileSpreadsheet, BarChart,
-    Eye, Search, BookOpen, Receipt,
-    ClipboardCheck, Phone, Mail
+    Folder, BarChart,
+    Eye, Search, Receipt,
+    Phone, Mail
 } from 'lucide-react';
 import React, { useState } from 'react';
 
@@ -24,9 +24,11 @@ interface SidebarNavProps {
         user?: {
             id: number;
             rol_nombre: string;
-            // Asegurarnos de incluir los datos de comercial
+            permisos?: string[];
+            ve_todas_cuentas?: boolean;
             comercial?: {
                 compania_id: number | null;
+                prefijo_id?: number | null;
             } | null;
             [key: string]: any;
         };
@@ -40,8 +42,10 @@ interface NavItem {
     icon?: React.ReactNode;
     children?: NavItem[];
     badge?: number;
-    visibleForRoles?: string[];
-    visibleForUsers?: number[];
+    permiso?: string; 
+    visibleForRoles?: string[]; 
+    visibleForUsers?: number[]; 
+    requiereVerTodasCuentas?: boolean; 
 }
 
 export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
@@ -55,29 +59,33 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
     };
 
     const userData = auth?.user;
-    const userId = userData?.id;
-    const userRole = userData?.rol_nombre;
-    // Obtener la compañía del usuario desde el objeto comercial
-    const userCompaniaId = userData?.comercial?.compania_id;
+    const permisos = userData?.permisos || [];
+    const veTodasCuentas = userData?.ve_todas_cuentas || false;
+
+    const tienePermiso = (permisoRequerido?: string): boolean => {
+        if (!permisoRequerido) return true;
+        return permisos.includes(permisoRequerido);
+    };
 
     const navigation: NavItem[] = [
         {
             id: 'configuracion',
             name: 'Configuración',
             icon: <Settings size={16} />,
-            visibleForRoles: ['Root', 'Administrador'],
+            permiso: 'ver_configuracion',
             children: [
                 {
                     id: 'parametros-generales',
                     name: 'Parámetros Generales',
                     icon: <Cog size={14} />,
+                    permiso: 'gestionar_parametros',
                     children: [
-                        { id: 'estados-lead', name: 'Estados de leads', href: '/config/parametros/estados-lead', icon: <Phone size={12} /> },
-                        { id: 'medios-pago', name: 'Medios de pago', href: '/config/parametros/medios-pago', icon: <CreditCardIcon size={12} /> },
-                        { id: 'motivos-baja', name: 'Motivos baja', href: '/config/parametros/motivos-baja', icon: <Lightbulb size={12} /> },
-                        { id: 'origen-prospecto', name: 'Origen de prospecto', href: '/config/parametros/origen-prospecto', icon: <Target size={12} /> },
-                        { id: 'rubros', name: 'Rubros', href: '/config/parametros/rubros', icon: <Layers size={12} /> },
-                        { id: 'terminos-condiciones', name: 'Términos y condiciones', href: '/config/parametros/terminos-condiciones', icon: <FileText size={12} /> },
+                        { id: 'estados-lead', name: 'Estados de leads', href: '/config/parametros/estados-lead', icon: <Phone size={12} />, permiso: 'gestionar_parametros' },
+                        { id: 'medios-pago', name: 'Medios de pago', href: '/config/parametros/medios-pago', icon: <CreditCardIcon size={12} />, permiso: 'gestionar_parametros' },
+                        { id: 'motivos-baja', name: 'Motivos baja', href: '/config/parametros/motivos-baja', icon: <Lightbulb size={12} />, permiso: 'gestionar_parametros' },
+                        { id: 'origen-prospecto', name: 'Origen de prospecto', href: '/config/parametros/origen-prospecto', icon: <Target size={12} />, permiso: 'gestionar_parametros' },
+                        { id: 'rubros', name: 'Rubros', href: '/config/parametros/rubros', icon: <Layers size={12} />, permiso: 'gestionar_parametros' },
+                        { id: 'terminos-condiciones', name: 'Términos y condiciones', href: '/config/parametros/terminos-condiciones', icon: <FileText size={12} />, permiso: 'gestionar_parametros' },
                     ]
                 },
                 {
@@ -85,20 +93,23 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     name: 'Gestión de Tarifas',
                     icon: <Tag size={14} />,
                     href: '/config/tarifas',
+                    permiso: 'gestionar_tarifas',
                 },
                 {
                     id: 'gestion-promociones',
                     name: 'Gestión de Promociones',
                     icon: <Tag size={14} />,
                     href: '/config/promociones',
+                    permiso: 'gestionar_promociones',
                 },
                 {
                     id: 'gestion-usuarios',
                     name: 'Gestión de Usuarios',
                     icon: <UserCog size={14} />,
+                    permiso: 'gestionar_usuarios',
                     children: [
-                        { id: 'usuarios-sistema', name: 'Usuarios del sistema', href: '/config/usuarios', icon: <User size={12} /> },
-                        { id: 'roles-permisos', name: 'Roles y permisos', href: '/config/usuarios/roles', icon: <Shield size={12} /> },
+                        { id: 'usuarios-sistema', name: 'Usuarios del sistema', href: '/config/usuarios', icon: <User size={12} />, permiso: 'gestionar_usuarios' },
+                        { id: 'roles-permisos', name: 'Roles y permisos', href: '/config/usuarios/roles', icon: <Shield size={12} />, permiso: 'gestionar_roles_permisos' },
                     ]
                 }
             ]
@@ -107,65 +118,65 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             id: 'condiciones-comerciales',
             name: 'Cond Comerciales',
             icon: <FileText size={16} />,
-            visibleForRoles: ['Comercial', 'Supervisor', 'Administrador', 'Root'],
+            permiso: 'ver_tarifas_consulta',
             children: [
-                { id: 'tarifas-consulta', name: 'Tarifas (consulta)', href: '/comercial/tarifas', icon: <Eye size={14} /> },
-                { id: 'convenios-vigentes', name: 'Convenios vigentes', href: '/comercial/convenios', icon: <FileCheck size={14} /> },
-                // CAMBIO IMPORTANTE: "Documentación" ahora es un enlace directo, no un submenú
+                { id: 'tarifas-consulta', name: 'Tarifas (consulta)', href: '/comercial/tarifas', icon: <Eye size={14} />, permiso: 'ver_tarifas_consulta' },
+                { id: 'convenios-vigentes', name: 'Convenios vigentes', href: '/comercial/convenios', icon: <FileCheck size={14} />, permiso: 'ver_convenios_vigentes' },
                 { 
                     id: 'documentacion', 
                     name: 'Documentación', 
-                    href: '/comercial/documentacion', // Enlace directo a la nueva vista
-                    icon: <Folder size={14} /> 
+                    href: '/comercial/documentacion', 
+                    icon: <Folder size={14} />,
+                    permiso: 'ver_documentacion'
                 },
-                { id: 'novedades', name: 'Novedades', href: '/comercial/novedades', icon: <Megaphone size={14} /> },
-                { id: 'reenvios-activos', name: 'Reenvíos activos', href: '/comercial/reenvios', icon: <Mail size={14} /> },
+                { id: 'novedades', name: 'Novedades', href: '/comercial/novedades', icon: <Megaphone size={14} />, permiso: 'ver_novedades' },
+                { id: 'reenvios-activos', name: 'Reenvíos activos', href: '/comercial/reenvios', icon: <Mail size={14} />, permiso: 'ver_reenvios_activos' },
             ]
         },
         {
             id: 'gestion-comercial',
             name: 'Gestión Comercial',
             icon: <Briefcase size={16} />,
-            visibleForRoles: ['Comercial', 'Supervisor', 'Administrador', 'Root'],
+            permiso: 'ver_prospectos_leads',
             children: [
-                { id: 'actividad', name: 'Actividad', href: '/comercial/actividad', icon: <Bell size={14} /> },
-                { id: 'contactos', name: 'Contactos', href: '/comercial/contactos', icon: <Users size={14} /> },
+                { id: 'actividad', name: 'Actividad', href: '/comercial/actividad', icon: <Bell size={14} />, permiso: 'ver_actividad' },
+                { id: 'contactos', name: 'Contactos', href: '/comercial/contactos', icon: <Users size={14} />, permiso: 'ver_contactos' },
                 {
                     id: 'cuentas',
                     name: 'Cuentas',
                     icon: <Building size={14} />,
+                    permiso: 'ver_cuentas',
                     children: [
-                        { id: 'detalles', name: 'Detalles', href: '/comercial/cuentas', icon: <Search size={12} /> },
-                        { id: 'certificados-flota', name: 'Certificados flota', href: '/comercial/cuentas/certificados', icon: <FileCheck size={12} /> },
-                        { id: 'cambio-titularidad', name: 'Cambio Titularidad', href: '/comercial/cuentas/cambio-titularidad', icon: <User size={12} /> },
-                        { id: 'cambio-razon-social', name: 'Cambio Razón Social', href: '/comercial/cuentas/cambio-razon-social', icon: <Building size={12} /> },
+                        { id: 'detalles', name: 'Detalles', href: '/comercial/cuentas', icon: <Search size={12} />, permiso: 'ver_detalles_cuenta' },
+                        { id: 'certificados-flota', name: 'Certificados flota', href: '/comercial/cuentas/certificados', icon: <FileCheck size={12} />, permiso: 'ver_certificados_flota' },
+                        { id: 'cambio-titularidad', name: 'Cambio Titularidad', href: '/comercial/cuentas/cambio-titularidad', icon: <User size={12} />, permiso: 'gestionar_cambio_titularidad' },
+                        { id: 'cambio-razon-social', name: 'Cambio Razón Social', href: '/comercial/cuentas/cambio-razon-social', icon: <Building size={12} />, permiso: 'gestionar_cambio_razon_social' },
                     ]
                 },
-                { id: 'contratos', name: 'Contratos', href: '/comercial/contratos', icon: <FileText size={14} /> },
-                { id: 'presupuestos', name: 'Presupuestos', href: '/comercial/presupuestos', icon: <FileText size={14} /> },
-                { id: 'recordatorios', name: 'Recordatorios', href: '/notificaciones/programadas', icon: <Calendar size={14} /> },
-                { id: 'prospectos', name: 'Prospectos & Leads', href: '/comercial/prospectos', icon: <Target size={14} /> },
-                { id: 'perdidas', name: 'Leads perdidos', href: '/comercial/leads-perdidos', icon: <Receipt size={14} /> },
+                { id: 'contratos', name: 'Contratos', href: '/comercial/contratos', icon: <FileText size={14} />, permiso: 'ver_contratos' },
+                { id: 'presupuestos', name: 'Presupuestos', href: '/comercial/presupuestos', icon: <FileText size={14} />, permiso: 'ver_presupuestos' },
+                { id: 'recordatorios', name: 'Recordatorios', href: '/notificaciones/programadas', icon: <Calendar size={14} />, permiso: 'ver_recordatorios' },
+                { id: 'prospectos', name: 'Prospectos & Leads', href: '/comercial/prospectos', icon: <Target size={14} />, permiso: 'ver_prospectos_leads' },
+                { id: 'perdidas', name: 'Leads perdidos', href: '/comercial/leads-perdidos', icon: <Receipt size={14} />, permiso: 'ver_leads_perdidos' },
             ]
         },
         {
             id: 'estadisticas',
             name: 'Estadísticas',
             icon: <BarChart size={16} />,
-            visibleForRoles: ['Administrador'],
             visibleForUsers: [3, 5],
             children: [
                 { 
                     id: 'comercial-grupal', 
                     name: 'Desempeño Grupal', 
                     href: '/estadisticas/comercial-grupal', 
-                    icon: <Users size={14} /> 
+                    icon: <Users size={14} />,
                 },
                 { 
                     id: 'comercial-individual', 
                     name: 'Rendimiento Individual', 
                     href: '/estadisticas/comercial-individual', 
-                    icon: <User size={14} /> 
+                    icon: <User size={14} />,
                 },
             ]
         },
@@ -173,48 +184,64 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             id: 'rrhh',
             name: 'Recursos Humanos',
             icon: <Users size={16} />,
-            visibleForRoles: ['Comercial', 'Supervisor', 'Administrador', 'Root'],
+            permiso: 'ver_datos_personales',
             children: [
                 {
                     id: 'personal',
                     name: 'Personal',
                     icon: <User size={14} />,
+                    permiso: 'ver_datos_personales',
                     children: [
-                        { id: 'datos-personales', name: 'Datos personales', href: '/rrhh/personal/datos', icon: <User size={12} /> },
-                        { id: 'licencias', name: 'Licencias', href: '/rrhh/personal/licencias', icon: <FileCheck size={12} /> },
-                        { id: 'cumpleanos', name: 'Cumpleaños', href: '/rrhh/personal/cumpleanos', icon: <Cake size={12} /> },
+                        { id: 'datos-personales', name: 'Datos personales', href: '/rrhh/personal/datos', icon: <User size={12} />, permiso: 'ver_datos_personales' },
+                        { id: 'licencias', name: 'Licencias', href: '/rrhh/personal/licencias', icon: <FileCheck size={12} />, permiso: 'ver_licencias' },
+                        { id: 'cumpleanos', name: 'Cumpleaños', href: '/rrhh/personal/cumpleanos', icon: <Cake size={12} />, permiso: 'ver_cumpleanos' },
                     ]
                 },
                 {
                     id: 'equipos',
                     name: 'Equipos',
                     icon: <Users size={14} />,
+                    permiso: 'ver_equipos',
                     children: [
-                        { id: 'equipo-comercial', name: 'Comercial', href: '/rrhh/equipos/comercial', icon: <BriefcaseIcon size={12} /> },
-                        { id: 'equipo-tecnico', name: 'Técnico', href: '/rrhh/equipos/tecnico', icon: <Wrench size={12} /> },
+                        { id: 'equipo-comercial', name: 'Comercial', href: '/rrhh/equipos/comercial', icon: <BriefcaseIcon size={12} />, permiso: 'gestionar_equipo_comercial' },
+                        { id: 'equipo-tecnico', name: 'Técnico', href: '/rrhh/equipos/tecnico', icon: <Wrench size={12} />, permiso: 'gestionar_equipo_tecnico' },
                     ]
                 }
             ]
         }
     ];
 
-    const shouldShowItem = (item: NavItem): boolean => {
-        if (!userId || !userRole) return false;
-        
-        if (item.visibleForUsers && !item.visibleForUsers.includes(userId)) {
-            return false;
-        }
-        
-        if (item.visibleForRoles && !item.visibleForRoles.includes(userRole)) {
-            return false;
-        }
-        
-        return true;
+    // 🔥 FUNCIÓN DE FILTRADO CORREGIDA - respeta visibleForUsers
+    const filterNavItems = (items: NavItem[]): NavItem[] => {
+        return items.filter(item => {
+            // Verificar usuarios específicos
+            if (item.visibleForUsers && !item.visibleForUsers.includes(userData?.id || 0)) {
+                return false;
+            }
+            
+            // Verificar roles
+            if (item.visibleForRoles && !item.visibleForRoles.includes(userData?.rol_nombre || '')) {
+                return false;
+            }
+            
+            // Verificar permiso
+            if (item.permiso && !tienePermiso(item.permiso)) {
+                return false;
+            }
+            
+            // Filtrar hijos recursivamente
+            if (item.children) {
+                item.children = filterNavItems(item.children);
+                return item.children.length > 0;
+            }
+            
+            return true;
+        });
     };
 
-    const filteredNavigation = navigation.filter(item => shouldShowItem(item));
+    const filteredNavigation = filterNavItems(navigation);
 
-    const renderNavItem = (item: NavItem, level = 0, parentId?: string): React.ReactNode => {
+    const renderNavItem = (item: NavItem, level = 0): React.ReactNode => {
         const hasChildren = item.children && item.children.length > 0;
         const hasNestedChildren = item.children?.some(child => child.children);
         const isExpanded = expandedItems[item.id];
@@ -257,23 +284,9 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     {isExpanded && (
                         <div className={`${isSecondLevel ? 'ml-8 border-l border-gray-700' : isThirdLevel ? 'ml-12 border-l border-gray-600' : ''}`}>
                             <div className="py-2">
-                                {item.children?.map((child: NavItem) => (
+                                {item.children?.map((child) => (
                                     <div key={child.id}>
-                                        {child.children ? (
-                                            renderNavItem(child, level + 1, item.id)
-                                        ) : (
-                                            <Link
-                                                href={child.href || '#'}
-                                                className="flex items-center px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors sidebar-subitem ml-4"
-                                            >
-                                                {child.icon && (
-                                                    <span className="mr-3 text-gray-500">
-                                                        {child.icon}
-                                                    </span>
-                                                )}
-                                                <span>{child.name}</span>
-                                            </Link>
-                                        )}
+                                        {renderNavItem(child, level + 1)}
                                     </div>
                                 ))}
                             </div>
@@ -317,7 +330,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     {isExpanded && (
                         <div className={`${isSecondLevel ? 'ml-8 border-l border-gray-700' : ''}`}>
                             <div className="py-1">
-                                {item.children!.map((child: NavItem) => (
+                                {item.children!.map((child) => (
                                     <Link
                                         key={child.id}
                                         href={child.href || '#'}

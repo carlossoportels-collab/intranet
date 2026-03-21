@@ -1,19 +1,25 @@
 <?php
+// app/Services/Lead/LeadUpdateService.php
 
 namespace App\Services\Lead;
 
 use App\Models\Lead;
 use App\DTOs\LeadUpdateData;
 use App\Models\EstadoLead;
+use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class LeadUpdateService
 {
+    use HasPermisosService; // 🔥 AGREGAR TRAIT
+
     public function __construct(
         private LeadAuditService $auditService,
         private LeadStateTransitionService $stateService
-    ) {}
+    ) {
+        $this->initializePermisoService(); // 🔥 INICIALIZAR
+    }
 
     public function updateLead(LeadUpdateData $data): array
     {
@@ -90,7 +96,7 @@ class LeadUpdateService
             return;
         }
 
-        $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+        $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
         
         if (empty($prefijosPermitidos) || !in_array($lead->prefijo_id, $prefijosPermitidos)) {
             abort(403, 'No tiene permisos para modificar este lead');

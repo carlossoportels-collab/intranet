@@ -158,5 +158,11 @@ class Empresa extends Model
     {
     return $this->hasMany(CambioRazonSocial::class, 'empresa_id');
     }
-
+    /**
+     * Relación con admin_empresas a través de numeroalfa
+     */
+    public function adminEmpresa()
+    {
+        return $this->hasOne(AdminEmpresa::class, 'codigoalf2', 'numeroalfa');
+    }
 }

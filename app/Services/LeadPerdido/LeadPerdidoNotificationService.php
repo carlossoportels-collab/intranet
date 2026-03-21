@@ -1,4 +1,5 @@
 <?php
+// app/Services/LeadPerdido/LeadPerdidoNotificationService.php
 
 namespace App\Services\LeadPerdido;
 
@@ -7,12 +8,19 @@ use App\Models\Comentario;
 use App\Models\TipoComentario;
 use App\Models\SeguimientoPerdida;
 use App\Models\Usuario;
-use App\Helpers\PermissionHelper; 
+use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class LeadPerdidoNotificationService
 {
+    use HasPermisosService; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializePermisoService(); // 🔥 INICIALIZAR
+    }
+
     /**
      * Crear notificación de seguimiento (recordatorio)
      */
@@ -231,58 +239,58 @@ class LeadPerdidoNotificationService
     /**
      * Contar notificaciones de recontacto programadas
      */
-public function contarNotificacionesProgramadas(Usuario $usuario): int
-{
-    $usuarioId = $usuario->id;
-    
-    // Función helper para construir cada query
-    $buildQuery = function(string $entidadTipo, string $tablaJoin, string $leadAlias) use ($usuario, $usuarioId) {
-        $query = DB::table('notificaciones as n')
-            ->join("{$tablaJoin} as tj", function($join) use ($entidadTipo) {
-                $join->on('n.entidad_id', '=', 'tj.id')
-                     ->where('n.entidad_tipo', '=', $entidadTipo);
-            })
-            ->join("leads as {$leadAlias}", "tj.lead_id", '=', "{$leadAlias}.id")
-            ->where('n.tipo', 'lead_posible_recontacto')
-            ->where("{$leadAlias}.es_cliente", 0)
-            ->whereNull('n.deleted_at')
-            ->where('n.leida', 0)
-            ->where('n.fecha_notificacion', '>=', now()->startOfDay())
-            ->whereNull('tj.deleted_at')
-            ->whereNull("{$leadAlias}.deleted_at");
+    public function contarNotificacionesProgramadas(Usuario $usuario): int
+    {
+        $usuarioId = $usuario->id;
+        
+        // Función helper para construir cada query
+        $buildQuery = function(string $entidadTipo, string $tablaJoin, string $leadAlias) use ($usuario, $usuarioId) {
+            $query = DB::table('notificaciones as n')
+                ->join("{$tablaJoin} as tj", function($join) use ($entidadTipo) {
+                    $join->on('n.entidad_id', '=', 'tj.id')
+                         ->where('n.entidad_tipo', '=', $entidadTipo);
+                })
+                ->join("leads as {$leadAlias}", "tj.lead_id", '=', "{$leadAlias}.id")
+                ->where('n.tipo', 'lead_posible_recontacto')
+                ->where("{$leadAlias}.es_cliente", 0)
+                ->whereNull('n.deleted_at')
+                ->where('n.leida', 0)
+                ->where('n.fecha_notificacion', '>=', now()->startOfDay())
+                ->whereNull('tj.deleted_at')
+                ->whereNull("{$leadAlias}.deleted_at");
 
-        // Aplicar filtro de permisos
-        if (!$usuario->ve_todas_cuentas) {
-            $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuarioId);
-            if (empty($prefijosPermitidos)) {
-                return null; // Indicar que no hay resultados
+            // Aplicar filtro de permisos usando el servicio
+            if (!$usuario->ve_todas_cuentas) {
+                $prefijosPermitidos = $this->getPrefijosPermitidos($usuarioId);
+                if (empty($prefijosPermitidos)) {
+                    return null; // Indicar que no hay resultados
+                }
+                $query->whereIn("{$leadAlias}.prefijo_id", $prefijosPermitidos);
             }
-            $query->whereIn("{$leadAlias}.prefijo_id", $prefijosPermitidos);
+
+            return $query;
+        };
+
+        $total = 0;
+
+        // Contar seguimientos_perdida
+        if ($querySeguimiento = $buildQuery('seguimiento_perdida', 'seguimientos_perdida', 'l1')) {
+            $total += $querySeguimiento->count();
         }
 
-        return $query;
-    };
+        // Contar comentarios
+        if ($queryComentario = $buildQuery('comentario', 'comentarios', 'l2')) {
+            // Necesitamos el EXISTS adicional para comentarios
+            $queryComentario->whereExists(function($q) {
+                $q->select(DB::raw(1))
+                  ->from('seguimientos_perdida')
+                  ->whereColumn('seguimientos_perdida.lead_id', 'l2.id')
+                  ->whereNull('seguimientos_perdida.deleted_at');
+            });
+            
+            $total += $queryComentario->count();
+        }
 
-    $total = 0;
-
-    // Contar seguimientos_perdida
-    if ($querySeguimiento = $buildQuery('seguimiento_perdida', 'seguimientos_perdida', 'l1')) {
-        $total += $querySeguimiento->count();
+        return $total;
     }
-
-    // Contar comentarios
-    if ($queryComentario = $buildQuery('comentario', 'comentarios', 'l2')) {
-        // Necesitamos el EXISTS adicional para comentarios
-        $queryComentario->whereExists(function($q) {
-            $q->select(DB::raw(1))
-              ->from('seguimientos_perdida')
-              ->whereColumn('seguimientos_perdida.lead_id', 'l2.id')
-              ->whereNull('seguimientos_perdida.deleted_at');
-        });
-        
-        $total += $queryComentario->count();
-    }
-
-    return $total;
-}
 }

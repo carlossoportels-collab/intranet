@@ -1,304 +1,497 @@
 // resources/js/Pages/Config/Usuarios/RolesPermisos.tsx
+
 import React, { useState } from 'react';
-
+import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { 
+    Shield, 
+    Users, 
+    Key, 
+    ChevronDown, 
+    ChevronRight,
+    CheckCircle,
+    XCircle,
+    RefreshCw,
+    Search,
+    Save,
+    Eye,
+    EyeOff,
+    BarChart,
+    Settings,
+    Briefcase,
+    Calendar,
+    Bell,
+    FileText,
+    Home,
+    User,
+    AlertCircle,
+    Activity,
+    Folder,
+    Tag,
+    Clock
+} from 'lucide-react';
+import { useToast } from '@/contexts/ToastContext';
 
-interface Rol {
+interface Role {
     id: number;
     nombre: string;
-    descripcion: string;
-    usuarios_asignados: number;
-    permisos: number;
-    fecha_creacion: string;
-    estado: string;
+    nivel_permiso: number;
+    descripcion: string | null;
 }
 
 interface Permiso {
     id: number;
-    modulo: string;
     nombre: string;
     descripcion: string;
-    asignado: boolean;
+    modulo: string;
 }
 
-export default function RolesPermisos() {
-    const [roles] = useState<Rol[]>([
-        { id: 1, nombre: 'Administrador', descripcion: 'Acceso total al sistema', usuarios_asignados: 3, permisos: 42, fecha_creacion: '2023-01-15', estado: 'Activo' },
-        { id: 2, nombre: 'Comercial', descripcion: 'Gestión comercial y ventas', usuarios_asignados: 8, permisos: 28, fecha_creacion: '2023-02-20', estado: 'Activo' },
-        { id: 3, nombre: 'Operativo', descripcion: 'Operaciones y seguimiento', usuarios_asignados: 12, permisos: 22, fecha_creacion: '2023-03-10', estado: 'Activo' },
-        { id: 4, nombre: 'RRHH', descripcion: 'Gestión de personal', usuarios_asignados: 2, permisos: 18, fecha_creacion: '2023-04-05', estado: 'Activo' },
-        { id: 5, nombre: 'Consulta', descripcion: 'Solo lectura', usuarios_asignados: 5, permisos: 15, fecha_creacion: '2023-05-15', estado: 'Inactivo' },
-    ]);
+interface Props {
+    roles: Role[];
+    permisos: Record<string, Permiso[]>;
+    asignaciones: Record<number, number[]>;
+    usuariosPorRol: Record<number, number>;
+}
 
-    const [permisos] = useState<Permiso[]>([
-        { id: 1, modulo: 'Dashboard', nombre: 'Ver dashboard', descripcion: 'Acceso al panel principal', asignado: true },
-        { id: 2, modulo: 'Gestión Comercial', nombre: 'Crear contactos', descripcion: 'Agregar nuevos contactos', asignado: true },
-        { id: 3, modulo: 'Gestión Comercial', nombre: 'Editar contactos', descripcion: 'Modificar información de contactos', asignado: true },
-        { id: 4, modulo: 'Configuración', nombre: 'Administrar usuarios', descripcion: 'Gestión completa de usuarios', asignado: false },
-        { id: 5, modulo: 'Configuración', nombre: 'Editar parámetros', descripcion: 'Modificar configuración del sistema', asignado: false },
-        { id: 6, modulo: 'Tarifas', nombre: 'Ver tarifas', descripcion: 'Consulta de precios', asignado: true },
-        { id: 7, modulo: 'Tarifas', nombre: 'Modificar tarifas', descripcion: 'Edición de precios y abonos', asignado: false },
-        { id: 8, modulo: 'RRHH', nombre: 'Ver personal', descripcion: 'Consulta de información de personal', asignado: true },
-        { id: 9, modulo: 'RRHH', nombre: 'Gestionar personal', descripcion: 'Administración completa de RRHH', asignado: false },
-    ]);
+// Mapeo de íconos por módulo
+const moduloIconos: Record<string, any> = {
+    'config': Settings,
+    'condiciones': FileText,
+    'comercial': Briefcase,
+    'estadisticas': BarChart,
+    'rrhh': Users,
+    'notificaciones': Bell,
+    'default': Activity
+};
 
-    const [selectedRol, setSelectedRol] = useState<Rol>(roles[0]);
+// Colores por módulo
+const moduloColores: Record<string, string> = {
+    'config': 'bg-purple-100 text-purple-700 border-purple-200',
+    'condiciones': 'bg-blue-100 text-blue-700 border-blue-200',
+    'comercial': 'bg-green-100 text-green-700 border-green-200',
+    'estadisticas': 'bg-orange-100 text-orange-700 border-orange-200',
+    'rrhh': 'bg-pink-100 text-pink-700 border-pink-200',
+    'notificaciones': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    'default': 'bg-gray-100 text-gray-700 border-gray-200'
+};
 
-    const getRolColor = (nombre: string) => {
-        switch (nombre) {
-            case 'Administrador': return 'bg-red-100 text-red-800';
-            case 'Comercial': return 'bg-blue-100 text-blue-800';
-            case 'Operativo': return 'bg-green-100 text-green-800';
-            case 'RRHH': return 'bg-purple-100 text-purple-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
+export default function RolesPermisos({ roles, permisos, asignaciones, usuariosPorRol }: Props) {
+    const toast = useToast();
+    const [activeTab, setActiveTab] = useState<number>(roles[0]?.id || 0);
+    const [expandedModulos, setExpandedModulos] = useState<Record<string, boolean>>({});
+    const [searchTerm, setSearchTerm] = useState('');
+    const [cargando, setCargando] = useState(false);
+    const [permisosEditando, setPermisosEditando] = useState<Record<number, boolean>>({});
+    const [mostrarSoloAsignados, setMostrarSoloAsignados] = useState(false);
+
+    const rolActivo = roles.find(r => r.id === activeTab);
+
+    const toggleModulo = (modulo: string) => {
+        setExpandedModulos(prev => ({
+            ...prev,
+            [modulo]: !prev[modulo]
+        }));
     };
+
+    const expandirTodos = () => {
+        const todosExpandidos = Object.keys(permisos).reduce((acc, modulo) => {
+            if (modulo !== 'estadisticas') {
+                acc[modulo] = true;
+            }
+            return acc;
+        }, {} as Record<string, boolean>);
+        setExpandedModulos(todosExpandidos);
+    };
+
+    const colapsarTodos = () => {
+        setExpandedModulos({});
+    };
+
+    const togglePermiso = (permisoId: number) => {
+        setPermisosEditando(prev => ({
+            ...prev,
+            [permisoId]: !prev[permisoId]
+        }));
+    };
+
+    const tienePermiso = (permisoId: number): boolean => {
+        return asignaciones[activeTab]?.includes(permisoId) || false;
+    };
+
+    const estaEditado = (permisoId: number): boolean => {
+        return permisosEditando[permisoId] !== undefined && 
+               permisosEditando[permisoId] !== tienePermiso(permisoId);
+    };
+
+    const getResumenRol = (rolId: number) => {
+        // Filtrar estadísticas del total
+        const total = Object.values(permisos)
+            .flat()
+            .filter(p => p.modulo !== 'estadisticas')
+            .length;
+        
+        const asignados = asignaciones[rolId]?.filter(permisoId => {
+            const permiso = Object.values(permisos).flat().find(p => p.id === permisoId);
+            return permiso && permiso.modulo !== 'estadisticas';
+        }).length || 0;
+        
+        const porcentaje = total > 0 ? Math.round((asignados / total) * 100) : 0;
+        return { asignados, total, porcentaje };
+    };
+
+    const filtrarPermisos = (permiso: Permiso): boolean => {
+        // No mostrar permisos de estadísticas
+        if (permiso.modulo === 'estadisticas') return false;
+        
+        // Filtro por búsqueda
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            const matchesSearch = permiso.nombre.toLowerCase().includes(term) ||
+                                 permiso.descripcion?.toLowerCase().includes(term) ||
+                                 permiso.modulo.toLowerCase().includes(term);
+            if (!matchesSearch) return false;
+        }
+        
+        // Filtro "solo asignados"
+        if (mostrarSoloAsignados && !tienePermiso(permiso.id)) {
+            return false;
+        }
+        
+        return true;
+    };
+
+    const handleGuardarPermisos = async () => {
+        setCargando(true);
+        
+        // Obtener los permisos finales: combinación de asignaciones originales + cambios
+        const permisosFinales = [...(asignaciones[activeTab] || [])];
+        
+        // Aplicar cambios
+        Object.entries(permisosEditando).forEach(([permisoIdStr, valor]) => {
+            const permisoId = parseInt(permisoIdStr);
+            if (valor && !permisosFinales.includes(permisoId)) {
+                permisosFinales.push(permisoId);
+            } else if (!valor && permisosFinales.includes(permisoId)) {
+                const index = permisosFinales.indexOf(permisoId);
+                permisosFinales.splice(index, 1);
+            }
+        });
+
+        // Usar Inertia para la petición (maneja CSRF automáticamente)
+        router.put(`/config/usuarios/roles/${activeTab}/permisos`, {
+            permisos: permisosFinales
+        }, {
+            onStart: () => setCargando(true),
+            onFinish: () => setCargando(false),
+            onSuccess: (page) => {
+                toast.success('Permisos actualizados correctamente');
+                setPermisosEditando({});
+                // Recargar solo las asignaciones
+                router.reload({ only: ['asignaciones'] });
+            },
+            onError: (errors) => {
+                console.error('Error:', errors);
+                toast.error('Error al actualizar permisos');
+            }
+        });
+    };
+
+    const hayCambios = Object.keys(permisosEditando).length > 0;
+
+    // Calcular estadísticas filtradas
+    const modulosFiltrados = Object.keys(permisos).filter(m => m !== 'estadisticas');
+    const permisosFiltrados = Object.values(permisos)
+        .flat()
+        .filter(p => p.modulo !== 'estadisticas');
 
     return (
         <AppLayout title="Roles y Permisos">
-            <div className="mb-4">
-                <h1 className="text-3xl font-bold text-gray-900">
-                    Roles y Permisos
-                </h1>
-                <p className="mt-1 text-gray-600 text-base">
-                    Gestión de roles y permisos de acceso al sistema
-                </p>
-            </div>
-
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column - Roles List */}
-                <div className="lg:col-span-1">
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-lg font-semibold text-gray-900">Roles del Sistema</h2>
-                            <button className="px-3 py-1.5 bg-sat text-white text-sm rounded hover:bg-sat-600 transition-colors">
-                                + Nuevo Rol
-                            </button>
+            <Head title="Roles y Permisos" />
+            
+            <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                {/* Header con estadísticas rápidas */}
+                <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                <Shield className="h-6 w-6 text-sat" />
+                                Roles y Permisos
+                            </h1>
+                            <p className="text-gray-600 mt-1">
+                                Gestiona los permisos asignados a cada rol del sistema
+                            </p>
                         </div>
-
-                        <div className="space-y-3">
-                            {roles.map((rol) => (
-                                <button
-                                    key={rol.id}
-                                    onClick={() => setSelectedRol(rol)}
-                                    className={`w-full text-left p-4 rounded-lg border transition-colors ${
-                                        selectedRol.id === rol.id 
-                                            ? 'border-sat bg-sat-50' 
-                                            : 'border-gray-200 hover:border-sat hover:bg-gray-50'
-                                    }`}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex items-center">
-                                            <div className={`h-3 w-3 rounded-full mr-2 ${
-                                                rol.estado === 'Activo' ? 'bg-green-500' : 'bg-gray-400'
-                                            }`}></div>
-                                            <div className="font-medium text-gray-900">{rol.nombre}</div>
-                                        </div>
-                                        <span className={`px-2 py-1 text-xs rounded-full ${getRolColor(rol.nombre)}`}>
-                                            {rol.usuarios_asignados} usuarios
-                                        </span>
-                                    </div>
-                                    <div className="text-sm text-gray-600 mb-3">{rol.descripcion}</div>
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>{rol.permisos} permisos</span>
-                                        <span>Creado: {rol.fecha_creacion}</span>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Stats */}
-                        <div className="mt-6 p-4 bg-gray-50 rounded border">
-                            <h3 className="font-medium text-gray-900 mb-2">Resumen de Roles</h3>
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Roles activos:</span>
-                                    <span className="font-medium">{roles.filter(r => r.estado === 'Activo').length}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Total usuarios asignados:</span>
-                                    <span className="font-medium">{roles.reduce((sum, r) => sum + r.usuarios_asignados, 0)}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Permisos promedio:</span>
-                                    <span className="font-medium">
-                                        {Math.round(roles.reduce((sum, r) => sum + r.permisos, 0) / roles.length)}
-                                    </span>
-                                </div>
+                        
+                        <div className="flex gap-4">
+                            <div className="bg-gray-50 rounded-lg px-4 py-2 border border-gray-200">
+                                <p className="text-xs text-gray-500">Roles activos</p>
+                                <p className="text-2xl font-bold text-gray-900">{roles.length}</p>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right Column - Permissions */}
-                <div className="lg:col-span-2">
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                            <div>
-                                <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                                    Permisos del Rol: {selectedRol.nombre}
-                                </h2>
-                                <p className="text-sm text-gray-600">
-                                    {selectedRol.descripcion}
+                            <div className="bg-gray-50 rounded-lg px-4 py-2 border border-gray-200">
+                                <p className="text-xs text-gray-500">Módulos</p>
+                                <p className="text-2xl font-bold text-gray-900">
+                                    {modulosFiltrados.length}
                                 </p>
                             </div>
-                            <div className="flex gap-2">
-                                <button className="px-3 py-1.5 text-sm border border-sat text-sat rounded hover:bg-sat-50 transition-colors">
-                                    Editar Rol
-                                </button>
-                                <button className="px-3 py-1.5 text-sm bg-sat text-white rounded hover:bg-sat-600 transition-colors">
-                                    Asignar Permisos
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Role Info */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                            <div className="p-4 bg-gray-50 rounded border">
-                                <div className="text-sm font-medium text-gray-700">Usuarios asignados</div>
-                                <div className="text-2xl font-bold text-local">{selectedRol.usuarios_asignados}</div>
-                            </div>
-                            <div className="p-4 bg-gray-50 rounded border">
-                                <div className="text-sm font-medium text-gray-700">Permisos asignados</div>
-                                <div className="text-2xl font-bold text-blue-600">{selectedRol.permisos}</div>
-                            </div>
-                            <div className="p-4 bg-gray-50 rounded border">
-                                <div className="text-sm font-medium text-gray-700">Fecha creación</div>
-                                <div className="text-lg font-bold text-gray-900">{selectedRol.fecha_creacion}</div>
-                            </div>
-                        </div>
-
-                        {/* Permissions by Module */}
-                        <div className="mb-6">
-                            <h3 className="font-medium text-gray-900 mb-4">Permisos por Módulo</h3>
-                            <div className="space-y-4">
-                                {['Dashboard', 'Gestión Comercial', 'Configuración', 'Tarifas', 'RRHH'].map((modulo) => {
-                                    const permisosModulo = permisos.filter(p => p.modulo === modulo);
-                                    const asignados = permisosModulo.filter(p => p.asignado).length;
-                                    const total = permisosModulo.length;
-                                    
-                                    if (total === 0) return null;
-                                    
-                                    return (
-                                        <div key={modulo} className="border border-gray-200 rounded-lg overflow-hidden">
-                                            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                                                <div className="flex justify-between items-center">
-                                                    <div className="font-medium text-gray-900">{modulo}</div>
-                                                    <div className="text-sm text-gray-600">
-                                                        {asignados} de {total} permisos asignados
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="p-4">
-                                                <div className="space-y-3">
-                                                    {permisosModulo.map((permiso) => (
-                                                        <div key={permiso.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded">
-                                                            <div className="flex-1">
-                                                                <div className="font-medium text-gray-900">{permiso.nombre}</div>
-                                                                <div className="text-sm text-gray-600">{permiso.descripcion}</div>
-                                                            </div>
-                                                            <div className="flex items-center">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={permiso.asignado}
-                                                                    onChange={() => {}}
-                                                                    className="h-4 w-4 text-sat focus:ring-sat border-gray-300 rounded"
-                                                                />
-                                                                <span className="ml-2 text-sm">
-                                                                    {permiso.asignado ? 'Asignado' : 'No asignado'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Bulk Actions */}
-                        <div className="border border-gray-200 rounded-lg">
-                            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                                <h3 className="font-medium text-gray-900">Acciones Masivas</h3>
-                            </div>
-                            <div className="p-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <button className="p-3 border border-green-200 text-green-700 bg-green-50 rounded hover:bg-green-100 transition-colors text-left">
-                                        <div className="font-medium mb-1">Seleccionar todos</div>
-                                        <div className="text-sm">Asignar todos los permisos</div>
-                                    </button>
-                                    <button className="p-3 border border-red-200 text-red-700 bg-red-50 rounded hover:bg-red-100 transition-colors text-left">
-                                        <div className="font-medium mb-1">Desmarcar todos</div>
-                                        <div className="text-sm">Quitar todos los permisos</div>
-                                    </button>
-                                    <button className="p-3 border border-blue-200 text-blue-700 bg-blue-50 rounded hover:bg-blue-100 transition-colors text-left">
-                                        <div className="font-medium mb-1">Permisos por defecto</div>
-                                        <div className="text-sm">Restaurar configuración inicial</div>
-                                    </button>
-                                    <button className="p-3 border border-purple-200 text-purple-700 bg-purple-50 rounded hover:bg-purple-100 transition-colors text-left">
-                                        <div className="font-medium mb-1">Copiar de otro rol</div>
-                                        <div className="text-sm">Importar configuración</div>
-                                    </button>
-                                </div>
+                            <div className="bg-gray-50 rounded-lg px-4 py-2 border border-gray-200">
+                                <p className="text-xs text-gray-500">Permisos</p>
+                                <p className="text-2xl font-bold text-gray-900">
+                                    {permisosFiltrados.length}
+                                </p>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Permissions Matrix */}
-            <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Matriz de Permisos</h2>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="py-3 px-4 text-left font-medium text-gray-700">Permiso</th>
-                                {roles.filter(r => r.estado === 'Activo').map((rol) => (
-                                    <th key={rol.id} className="py-3 px-4 text-center font-medium text-gray-700">
-                                        <div className="flex flex-col items-center">
-                                            <span>{rol.nombre}</span>
-                                            <span className="text-xs text-gray-500">({rol.usuarios_asignados} users)</span>
-                                        </div>
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {permisos.slice(0, 6).map((permiso) => (
-                                <tr key={permiso.id} className="hover:bg-gray-50">
-                                    <td className="py-3 px-4">
-                                        <div>
-                                            <div className="font-medium">{permiso.nombre}</div>
-                                            <div className="text-xs text-gray-500">{permiso.modulo}</div>
-                                        </div>
-                                    </td>
-                                    {roles.filter(r => r.estado === 'Activo').map((rol) => (
-                                        <td key={rol.id} className="py-3 px-4 text-center">
-                                            <div className="flex justify-center">
-                                                <div className={`h-6 w-6 rounded flex items-center justify-center ${
-                                                    permiso.asignado && rol.nombre === 'Administrador' 
-                                                        ? 'bg-green-100 text-green-600' 
-                                                        : 'bg-gray-100 text-gray-400'
-                                                }`}>
-                                                    {permiso.asignado && rol.nombre === 'Administrador' ? '✓' : '—'}
-                                                </div>
+                {/* Tabs de roles */}
+                <div className="mb-6 border-b border-gray-200">
+                    <nav className="flex -mb-px space-x-8 overflow-x-auto">
+                        {roles.map(rol => {
+                            const resumen = getResumenRol(rol.id);
+                            const isActive = activeTab === rol.id;
+                            return (
+                                <button
+                                    key={rol.id}
+                                    onClick={() => setActiveTab(rol.id)}
+                                    className={`
+                                        py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap
+                                        ${isActive 
+                                            ? 'border-sat text-sat' 
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        }
+                                    `}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span>{rol.nombre}</span>
+                                        <span className={`
+                                            text-xs px-2 py-0.5 rounded-full
+                                            ${isActive 
+                                                ? 'bg-sat/10 text-sat' 
+                                                : 'bg-gray-100 text-gray-600'
+                                            }
+                                        `}>
+                                            {resumen.asignados}/{resumen.total}
+                                        </span>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </nav>
+                </div>
+
+                {/* Panel de control del rol activo */}
+                {rolActivo && (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        {/* Header del rol */}
+                        <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                        {rolActivo.nombre}
+                                        <span className="text-sm font-normal text-gray-500 ml-2">
+                                            Nivel {rolActivo.nivel_permiso}
+                                        </span>
+                                    </h2>
+                                    {rolActivo.descripcion && (
+                                        <p className="text-sm text-gray-600 mt-1">{rolActivo.descripcion}</p>
+                                    )}
+                                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                        <Users className="h-3 w-3" />
+                                        {usuariosPorRol[rolActivo.id] || 0} usuarios con este rol
+                                    </p>
+                                </div>
+                                
+                                <div className="flex flex-wrap gap-2">
+                                    {/* Buscador */}
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar permisos..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-sat focus:border-sat w-full md:w-64 text-gray-900 placeholder-gray-400"
+                                        />
+                                    </div>
+                                    
+                                    {/* Filtro solo asignados */}
+                                    <button
+                                        onClick={() => setMostrarSoloAsignados(!mostrarSoloAsignados)}
+                                        className={`px-3 py-2 text-sm rounded-lg border flex items-center gap-2 ${
+                                            mostrarSoloAsignados
+                                                ? 'bg-sat text-white border-sat'
+                                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {mostrarSoloAsignados ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                        Solo asignados
+                                    </button>
+                                    
+                                    {/* Botones expandir/colapsar */}
+                                    <button
+                                        onClick={expandirTodos}
+                                        className="px-3 py-2 text-sm bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        Expandir todo
+                                    </button>
+                                    <button
+                                        onClick={colapsarTodos}
+                                        className="px-3 py-2 text-sm bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        Colapsar todo
+                                    </button>
+                                    
+                                    {/* Botón guardar */}
+                                    {hayCambios && (
+                                        <button
+                                            onClick={handleGuardarPermisos}
+                                            disabled={cargando}
+                                            className="px-4 py-2 bg-sat text-white rounded-lg hover:bg-sat-600 font-medium flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            {cargando ? (
+                                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Save className="h-4 w-4" />
+                                            )}
+                                            Guardar cambios
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Lista de permisos por módulo */}
+                        <div className="p-6 max-h-[600px] overflow-y-auto">
+                            <div className="space-y-4">
+                                {Object.entries(permisos)
+                                    .filter(([modulo]) => modulo !== 'estadisticas')
+                                    .map(([modulo, items]) => {
+                                        const itemsFiltrados = items.filter(filtrarPermisos);
+                                        if (itemsFiltrados.length === 0) return null;
+                                        
+                                        const isExpanded = expandedModulos[modulo] || false;
+                                        const Icono = moduloIconos[modulo] || moduloIconos.default;
+                                        const colores = moduloColores[modulo] || moduloColores.default;
+                                        
+                                        // Contar permisos asignados en este módulo
+                                        const asignadosEnModulo = items.filter(p => tienePermiso(p.id)).length;
+                                        
+                                        return (
+                                            <div key={modulo} className="border border-gray-200 rounded-lg overflow-hidden">
+                                                {/* Header del módulo */}
+                                                <button
+                                                    onClick={() => toggleModulo(modulo)}
+                                                    className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-lg ${colores}`}>
+                                                            <Icono className="h-4 w-4" />
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-medium capitalize text-gray-900">
+                                                                {modulo}
+                                                            </span>
+                                                            <span className="text-xs text-gray-500 ml-2">
+                                                                {items.length} permisos
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-xs px-2 py-0.5 rounded-full bg-white border border-gray-300 text-gray-700">
+                                                            {asignadosEnModulo}/{items.length} asignados
+                                                        </span>
+                                                    </div>
+                                                    {isExpanded ? (
+                                                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                                                    ) : (
+                                                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                                                    )}
+                                                </button>
+                                                
+                                                {/* Lista de permisos */}
+                                                {isExpanded && (
+                                                    <div className="p-4 space-y-2 bg-white">
+                                                        {itemsFiltrados.map(permiso => {
+                                                            const asignado = tienePermiso(permiso.id);
+                                                            const editado = estaEditado(permiso.id);
+                                                            const nuevoEstado = permisosEditando[permiso.id] !== undefined 
+                                                                ? permisosEditando[permiso.id] 
+                                                                : asignado;
+                                                            
+                                                            return (
+                                                                <label
+                                                                    key={permiso.id}
+                                                                    className={`
+                                                                        flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors
+                                                                        ${editado ? 'bg-yellow-50 border border-yellow-200' : 'hover:bg-gray-50'}
+                                                                    `}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={nuevoEstado}
+                                                                        onChange={() => togglePermiso(permiso.id)}
+                                                                        className="mt-1 h-4 w-4 text-sat rounded border-gray-300 focus:ring-sat"
+                                                                    />
+                                                                    <div className="flex-1">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <p className="text-sm font-medium text-gray-900">
+                                                                                {permiso.nombre}
+                                                                            </p>
+                                                                            {editado && (
+                                                                                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
+                                                                                    Pendiente
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className="text-xs text-gray-500 mt-1">
+                                                                            {permiso.descripcion}
+                                                                        </p>
+                                                                    </div>
+                                                                    {asignado ? (
+                                                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                                                    ) : (
+                                                                        <XCircle className="h-4 w-4 text-gray-300" />
+                                                                    )}
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="mt-4 text-center">
-                    <button className="text-sat hover:text-sat-600 text-sm">
-                        Ver matriz completa →
-                    </button>
-                </div>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+
+                        {/* Footer con resumen de cambios */}
+                        {hayCambios && (
+                            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-between items-center">
+                                <div className="text-sm text-gray-600 flex items-center gap-1">
+                                    <AlertCircle className="h-4 w-4 text-yellow-500" />
+                                    Tienes cambios sin guardar en {Object.keys(permisosEditando).length} permiso(s)
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setPermisosEditando({})}
+                                        className="px-3 py-2 text-sm bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleGuardarPermisos}
+                                        disabled={cargando}
+                                        className="px-4 py-2 bg-sat text-white rounded-lg hover:bg-sat-600 font-medium flex items-center gap-2"
+                                    >
+                                        {cargando ? (
+                                            <RefreshCw className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Save className="h-4 w-4" />
+                                        )}
+                                        Guardar cambios
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </AppLayout>
     );

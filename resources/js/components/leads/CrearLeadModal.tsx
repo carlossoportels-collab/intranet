@@ -194,10 +194,11 @@ export default function CrearLeadModal({
             return;
         }
         
-        if (formData.prefijo_id) {
-            const comercial = comerciales.find(c => c.prefijo_id.toString() === formData.prefijo_id);
-            setComercialAsignado(comercial || null);
-        }
+    if (formData.prefijo_id) {
+        const comercial = comerciales.find(c => c.prefijo_id.toString() === formData.prefijo_id);
+        console.log('Comercial seleccionado:', comercial); // ← AGREGAR ESTO
+        setComercialAsignado(comercial || null);
+    }
         
         setStep(2);
     };

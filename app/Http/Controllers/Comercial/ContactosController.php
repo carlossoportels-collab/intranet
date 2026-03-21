@@ -1,9 +1,11 @@
 <?php
+// app/Http/Controllers/Comercial/ContactosController.php
 
 namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
 use App\Services\Lead\LeadFilterService;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\EmpresaContacto;
@@ -11,46 +13,21 @@ use Illuminate\Support\Facades\DB;
 
 class ContactosController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
     protected LeadFilterService $filterService;
 
     public function __construct(LeadFilterService $filterService)
     {
         $this->filterService = $filterService;
-    }
-
-    /**
-     * Obtener los prefijos permitidos para un usuario
-     */
-    private function getPrefijosPermitidos($usuarioId)
-    {
-        return DB::table('usuario_prefijos')
-            ->where('usuario_id', $usuarioId)
-            ->where('activo', 1)
-            ->whereNull('deleted_at')
-            ->pluck('prefijo_id')
-            ->toArray();
-    }
-    
-    /**
-     * Aplicar filtro de prefijos a una query
-     */
-    private function aplicarFiltroPrefijos($query, $usuario, $campoPrefijo = 'prefijo_id')
-    {
-        if (!$usuario->ve_todas_cuentas) {
-            $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
-            
-            if (!empty($prefijosPermitidos)) {
-                $query->whereIn($campoPrefijo, $prefijosPermitidos);
-            } else {
-                $query->whereRaw('1 = 0');
-            }
-        }
-        
-        return $query;
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
     }
 
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.VER_CONTACTOS'));
+        
         $usuario = auth()->user();
         
         // Base query para contactos (empresa_contactos con lead asociado)
@@ -58,10 +35,10 @@ class ContactosController extends Controller
             ->where('es_activo', 1)
             ->whereNull('deleted_at');
         
-        // Filtrar por prefijos si el usuario no ve todos
+        // 🔥 APLICAR FILTRO DE PREFIJOS usando el trait
+        // Para contactos, filtramos a través de las empresas
         if (!$usuario->ve_todas_cuentas) {
-            // Obtener prefijos del usuario
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 // Primero obtener empresas con esos prefijos
@@ -110,7 +87,7 @@ class ContactosController extends Controller
         
         // Aplicar los mismos filtros de permisos
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 $empresasIds = DB::table('empresas')
@@ -135,7 +112,7 @@ class ContactosController extends Controller
         $prefijosAsignados = [];
         $cantidadPrefijos = 0;
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosAsignados = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosAsignados = $this->getPrefijosPermitidos();
             $cantidadPrefijos = count($prefijosAsignados);
         }
         
@@ -145,7 +122,7 @@ class ContactosController extends Controller
         // Usar el LeadFilterService para obtener los conteos
         $comentariosPorLead = $this->filterService->getConteoComentarios($leadIds);
         $presupuestosPorLead = $this->filterService->getConteoPresupuestos($leadIds);
-        $contratosPorLead = $this->getConteoContratos($leadIds);  // ← NUEVO
+        $contratosPorLead = $this->getConteoContratos($leadIds);
         
         return Inertia::render('Comercial/Contactos', [
             'contactos' => $contactos,
@@ -166,7 +143,7 @@ class ContactosController extends Controller
             ],
             'comentariosPorLead' => $comentariosPorLead,
             'presupuestosPorLead' => $presupuestosPorLead,
-            'contratosPorLead' => $contratosPorLead, // ← NUEVO
+            'contratosPorLead' => $contratosPorLead,
         ]);
     }
     
@@ -183,9 +160,9 @@ class ContactosController extends Controller
             ->whereNull('deleted_at')
             ->firstOrFail();
         
-        // Verificar permisos para ver este contacto
+        // 🔥 VERIFICAR ACCESO AL CONTACTO
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 // Verificar si la empresa del contacto tiene un prefijo permitido
@@ -215,6 +192,9 @@ class ContactosController extends Controller
      */
     public function create()
     {
+        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
+        $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS')); // Necesitas definir este permiso
+        
         $usuario = auth()->user();
         
         // Obtener empresas disponibles según permisos
@@ -225,7 +205,7 @@ class ContactosController extends Controller
         
         // Filtrar empresas por permisos
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 $empresasQuery->whereIn('prefijo_id', $prefijosUsuario);
@@ -249,6 +229,9 @@ class ContactosController extends Controller
      */
     public function store(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
+        $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
+        
         // Validar los datos del formulario
         $validated = $request->validate([
             'empresa_id' => 'required|exists:empresas,id',
@@ -261,7 +244,7 @@ class ContactosController extends Controller
         // Verificar permisos para crear contacto en esta empresa
         $usuario = auth()->user();
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 $empresaPrefijo = DB::table('empresas')
@@ -302,6 +285,9 @@ class ContactosController extends Controller
      */
     public function edit($id)
     {
+        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
+        $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
+        
         $usuario = auth()->user();
         
         $contacto = EmpresaContacto::with(['lead', 'empresa'])
@@ -312,7 +298,7 @@ class ContactosController extends Controller
         
         // Verificar permisos para editar este contacto
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 $empresaPrefijo = DB::table('empresas')
@@ -336,7 +322,7 @@ class ContactosController extends Controller
         
         // Filtrar empresas por permisos
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 $empresasQuery->whereIn('prefijo_id', $prefijosUsuario);
@@ -361,6 +347,9 @@ class ContactosController extends Controller
      */
     public function update(Request $request, $id)
     {
+        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
+        $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
+        
         $contacto = EmpresaContacto::where('id', $id)
             ->where('es_activo', 1)
             ->whereNull('deleted_at')
@@ -369,7 +358,7 @@ class ContactosController extends Controller
         // Verificar permisos para actualizar este contacto
         $usuario = auth()->user();
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 $empresaPrefijo = DB::table('empresas')
@@ -399,7 +388,7 @@ class ContactosController extends Controller
         
         // Verificar permisos para la nueva empresa si cambió
         if ($contacto->empresa_id != $validated['empresa_id'] && !$usuario->ve_todas_cuentas) {
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 $nuevaEmpresaPrefijo = DB::table('empresas')
@@ -434,6 +423,9 @@ class ContactosController extends Controller
      */
     public function destroy($id)
     {
+        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
+        $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
+        
         $contacto = EmpresaContacto::where('id', $id)
             ->where('es_activo', 1)
             ->whereNull('deleted_at')
@@ -442,7 +434,7 @@ class ContactosController extends Controller
         // Verificar permisos para eliminar este contacto
         $usuario = auth()->user();
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosUsuario = $this->getPrefijosPermitidos($usuario->id);
+            $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
                 $empresaPrefijo = DB::table('empresas')
@@ -469,83 +461,7 @@ class ContactosController extends Controller
     }
 
     /**
-     * Obtener conteo de comentarios (incluyendo legacy)
-     */
-    private function getConteoComentarios(array $leadIds): array
-    {
-        if (empty($leadIds)) {
-            return [];
-        }
-
-        // Comentarios actuales
-        $comentariosActuales = DB::table('comentarios')
-            ->select('lead_id', DB::raw('COUNT(*) as total'))
-            ->whereIn('lead_id', $leadIds)
-            ->whereNull('deleted_at')
-            ->groupBy('lead_id')
-            ->pluck('total', 'lead_id')
-            ->toArray();
-
-        // Comentarios legacy
-        $comentariosLegacy = DB::table('comentarios_legacy')
-            ->select('lead_id', DB::raw('COUNT(*) as total'))
-            ->whereIn('lead_id', $leadIds)
-            ->groupBy('lead_id')
-            ->pluck('total', 'lead_id')
-            ->toArray();
-
-        // Combinar
-        $resultado = [];
-        foreach ($leadIds as $leadId) {
-            $total = ($comentariosActuales[$leadId] ?? 0) + ($comentariosLegacy[$leadId] ?? 0);
-            if ($total > 0) {
-                $resultado[$leadId] = $total;
-            }
-        }
-
-        return $resultado;
-    }
-
-    /**
-     * Obtener conteo de presupuestos (incluyendo legacy)
-     */
-    private function getConteoPresupuestos(array $leadIds): array
-    {
-        if (empty($leadIds)) {
-            return [];
-        }
-
-        // Presupuestos actuales
-        $presupuestosActuales = DB::table('presupuestos')
-            ->select('lead_id', DB::raw('COUNT(*) as total'))
-            ->whereIn('lead_id', $leadIds)
-            ->whereNull('deleted_at')
-            ->groupBy('lead_id')
-            ->pluck('total', 'lead_id')
-            ->toArray();
-
-        // Presupuestos legacy
-        $presupuestosLegacy = DB::table('presupuestos_legacy')
-            ->select('lead_id', DB::raw('COUNT(*) as total'))
-            ->whereIn('lead_id', $leadIds)
-            ->groupBy('lead_id')
-            ->pluck('total', 'lead_id')
-            ->toArray();
-
-        // Combinar
-        $resultado = [];
-        foreach ($leadIds as $leadId) {
-            $total = ($presupuestosActuales[$leadId] ?? 0) + ($presupuestosLegacy[$leadId] ?? 0);
-            if ($total > 0) {
-                $resultado[$leadId] = $total;
-            }
-        }
-
-        return $resultado;
-    }
-
-    /**
-     * Obtener conteo de contratos (nuevos + legacy) ← NUEVO
+     * Obtener conteo de contratos (nuevos + legacy)
      */
     private function getConteoContratos(array $leadIds): array
     {

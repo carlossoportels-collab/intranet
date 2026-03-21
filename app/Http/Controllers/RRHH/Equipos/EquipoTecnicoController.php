@@ -1,9 +1,10 @@
 <?php
-// app/Http/Controllers/RRHH/Equipos/EquipoTecnicoController.php
+// app/Http/Controllers/rrhh/Equipos/EquipoTecnicoController.php
 
 namespace App\Http\Controllers\rrhh\Equipos;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 USAR TRAIT
 use Illuminate\Http\Request;
 use App\Models\Tecnico;
 use App\Models\Personal;
@@ -12,8 +13,25 @@ use Inertia\Inertia;
 
 class EquipoTecnicoController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        if (!auth()->check()) {
+            return redirect()->route('login');
+        }
+
+        $usuarioId = auth()->id();
+        
+        // Verificar si tiene permiso para ver equipo técnico
+        $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+
         try {
             // Obtener técnicos con sus datos de personal
             $tecnicos = Tecnico::with(['personal' => function ($query) {
@@ -119,5 +137,4 @@ class EquipoTecnicoController extends Controller
 
         return 'Sin Provincia';
     }
-    
 }

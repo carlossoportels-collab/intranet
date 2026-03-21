@@ -1,15 +1,22 @@
 <?php
-// app/Http/Middleware/HandleInertiaRequests.php
 
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Illuminate\Support\Facades\DB;
+use App\Services\PermisoService;
 
 class HandleInertiaRequests extends Middleware
 {
     protected $rootView = 'app';
+
+    protected $permisoService;
+
+    public function __construct(PermisoService $permisoService)
+    {
+        $this->permisoService = $permisoService;
+    }
 
     public function version(Request $request): ?string
     {
@@ -18,30 +25,31 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        $shared = [];
+        $shared = parent::share($request);
+        
+        // Compartir errores con el frontend
+        $shared['error'] = $request->session()->get('error');
         
         $user = $request->user();
         
         if ($user) {
-            // Obtener datos del personal
+            // ... (todo tu código existente para usuarios autenticados) ...
+            
             $personal = DB::table('personal')
                 ->where('id', $user->personal_id)
                 ->first();
             
-            // Obtener datos del comercial (si existe en la tabla comercial)
             $comercial = DB::table('comercial')
                 ->where('personal_id', $user->personal_id)
                 ->first();
                 
-            // Obtener rol
             $rol = DB::table('roles')->where('id', $user->rol_id)->first();
             
-            // Obtener datos de la compañía
             $companiaData = $this->getCompaniaData($comercial);
             
-            // Construir datos del usuario
+            $permisos = $this->permisoService->getPermisosUsuario($user->id);
+            
             $userData = [
-                // Datos básicos del usuario
                 'id' => (int) $user->id,
                 'nombre_usuario' => (string) $user->nombre_usuario,
                 'rol_id' => (int) $user->rol_id,
@@ -49,7 +57,6 @@ class HandleInertiaRequests extends Middleware
                 've_todas_cuentas' => (bool) $user->ve_todas_cuentas,
                 'ultimo_acceso' => $user->ultimo_acceso ? $user->ultimo_acceso->toDateTimeString() : null,
                 
-                // Datos del personal
                 'personal_id' => (int) $user->personal_id,
                 'nombre_completo' => $personal ? trim($personal->nombre . ' ' . $personal->apellido) : $user->nombre_usuario,
                 'nombre' => $personal ? (string) $personal->nombre : $user->nombre_usuario,
@@ -57,59 +64,47 @@ class HandleInertiaRequests extends Middleware
                 'email' => $personal ? (string) $personal->email : null,
                 'telefono' => $personal ? (string) $personal->telefono : null,
                 
-                // Datos comerciales
                 'comercial' => $comercial ? [
                     'es_comercial' => true,
                     'prefijo_id' => $comercial && $comercial->prefijo_id ? (int) $comercial->prefijo_id : null,
                 ] : null,
                 
-                // Datos de la compañía
                 'compania_data' => $companiaData,
-                
-                // Iniciales para avatar
+                'permisos' => $permisos,
                 'iniciales' => $this->getIniciales($personal, $user),
             ];
             
-            $shared['auth'] = [
-                'user' => $userData
-            ];
-            
-            // Compartir datos de la compañía globalmente
+            $shared['auth'] = ['user' => $userData];
             $shared['compania'] = $companiaData;
             
-            // Compartir datos para el modal de crear leads (para todos los usuarios)
-            // Obtener datos para el modal de crear leads
             $shared['origenes'] = DB::table('origenes_contacto')
                 ->where('activo', 1)
                 ->select('id', 'nombre', 'color', 'icono')
                 ->get();
                 
-            // La tabla rubros NO tiene columna activo, traer todos
             $shared['rubros'] = DB::table('rubros')
                 ->select('id', 'nombre')
                 ->get();
             
-            // Provincias para el autocomplete de localidades
             $shared['provincias'] = DB::table('provincias')
                 ->where('activo', 1)
                 ->select('id', 'nombre')
                 ->orderBy('nombre')
                 ->get();
             
-            // Obtener lista de TODOS los comerciales activos (sin filtrar por compañía)
             $comercialesDisponibles = DB::table('comercial')
                 ->join('personal', 'comercial.personal_id', '=', 'personal.id')
                 ->join('usuarios', 'personal.id', '=', 'usuarios.personal_id')
                 ->where('comercial.activo', 1)
-                ->where('usuarios.rol_id', 5) // Solo comerciales (rol_id = 5)
+                ->where('usuarios.rol_id', 5)
                 ->where('usuarios.activo', 1)
                 ->where('personal.activo', 1)
                 ->select(
                     'comercial.id as comercial_id',
                     'comercial.prefijo_id',
                     'personal.id as personal_id',
+                    'personal.telefono',
                     DB::raw("CONCAT(personal.nombre, ' ', personal.apellido) as nombre_completo")
-                    // Quitamos el email como solicitaste
                 )
                 ->orderBy('personal.nombre')
                 ->get()
@@ -119,13 +114,11 @@ class HandleInertiaRequests extends Middleware
                         'prefijo_id' => $item->prefijo_id,
                         'personal_id' => $item->personal_id,
                         'nombre' => $item->nombre_completo,
-                        // Sin email
+                        'telefono' => $item->telefono,
                     ];
                 });
             
             $shared['comerciales'] = $comercialesDisponibles;
-            
-            // Indicador si hay comerciales disponibles
             $shared['hay_comerciales'] = count($comercialesDisponibles) > 0;
             
         } else {
@@ -146,7 +139,6 @@ class HandleInertiaRequests extends Middleware
                 $shared['errors'] = $request->session()->get('errors')?->getBag('default')?->getMessages();
             }
             
-            // Limpiar después de usar
             $request->session()->forget(['login_compania', 'login_nombre']);
         }
         
@@ -161,18 +153,15 @@ class HandleInertiaRequests extends Middleware
         return $shared;
     }
 
-    /**
-     * Obtener datos de la compañía
-     */
+    // ... (todos los métodos privados que ya tenías: getCompaniaData, getDefaultCompaniaData, getIniciales) ...
     private function getCompaniaData($comercial)
     {
         if (!$comercial || !$comercial->compania_id) {
             return $this->getDefaultCompaniaData();
         }
         
-        // Definir información por compañía (misma que en LoginController)
         $companias = [
-            1 => [ // LocalSat
+            1 => [
                 'nombre' => 'LocalSat',
                 'logo' => 'logo.webp',
                 'short_name' => 'LS',
@@ -181,7 +170,7 @@ class HandleInertiaRequests extends Middleware
                     'secondary' => '#3b3b3d',
                 ]
             ],
-            2 => [ // SmartSat
+            2 => [
                 'nombre' => 'SmartSat',
                 'logo' => 'logosmart.png',
                 'short_name' => 'SS',
@@ -190,7 +179,7 @@ class HandleInertiaRequests extends Middleware
                     'secondary' => '#3b3b3d',
                 ]
             ],
-            3 => [ // 360
+            3 => [
                 'nombre' => '360',
                 'logo' => '360-logo.webp',
                 'short_name' => '360',
@@ -204,9 +193,6 @@ class HandleInertiaRequests extends Middleware
         return $companias[$comercial->compania_id] ?? $this->getDefaultCompaniaData();
     }
     
-    /**
-     * Datos por defecto de compañía
-     */
     private function getDefaultCompaniaData()
     {
         return [
@@ -220,9 +206,6 @@ class HandleInertiaRequests extends Middleware
         ];
     }
     
-    /**
-     * Obtener iniciales para el avatar
-     */
     private function getIniciales($personal, $user)
     {
         if ($personal) {
@@ -236,7 +219,6 @@ class HandleInertiaRequests extends Middleware
             }
         }
         
-        // Fallback al nombre de usuario
         return strtoupper(substr($user->nombre_usuario, 0, 2));
     }
 }

@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    'delta' => [
+        'user' => env('DELTA_API_USER', 'certificados'),
+        'pass' => env('DELTA_API_PASS'),
+        'url' => env('DELTA_API_URL', 'https://seguimiento2.localsat.com.ar/api/v2/api.jss'),
+    ],
+    
+    'geoapify' => [
+        'key' => env('GEOAPIFY_API_KEY'),
+    ],
+    
+    'alpha' => [
+        'wsdl' => env('ALPHA_WSDL', 'http://190.64.141.171:8009/wcAdmin/services/ServiceDataBykom?wsdl'),
+        'pass' => env('ALPHA_PASS', '1234'),
+    ],
+
 ];

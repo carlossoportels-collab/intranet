@@ -4,6 +4,7 @@
 namespace App\Http\Controllers\rrhh\Personal;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Personal;
@@ -12,10 +13,19 @@ use Illuminate\Support\Facades\Auth;
 
 class DatosPersonalesController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     public function index(Request $request)
     {
         $user = Auth::user();
-        $esComercial = $user->rol_id == 5; // Rol 5 es Comercial
+        
+        // 🔥 VERIFICAR PERMISO BASE
+        $this->authorizePermiso(config('permisos.VER_DATOS_PERSONALES'));
         
         // Obtener personal con tipo_personal
         $query = Personal::with('tipoPersonal')
@@ -23,8 +33,8 @@ class DatosPersonalesController extends Controller
             ->orderBy('apellido')
             ->orderBy('nombre');
         
-        // Si es comercial, solo ver su propio registro
-        if ($esComercial) {
+        // Si NO tiene permiso para ver todos, ver solo su propio registro
+        if (!$this->permisoService->usuarioTienePermiso($user->id, config('permisos.GESTIONAR_DATOS_PERSONALES'))) {
             $query->where('id', $user->personal_id);
         }
         
@@ -47,9 +57,9 @@ class DatosPersonalesController extends Controller
             ->orderBy('nombre')
             ->get(['id', 'nombre']);
         
-        // Calcular estadísticas (solo si no es comercial o si es admin)
+        // Calcular estadísticas (solo si tiene permiso de gestión)
         $estadisticas = null;
-        if (!$esComercial) {
+        if ($this->permisoService->usuarioTienePermiso($user->id, config('permisos.GESTIONAR_DATOS_PERSONALES'))) {
             $total = $personal->count();
             $activos = $personal->where('activo', 1)->count();
             
@@ -72,16 +82,14 @@ class DatosPersonalesController extends Controller
             'estadisticas' => $estadisticas,
             'filters' => $request->only(['search']),
             'userRole' => $user->rol_id,
-            'esComercial' => $esComercial,
+            'puedeGestionar' => $this->permisoService->usuarioTienePermiso($user->id, config('permisos.GESTIONAR_DATOS_PERSONALES')),
         ]);
     }
     
     public function store(Request $request)
     {
-        // Solo usuarios no comerciales pueden crear
-        if (Auth::user()->rol_id == 5) {
-            return response()->json(['error' => 'No tiene permisos para realizar esta acción'], 403);
-        }
+        // 🔥 VERIFICAR PERMISO DE GESTIÓN
+        $this->authorizePermiso(config('permisos.GESTIONAR_DATOS_PERSONALES'));
         
         $validated = $request->validate([
             'nombre' => 'required|string|max:100',
@@ -103,12 +111,13 @@ class DatosPersonalesController extends Controller
     public function update(Request $request, $id)
     {
         $user = Auth::user();
-        $esComercial = $user->rol_id == 5;
         $personal = Personal::findOrFail($id);
         
-        // Si es comercial, solo puede editar su propio registro
-        if ($esComercial && $personal->id != $user->personal_id) {
-            return response()->json(['error' => 'No tiene permisos para editar este registro'], 403);
+        // 🔥 VERIFICAR: Si no tiene permiso de gestión, solo puede editar su propio registro
+        $puedeGestionar = $this->permisoService->usuarioTienePermiso($user->id, config('permisos.GESTIONAR_DATOS_PERSONALES'));
+        
+        if (!$puedeGestionar && $personal->id != $user->personal_id) {
+            abort(403, 'No tiene permisos para editar este registro');
         }
         
         $validated = $request->validate([
@@ -130,10 +139,8 @@ class DatosPersonalesController extends Controller
     
     public function destroy($id)
     {
-        // Solo usuarios no comerciales pueden eliminar
-        if (Auth::user()->rol_id == 5) {
-            return response()->json(['error' => 'No tiene permisos para realizar esta acción'], 403);
-        }
+        // 🔥 VERIFICAR PERMISO DE GESTIÓN
+        $this->authorizePermiso(config('permisos.GESTIONAR_DATOS_PERSONALES'));
         
         $personal = Personal::findOrFail($id);
         
@@ -147,7 +154,7 @@ class DatosPersonalesController extends Controller
         return redirect()->back()->with('success', 'Personal eliminado correctamente');
     }
 
-       public function buscar(Request $request)
+    public function buscar(Request $request)
     {
         $query = $request->get('q');
         
@@ -155,7 +162,7 @@ class DatosPersonalesController extends Controller
             return response()->json([]);
         }
         
-        $personal = Personal::where('activo', 1) // Solo activos
+        $personal = Personal::where('activo', 1)
             ->where(function($q) use ($query) {
                 $q->where('nombre', 'LIKE', "%{$query}%")
                   ->orWhere('apellido', 'LIKE', "%{$query}%")

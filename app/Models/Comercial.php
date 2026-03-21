@@ -45,6 +45,11 @@ class Comercial extends Model
         return $this->hasMany(Lead::class, 'prefijo_id', 'prefijo_id');
     }
     
+    public function prefijo(): BelongsTo
+    {
+        return $this->belongsTo(Prefijo::class, 'prefijo_id');
+    }
+
     public function creadoPor()
     {
         return $this->belongsTo(Usuario::class, 'created_by');

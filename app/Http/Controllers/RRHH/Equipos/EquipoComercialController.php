@@ -4,6 +4,7 @@
 namespace App\Http\Controllers\rrhh\Equipos;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 USAR TRAIT EN LUGAR DE PERMISOSERVICE
 use App\Models\Comercial;
 use App\Models\Personal;
 use Illuminate\Http\Request;
@@ -12,8 +13,25 @@ use Carbon\Carbon;
 
 class EquipoComercialController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO usando el trait
+        if (!auth()->check()) {
+            return redirect()->route('login');
+        }
+
+        $usuarioId = auth()->id();
+        
+        // Verificar si tiene permiso para ver equipo comercial
+        $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_COMERCIAL'));
+
         // Obtener todos los comerciales con su información personal
         $comerciales = Comercial::with('personal')
             ->orderBy('created', 'desc')
@@ -23,7 +41,7 @@ class EquipoComercialController extends Controller
                 $edad = null;
                 if ($c->personal && $c->personal->fecha_nacimiento) {
                     $fechaNacimiento = Carbon::parse($c->personal->fecha_nacimiento);
-                    $edad = $fechaNacimiento->age; // Carbon tiene un método age que calcula la edad correctamente
+                    $edad = $fechaNacimiento->age;
                 }
 
                 // Obtener último acceso del usuario si existe

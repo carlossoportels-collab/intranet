@@ -4,14 +4,25 @@
 namespace App\Http\Controllers\rrhh\Personal;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Personal;
 
 class CumpleanosController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.VER_CUMPLEANOS'));
+        
         // Obtener personal con fecha de nacimiento válida y su tipo
         $personal = Personal::with('tipoPersonal')
             ->whereNotNull('fecha_nacimiento')

@@ -4,6 +4,7 @@
 namespace App\Http\Controllers\rrhh\Personal;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use App\Models\PersonalLicencia;
 use App\Models\MotivoLicencia;
 use Illuminate\Http\Request;
@@ -12,19 +13,34 @@ use Illuminate\Support\Facades\Auth;
 
 class LicenciasController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.VER_LICENCIAS'));
+        
         $user = Auth::user();
-        $esComercial = $user->rol_id == 5;
+        $puedeGestionar = $this->permisoService->usuarioTienePermiso($user->id, config('permisos.GESTIONAR_LICENCIAS'));
         
         $query = PersonalLicencia::with(['personal', 'motivo', 'creadoPor'])
             ->orderBy('desde', 'desc');
+        
+        // Si no puede gestionar, ver solo sus propias licencias
+        if (!$puedeGestionar) {
+            $query->where('personal_id', $user->personal_id);
+        }
         
         if ($request->filled('motivo_id')) {
             $query->where('motivo_licencia_id', $request->motivo_id);
         }
         
-        if ($request->filled('empleado')) {
+        if ($request->filled('empleado') && $puedeGestionar) {
             $query->whereHas('personal', function($q) use ($request) {
                 $q->whereRaw("CONCAT(nombre, ' ', apellido) LIKE ?", ["%{$request->empleado}%"]);
             });
@@ -63,15 +79,14 @@ class LicenciasController extends Controller
             'motivos' => $motivos,
             'filters' => $request->only(['estado', 'motivo_id', 'empleado']),
             'userRole' => $user->rol_id,
-            'esComercial' => $esComercial
+            'puedeGestionar' => $puedeGestionar,
         ]);
     }
     
     public function store(Request $request)
     {
-        if (Auth::user()->rol_id == 5) {
-            return back()->withErrors(['error' => 'No tiene permisos para crear licencias']);
-        }
+        // 🔥 VERIFICAR PERMISO DE GESTIÓN
+        $this->authorizePermiso(config('permisos.GESTIONAR_LICENCIAS'));
         
         $validated = $request->validate([
             'personal_id' => 'required|exists:personal,id',
@@ -92,9 +107,8 @@ class LicenciasController extends Controller
     
     public function update(Request $request, $id)
     {
-        if (Auth::user()->rol_id == 5) {
-            return back()->withErrors(['error' => 'No tiene permisos para editar licencias']);
-        }
+        // 🔥 VERIFICAR PERMISO DE GESTIÓN
+        $this->authorizePermiso(config('permisos.GESTIONAR_LICENCIAS'));
         
         $licencia = PersonalLicencia::findOrFail($id);
         
@@ -115,9 +129,8 @@ class LicenciasController extends Controller
     
     public function destroy($id)
     {
-        if (Auth::user()->rol_id == 5) {
-            return back()->withErrors(['error' => 'No tiene permisos para eliminar licencias']);
-        }
+        // 🔥 VERIFICAR PERMISO DE GESTIÓN
+        $this->authorizePermiso(config('permisos.GESTIONAR_LICENCIAS'));
         
         $licencia = PersonalLicencia::findOrFail($id);
         $licencia->deleted_by = Auth::id();

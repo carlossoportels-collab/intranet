@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Comercial/LeadController.php
 
 namespace App\Http\Controllers\Comercial;
 
@@ -12,6 +13,7 @@ use App\DTOs\LeadData;
 use App\Models\Lead;
 use App\Models\Empresa;
 use App\Models\EmpresaContacto;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -19,18 +21,26 @@ use Inertia\Response;
 
 class LeadController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
     public function __construct(
         private LeadCreationService $leadService,
         private LeadDetailsService $detailsService,
         private LeadFormService $formService,
         private LeadFilterService $filterService 
-    ) {}
+    ) {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
 
     /**
      * Mostrar un lead individual
      */
     public function show($id): Response
     {
+        // Verificar acceso al lead
+        $lead = Lead::findOrFail($id);
+        $this->authorizeLeadAccess($lead, config('permisos.VER_PROSPECTOS'));
+        
         $dashboardData = $this->detailsService->getLeadDashboardData($id, auth()->id());
         
         if (empty($dashboardData)) {
@@ -57,6 +67,9 @@ class LeadController extends Controller
      */
     public function store(StoreLeadRequest $request)
     {
+        // 🔥 VERIFICAR PERMISO PARA GESTIONAR LEADS
+        $this->authorizePermiso(config('permisos.GESTIONAR_LEADS'));
+        
         try {
             $leadData = LeadData::fromRequest(
                 $request->validated(),
@@ -87,6 +100,7 @@ class LeadController extends Controller
                 ->withInput();
         }
     }
+    
     /**
      * Verificar qué datos faltan para generar un contrato
      */
@@ -99,6 +113,9 @@ class LeadController extends Controller
                 'origen',
                 'estadoLead'
             ])->findOrFail($id);
+            
+            // 🔥 VERIFICAR ACCESO AL LEAD
+            $this->authorizeLeadAccess($lead, config('permisos.VER_PROSPECTOS'));
 
             // Buscar el contacto a través de empresa_contactos
             $contacto = EmpresaContacto::with([
@@ -230,6 +247,4 @@ class LeadController extends Controller
             ], 500);
         }
     }
-
-
 }

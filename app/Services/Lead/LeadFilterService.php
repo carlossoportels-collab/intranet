@@ -1,4 +1,5 @@
 <?php
+// app/Services/Lead/LeadFilterService.php
 
 namespace App\Services\Lead;
 
@@ -6,16 +7,19 @@ use App\Models\Lead;
 use App\Models\EstadoLead;
 use App\Models\Prefijo;
 use App\Models\Comercial;
-use App\Helpers\PermissionHelper;
+use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
 class LeadFilterService
 {
+    use HasPermisosService; // 🔥 AGREGAR TRAIT
+
     private array $estadosExcluirIds;
     
     public function __construct()
     {
+        $this->initializePermisoService(); // 🔥 INICIALIZAR
         $this->estadosExcluirIds = $this->getEstadosExcluirIds();
     }
     
@@ -73,76 +77,76 @@ class LeadFilterService
     
     public function aplicarPermisos(\Illuminate\Database\Eloquent\Builder $query, $usuario): void
     {
-        PermissionHelper::aplicarFiltroPrefijos($query, $usuario);
+        $this->applyPrefijoFilter($query, $usuario);
     }
     
-public function getComercialesActivos($usuario): Collection
-{
-    \Log::info('=== DEBUG getComercialesActivos ===');
-    \Log::info('Usuario ID: ' . $usuario->id);
-    
-    $query = Comercial::with('personal')
-        ->where('activo', 1);
-    
-    // Aplicar filtro de permisos
-    if (!$usuario->ve_todas_cuentas) {
-        $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
-        \Log::info('Prefijos permitidos:', $prefijosPermitidos);
+    public function getComercialesActivos($usuario): Collection
+    {
+        \Log::info('=== DEBUG getComercialesActivos ===');
+        \Log::info('Usuario ID: ' . $usuario->id);
         
-        if (!empty($prefijosPermitidos)) {
-            $query->whereIn('prefijo_id', $prefijosPermitidos);
-        } else {
-            return collect([]);
+        $query = Comercial::with('personal')
+            ->where('activo', 1);
+        
+        // Aplicar filtro de permisos usando el trait
+        if (!$usuario->ve_todas_cuentas) {
+            $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
+            \Log::info('Prefijos permitidos:', $prefijosPermitidos);
+            
+            if (!empty($prefijosPermitidos)) {
+                $query->whereIn('prefijo_id', $prefijosPermitidos);
+            } else {
+                return collect([]);
+            }
         }
-    }
-    
-    $resultados = $query->get();
-    \Log::info('Cantidad de comerciales encontrados: ' . $resultados->count());
-    
-    // Log del primer comercial para ver qué datos tiene
-    if ($resultados->isNotEmpty()) {
-        $primerComercial = $resultados->first();
-        \Log::info('Primer comercial - ID: ' . $primerComercial->id);
-        \Log::info('Primer comercial - prefijo_id: ' . $primerComercial->prefijo_id);
-        \Log::info('Primer comercial - personal_id: ' . $primerComercial->personal_id);
         
-        // Verificar si la relación personal está cargada
-        \Log::info('¿Personal cargado? ' . ($primerComercial->relationLoaded('personal') ? 'SÍ' : 'NO'));
+        $resultados = $query->get();
+        \Log::info('Cantidad de comerciales encontrados: ' . $resultados->count());
         
-        if ($primerComercial->personal) {
-            \Log::info('Personal ID: ' . $primerComercial->personal->id);
-            \Log::info('Personal nombre: ' . $primerComercial->personal->nombre);
-            \Log::info('Personal teléfono: ' . $primerComercial->personal->telefono);
-        } else {
-            \Log::info('Personal es NULL');
+        // Log del primer comercial para ver qué datos tiene
+        if ($resultados->isNotEmpty()) {
+            $primerComercial = $resultados->first();
+            \Log::info('Primer comercial - ID: ' . $primerComercial->id);
+            \Log::info('Primer comercial - prefijo_id: ' . $primerComercial->prefijo_id);
+            \Log::info('Primer comercial - personal_id: ' . $primerComercial->personal_id);
+            
+            // Verificar si la relación personal está cargada
+            \Log::info('¿Personal cargado? ' . ($primerComercial->relationLoaded('personal') ? 'SÍ' : 'NO'));
+            
+            if ($primerComercial->personal) {
+                \Log::info('Personal ID: ' . $primerComercial->personal->id);
+                \Log::info('Personal nombre: ' . $primerComercial->personal->nombre);
+                \Log::info('Personal teléfono: ' . $primerComercial->personal->telefono);
+            } else {
+                \Log::info('Personal es NULL');
+            }
         }
-    }
-    
-    $mapeados = $resultados->map(function ($comercial) {
-        $datos = [
-            'id' => $comercial->id,
-            'prefijo_id' => $comercial->prefijo_id,
-            'personal_id' => $comercial->personal_id,
-            'nombre' => $comercial->personal->nombre_completo ?? 'Sin nombre',
-            'email' => $comercial->personal->email ?? '',
-            'telefono' => $comercial->personal->telefono ?? '',
-            'personal' => $comercial->personal ? [
-                'id' => $comercial->personal->id,
-                'nombre' => $comercial->personal->nombre,
-                'apellido' => $comercial->personal->apellido,
-                'email' => $comercial->personal->email,
-                'telefono' => $comercial->personal->telefono,
-            ] : null,
-        ];
         
-        \Log::info('Comercial mapeado:', $datos);
-        return $datos;
-    });
-    
-    \Log::info('=== FIN DEBUG getComercialesActivos ===');
-    
-    return $mapeados;
-}
+        $mapeados = $resultados->map(function ($comercial) {
+            $datos = [
+                'id' => $comercial->id,
+                'prefijo_id' => $comercial->prefijo_id,
+                'personal_id' => $comercial->personal_id,
+                'nombre' => $comercial->personal->nombre_completo ?? 'Sin nombre',
+                'email' => $comercial->personal->email ?? '',
+                'telefono' => $comercial->personal->telefono ?? '',
+                'personal' => $comercial->personal ? [
+                    'id' => $comercial->personal->id,
+                    'nombre' => $comercial->personal->nombre,
+                    'apellido' => $comercial->personal->apellido,
+                    'email' => $comercial->personal->email,
+                    'telefono' => $comercial->personal->telefono,
+                ] : null,
+            ];
+            
+            \Log::info('Comercial mapeado:', $datos);
+            return $datos;
+        });
+        
+        \Log::info('=== FIN DEBUG getComercialesActivos ===');
+        
+        return $mapeados;
+    }
         
     public function getConteoComentarios(array $leadIds): array
     {
@@ -258,7 +262,7 @@ public function getComercialesActivos($usuario): Collection
         
         // Si el usuario NO ve todas las cuentas, filtrar por sus prefijos asignados
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+            $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
             if (!empty($prefijosPermitidos)) {
                 $query->whereIn('prefijos.id', $prefijosPermitidos);
             } else {
@@ -318,5 +322,4 @@ public function getComercialesActivos($usuario): Collection
         
         return null;
     }
-
 }

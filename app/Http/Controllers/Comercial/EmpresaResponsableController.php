@@ -5,13 +5,24 @@ namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmpresaResponsable;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class EmpresaResponsableController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     public function store(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO (asumiendo que existe)
+        $this->authorizePermiso(config('permisos.GESTIONAR_EMPRESAS', 'gestionar_empresas'));
+        
         try {
             $validated = $request->validate([
                 'empresa_id' => 'required|integer|exists:empresas,id',
@@ -35,7 +46,6 @@ class EmpresaResponsableController extends Controller
 
             $responsable->load('tipoResponsabilidad');
 
-            // 👈 CAMBIO IMPORTANTE: Devolver los datos en una estructura específica
             return redirect()->back()->with([
                 'success' => 'Responsable guardado correctamente',
                 'data' => [
@@ -51,6 +61,9 @@ class EmpresaResponsableController extends Controller
 
     public function destroy($id)
     {
+        // 🔥 VERIFICAR PERMISO (asumiendo que existe)
+        $this->authorizePermiso(config('permisos.GESTIONAR_EMPRESAS', 'gestionar_empresas'));
+        
         try {
             $responsable = EmpresaResponsable::findOrFail($id);
             $responsable->es_activo = false;

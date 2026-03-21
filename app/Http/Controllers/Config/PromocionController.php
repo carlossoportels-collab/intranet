@@ -4,6 +4,7 @@
 namespace App\Http\Controllers\Config;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use App\Models\Promocion;
 use App\Services\Promocion\PromocionService;
 use App\Services\Promocion\PromocionProductoService;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\Auth;
 
 class PromocionController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
     protected $promocionService;
     protected $productoService;
 
@@ -20,10 +23,14 @@ class PromocionController extends Controller
     {
         $this->promocionService = $promocionService;
         $this->productoService = $productoService;
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
     }
 
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_PROMOCIONES'));
+        
         $usuario = auth()->user();
         
         $promociones = Promocion::withAllRelations()
@@ -80,8 +87,6 @@ class PromocionController extends Controller
         ]);
     }
 
-    // El método create ya no es necesario porque usamos modal
-    // Pero lo mantenemos por si acaso, redirigiendo al index
     public function create()
     {
         return redirect()->route('config.promociones.index');
@@ -89,6 +94,9 @@ class PromocionController extends Controller
 
     public function store(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_PROMOCIONES'));
+        
         $validated = $request->validate([
             'nombre' => 'required|string|max:200',
             'descripcion' => 'nullable|string',
@@ -114,6 +122,9 @@ class PromocionController extends Controller
 
     public function edit(Promocion $promocione)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_PROMOCIONES'));
+        
         $promocione->load('productos.productoServicio.compania');
         
         $productos = $this->productoService->getProductosCompania1();
@@ -148,6 +159,9 @@ class PromocionController extends Controller
 
     public function update(Request $request, Promocion $promocione)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_PROMOCIONES'));
+        
         $validated = $request->validate([
             'nombre' => 'required|string|max:200',
             'descripcion' => 'nullable|string',
@@ -173,6 +187,9 @@ class PromocionController extends Controller
 
     public function destroy(Promocion $promocione)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_PROMOCIONES'));
+        
         try {
             $promocione->productos()->delete();
             $promocione->delete();

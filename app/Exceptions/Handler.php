@@ -6,7 +6,6 @@ use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
 use App\Services\Error\ErrorNotificationService;
 use Illuminate\Support\Facades\Log;
-use Inertia\Inertia;
 
 class Handler extends ExceptionHandler
 {
@@ -27,62 +26,71 @@ class Handler extends ExceptionHandler
     public function register(): void
     {
         $this->reportable(function (Throwable $e) {
-            // Enviar notificación solo para errores 500 en producción
             if ($this->shouldReport($e) && app()->environment('production')) {
                 try {
                     $this->errorNotificationService->notifyError500($e, request());
                 } catch (\Exception $notificationError) {
-                    // Si falla la notificación, al menos loguearlo
                     Log::error('Error al enviar notificación de error: ' . $notificationError->getMessage());
                 }
             }
         });
     }
 
-    public function render($request, Throwable $exception)
-    {
-        // Si es una excepción HTTP
-        if ($this->isHttpException($exception)) {
-            $statusCode = $exception->getStatusCode();
-            
-            // Mapeo de códigos de error a componentes
-            $errorPages = [
-                403 => 'Errors/403',
-                404 => 'Errors/404',
-                419 => 'Errors/419',
-                500 => 'Errors/500',
-                503 => 'Errors/503',
+public function render($request, Throwable $exception)
+{
+    if ($this->isHttpException($exception)) {
+        $statusCode = $exception->getStatusCode();
+        
+        $errorViews = [
+            403 => 'errors.403',
+            404 => 'errors.404',
+            419 => 'errors.419',
+            500 => 'errors.500',
+            503 => 'errors.503',
+        ];
+
+        if (isset($errorViews[$statusCode])) {
+            $defaultMessages = [
+                403 => 'NO TIENES PERMISOS<br>PARA ACCEDER A ESTE RECURSO.',
+                404 => 'LA PÁGINA QUE BUSCAS<br>NO EXISTE O FUE MOVIDA.',
+                419 => 'TU SESIÓN HA CADUCADO<br>POR SEGURIDAD.',
+                500 => 'ERROR INTERNO DEL SERVIDOR.<br>LOS TÉCNICOS HAN SIDO NOTIFICADOS.',
+                503 => 'EL SISTEMA ESTÁ<br>TEMPORALMENTE EN MANTENIMIENTO.',
             ];
-
-            // Si tenemos una página personalizada para este código
-            if (isset($errorPages[$statusCode])) {
-                return response()->view($errorPages[$statusCode], [
-                    'status' => $statusCode,
-                    'message' => $exception->getMessage() ?: $this->getDefaultMessage($statusCode),
-                ], $statusCode);
-            }
+            
+            $message = $exception->getMessage() ?: $defaultMessages[$statusCode];
+            
+            return response()->view($errorViews[$statusCode], [
+                'code' => $statusCode,
+                'message' => $message,
+            ], $statusCode);
         }
-
-        // Para errores 500 en producción, mostrar página personalizada
-        if (app()->environment('production') && !$this->isHttpException($exception)) {
-            return response()->view('Errors/500', [
-                'status' => 500,
-                'message' => 'Ha ocurrido un error interno en el servidor. Nuestro equipo ha sido notificado.',
-            ], 500);
-        }
-
-        return parent::render($request, $exception);
     }
 
-    private function getDefaultMessage(int $statusCode): string
+    return parent::render($request, $exception);
+}
+
+    private function getTitle(int $statusCode): string
     {
         return match ($statusCode) {
-            403 => 'No tienes permisos para acceder a esta página.',
-            404 => 'La página que buscas no existe.',
-            419 => 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.',
-            500 => 'Ha ocurrido un error interno en el servidor.',
-            503 => 'El sitio está en mantenimiento. Por favor, intenta más tarde.',
-            default => 'Ha ocurrido un error.',
+            403 => '403 - Acceso prohibido',
+            404 => '404 - Página no encontrada',
+            419 => '419 - Sesión expirada',
+            500 => '500 - Error del servidor',
+            503 => '503 - Mantenimiento',
+            default => 'Error',
+        };
+    }
+
+    private function getMessageForBlade(int $statusCode): string
+    {
+        return match ($statusCode) {
+            403 => 'NO TIENES PERMISOS<br>PARA ACCEDER A ESTE RECURSO.',
+            404 => 'LA PÁGINA QUE BUSCAS<br>NO EXISTE O FUE MOVIDA.',
+            419 => 'TU SESIÓN HA EXPIRADO.<br>INICIA SESIÓN NUEVAMENTE.',
+            500 => 'ERROR INTERNO DEL SERVIDOR.<br>EL EQUIPO HA SIDO NOTIFICADO.',
+            503 => 'SITIO EN MANTENIMIENTO.<br>INTENTA MÁS TARDE.',
+            default => 'HA OCURRIDO UN ERROR.',
         };
     }
 }

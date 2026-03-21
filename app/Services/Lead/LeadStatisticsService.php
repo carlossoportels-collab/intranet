@@ -1,17 +1,21 @@
 <?php
+// app/Services/Lead/LeadStatisticsService.php
 
 namespace App\Services\Lead;
 
 use App\Models\EstadoLead;
-use App\Helpers\PermissionHelper;
+use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
 use Illuminate\Support\Facades\DB;
 
 class LeadStatisticsService
 {
+    use HasPermisosService; // 🔥 AGREGAR TRAIT
+
     private array $estadosExcluirIds;
     
     public function __construct()
     {
+        $this->initializePermisoService(); // 🔥 INICIALIZAR
         $this->estadosExcluirIds = $this->getEstadosExcluirIds();
     }
     
@@ -39,9 +43,9 @@ class LeadStatisticsService
             ->whereNotIn('estado_lead_id', $this->estadosExcluirIds)
             ->where('es_activo', 1);
         
-        // Aplicar filtro de permisos
+        // Aplicar filtro de permisos usando el trait
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+            $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
             if (!empty($prefijosPermitidos)) {
                 $query->whereIn('prefijo_id', $prefijosPermitidos);
             } else {

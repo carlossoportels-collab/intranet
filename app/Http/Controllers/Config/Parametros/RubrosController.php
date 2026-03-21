@@ -1,8 +1,10 @@
 <?php
+// app/Http/Controllers/Config/Parametros/RubrosController.php
 
 namespace App\Http\Controllers\Config\Parametros;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable;
 use App\Models\Rubro;
 use App\Models\Lead;
 use App\Models\Empresa;
@@ -11,19 +13,23 @@ use Illuminate\Support\Facades\DB;
 
 class RubrosController extends Controller
 {
+    use Authorizable;
+
+    public function __construct()
+    {
+        $this->initializeAuthorization();
+    }
+
     public function index()
     {
-        // Obtener todos los rubros
+        // 🔥 VERIFICAR PERMISO BASE
+        $this->authorizePermiso(config('permisos.VER_CONFIGURACION'));
+        
         $rubros = Rubro::orderBy('nombre')
             ->get()
             ->map(function ($rubro) {
-                // Contar leads asociados a este rubro
                 $totalLeads = Lead::where('rubro_id', $rubro->id)->count();
-                
-                // Contar empresas asociadas a este rubro
                 $totalEmpresas = Empresa::where('rubro_id', $rubro->id)->count();
-                
-                // Total de registros asociados (leads + empresas)
                 $totalAsociados = $totalLeads + $totalEmpresas;
                 
                 return [
@@ -36,14 +42,12 @@ class RubrosController extends Controller
                 ];
             });
 
-        // Calcular totales globales - CORREGIDO
         $totalLeadsConRubro = Lead::whereNotNull('rubro_id')->count();
         $totalLeadsSinRubro = Lead::whereNull('rubro_id')->count();
         
         $totalEmpresasConRubro = Empresa::whereNotNull('rubro_id')->count();
         $totalEmpresasSinRubro = Empresa::whereNull('rubro_id')->count();
 
-        // Verificar que los totales coincidan con la suma de los rubros
         $sumaLeadsPorRubro = $rubros->sum('total_leads');
         $sumaEmpresasPorRubro = $rubros->sum('total_empresas');
 
@@ -56,8 +60,8 @@ class RubrosController extends Controller
                 'total_leads_sin_rubro' => $totalLeadsSinRubro,
                 'total_empresas_con_rubro' => $totalEmpresasConRubro,
                 'total_empresas_sin_rubro' => $totalEmpresasSinRubro,
-                'suma_leads_por_rubro' => $sumaLeadsPorRubro, // Para debug
-                'suma_empresas_por_rubro' => $sumaEmpresasPorRubro, // Para debug
+                'suma_leads_por_rubro' => $sumaLeadsPorRubro,
+                'suma_empresas_por_rubro' => $sumaEmpresasPorRubro,
             ]
         ]);
     }

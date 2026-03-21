@@ -27,42 +27,42 @@ export default function Paso3WhatsApp({
     onBack
 }: Paso3WhatsAppProps) {
     
-    const telefonoComercial = comercial?.telefono || comercial?.personal?.telefono || '';
+    const telefonoComercial = comercial?.telefono || '';
     const primerNombreComercial = comercial?.nombre.split(' ')[0] || '';
     
-const generarMensajeVistaPrevia = () => {
-    if (!comercial) return '';
-    
-    let mensaje = `Hola ${primerNombreComercial}, nuevo lead:\n\n`;
-    mensaje += `👤 ${leadData.nombre_completo}\n`;
-    
-    if (leadData.telefono) {
-        mensaje += `📱 ${leadData.telefono}\n`;
-    }
-    
-    if (leadData.email) {
-        mensaje += `📧 ${leadData.email}\n`;
-    }
-    
-    if (leadData.nombre_completo && leadData.telefono && leadId) {
-        const primerNombreLead = leadData.nombre_completo.split(' ')[0];
+    const generarMensajeVistaPrevia = () => {
+        if (!comercial) return '';
         
-        // Usar la compañía desde window.compania que ya está disponible
-        const nombreCompania = (window as any).compania?.nombre || 'la empresa';
+        let mensaje = `Hola ${primerNombreComercial}, nuevo lead:\n\n`;
+        mensaje += `👤 ${leadData.nombre_completo}\n`;
         
-        // Mensaje ultra simple
-        const mensajeLead = `Hola ${primerNombreLead}, soy ${comercial.nombre} de ${nombreCompania}.`;
+        if (leadData.telefono) {
+            mensaje += `📱 ${leadData.telefono}\n`;
+        }
         
-        const telefonoLead = leadData.telefono.replace(/\D/g, '');
-        const telefonoLeadFormateado = telefonoLead.startsWith('54') ? telefonoLead : `54${telefonoLead}`;
+        if (leadData.email) {
+            mensaje += `📧 ${leadData.email}\n`;
+        }
         
-        mensaje += `\n📲 Contactar: ${window.location.origin}/comercial/lead/${leadId}/contactar-whatsapp?phone=${telefonoLeadFormateado}&msg=${encodeURIComponent(mensajeLead)}\n`;
-    }
-    
-    mensaje += `\nContacta al lead.`;
-    
-    return mensaje;
-};
+        if (leadData.telefono && leadId) {
+            const primerNombreLead = leadData.nombre_completo.split(' ')[0];
+            
+            const nombreCompania = (window as any).compania?.nombre || 'la empresa';
+            
+            const mensajeLead = `Hola ${primerNombreLead}, soy ${comercial.nombre} de ${nombreCompania}.`;
+            
+            const telefonoLead = leadData.telefono.replace(/\D/g, '');
+            const telefonoLeadFormateado = telefonoLead.startsWith('54') ? telefonoLead : `54${telefonoLead}`;
+            
+            // 🔥 URL CORREGIDA
+            mensaje += `\n📲 Link para contactar al lead (CLICK AQUÍ):\n`;
+            mensaje += `${window.location.origin}/comercial/lead/${leadId}/contactar-whatsapp?phone=${telefonoLeadFormateado}&msg=${encodeURIComponent(mensajeLead)}\n`;
+        }
+        
+        mensaje += `\nEste link registrará automáticamente el contacto en el sistema.`;
+        
+        return mensaje;
+    };
 
     return (
         <div className="space-y-6">

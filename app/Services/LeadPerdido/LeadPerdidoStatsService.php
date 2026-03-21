@@ -1,20 +1,24 @@
 <?php
+// app/Services/LeadPerdido/LeadPerdidoStatsService.php
 
 namespace App\Services\LeadPerdido;
 
 use App\Models\Usuario;
 use App\Models\SeguimientoPerdida;
-use App\Helpers\PermissionHelper;
+use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class LeadPerdidoStatsService
 {
+    use HasPermisosService; // 🔥 AGREGAR TRAIT
+
     protected LeadPerdidoNotificationService $notificationService;
 
     public function __construct(LeadPerdidoNotificationService $notificationService)
     {
         $this->notificationService = $notificationService;
+        $this->initializePermisoService(); // 🔥 INICIALIZAR
     }
 
     /**
@@ -43,7 +47,7 @@ class LeadPerdidoStatsService
             ->whereHas('lead', fn($q) => $q->where('es_cliente', 0));
 
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+            $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
             
             if (empty($prefijosPermitidos)) {
                 $query->whereRaw('1 = 0');
@@ -81,7 +85,7 @@ class LeadPerdidoStatsService
             ->where('l.es_cliente', 0);
 
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+            $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
             if (empty($prefijosPermitidos)) {
                 return collect([]);
             }
@@ -111,7 +115,7 @@ class LeadPerdidoStatsService
             ->where('l.es_cliente', 0);
 
         if (!$usuario->ve_todas_cuentas) {
-            $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+            $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
             if (empty($prefijosPermitidos)) {
                 return collect([]);
             }

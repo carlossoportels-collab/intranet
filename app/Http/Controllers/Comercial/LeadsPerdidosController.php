@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Comercial/LeadsPerdidosController.php
 
 namespace App\Http\Controllers\Comercial;
 
@@ -12,23 +13,31 @@ use App\Services\LeadPerdido\LeadPerdidoStatsService;
 use App\Services\LeadPerdido\LeadPerdidoSeguimientoService;
 use App\Http\Requests\ProcesarSeguimientoRequest;
 use App\DTOs\SeguimientoPerdidoData;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 
 class LeadsPerdidosController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
     public function __construct(
         protected LeadPerdidoQueryService $queryService,
         protected LeadPerdidoStatsService $statsService,
         protected LeadPerdidoSeguimientoService $seguimientoService
-    ) {}
+    ) {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
 
     /**
      * Vista principal de leads perdidos/recontactados
      */
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.VER_LEADS_PERDIDOS'));
+        
         $usuario = auth()->user();
         
         $leads = $this->queryService->getLeadsPerdidosPaginated($request, $usuario);
@@ -91,6 +100,10 @@ class LeadsPerdidosController extends Controller
     public function modalSeguimiento($id)
     {
         $lead = Lead::findOrFail($id);
+        
+        // 🔥 VERIFICAR ACCESO AL LEAD
+        $this->authorizeLeadAccess($lead, config('permisos.GESTIONAR_LEADS_PERDIDOS'));
+        
         $seguimiento = $lead->seguimientoPerdida()
             ->whereNull('deleted_at')
             ->firstOrFail();
@@ -130,6 +143,11 @@ class LeadsPerdidosController extends Controller
      */
     public function procesarSeguimiento(ProcesarSeguimientoRequest $request, $id)
     {
+        $lead = Lead::findOrFail($id);
+        
+        // 🔥 VERIFICAR ACCESO AL LEAD Y PERMISO
+        $this->authorizeLeadAccess($lead, config('permisos.GESTIONAR_LEADS_PERDIDOS'));
+        
         $data = SeguimientoPerdidoData::fromRequest(
             $request->validated(),
             $id,

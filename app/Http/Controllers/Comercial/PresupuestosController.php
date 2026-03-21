@@ -1,8 +1,10 @@
 <?php
+// app/Http/Controllers/Comercial/PresupuestosController.php
 
 namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use App\Models\Presupuesto;
 use App\Models\Lead;
 use App\Models\MedioPago;
@@ -11,13 +13,14 @@ use App\Models\Personal;
 use App\Services\Presupuesto\ProductoServicioService;
 use App\Services\Presupuesto\PresupuestoService;
 use App\Services\Promocion\PromocionService;
-use App\Helpers\PermissionHelper;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class PresupuestosController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
     protected $productoService;
     protected $presupuestoService;
     protected $promocionService;
@@ -30,10 +33,15 @@ class PresupuestosController extends Controller
         $this->productoService = $productoService;
         $this->presupuestoService = $presupuestoService;
         $this->promocionService = $promocionService;
+        
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
     }
 
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.VER_PRESUPUESTOS'));
+        
         $usuario = auth()->user();
         
         $query = Presupuesto::with(['lead', 'prefijo', 'estado', 'promocion']);
@@ -65,10 +73,8 @@ class PresupuestosController extends Controller
             $query->whereDate('created', '<=', $request->fecha_fin);
         }
         
-        if (!$usuario->ve_todas_cuentas) {
-            $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
-            $query->whereIn('prefijo_id', $prefijosPermitidos);
-        }
+        // 🔥 APLICAR FILTRO DE PREFIJOS usando el trait
+        $this->applyPrefijoFilter($query, $usuario);
         
         $presupuestos = $query->orderBy('created', 'desc')->paginate(5);
 
@@ -78,12 +84,9 @@ class PresupuestosController extends Controller
             return $presupuesto;
         });
 
+        // 🔥 ESTADÍSTICAS con filtro de prefijos
         $estadisticasQuery = Presupuesto::query();
-        
-        if (!$usuario->ve_todas_cuentas) {
-            $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
-            $estadisticasQuery->whereIn('prefijo_id', $prefijosPermitidos);
-        }
+        $this->applyPrefijoFilter($estadisticasQuery, $usuario);
         
         $estadisticas = [
             'total' => (clone $estadisticasQuery)->count(),
@@ -93,6 +96,10 @@ class PresupuestosController extends Controller
             'rechazados' => (clone $estadisticasQuery)->where('estado_id', 4)->count(),
         ];
 
+        // 🔥 OBTENER PREFIJOS PERMITIDOS usando el trait
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
+        
+        // Obtener prefijo del usuario si es comercial
         $prefijoUsuario = null;
         if ($usuario->rol_id == 5) {
             $comercial = \App\Models\Comercial::with('personal')
@@ -115,6 +122,7 @@ class PresupuestosController extends Controller
             }
         }
         
+        // Obtener todos los prefijos para el filtro
         $prefijosFiltro = \App\Models\Prefijo::with('comercial.personal')
             ->where('activo', 1)
             ->get()
@@ -148,7 +156,7 @@ class PresupuestosController extends Controller
                 'nombre_completo' => $usuario->personal ? 
                     $usuario->personal->nombre . ' ' . $usuario->personal->apellido : 
                     $usuario->nombre_usuario,
-                'prefijos_asignados' => $usuario->ve_todas_cuentas ? null : PermissionHelper::getPrefijosPermitidos($usuario->id)
+                'prefijos_asignados' => $usuario->ve_todas_cuentas ? null : $prefijosPermitidos
             ],
             'prefijosFiltro' => $prefijosFiltro,
             'prefijoUsuario' => $prefijoUsuario,
@@ -159,6 +167,9 @@ class PresupuestosController extends Controller
 
     public function create(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO DE GESTIÓN
+        $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
+        
         $usuario = auth()->user();
         $leadId = $request->get('lead_id');
         
@@ -174,6 +185,9 @@ class PresupuestosController extends Controller
                 ->with('error', 'El lead seleccionado no existe');
         }
         
+        // 🔥 VERIFICAR ACCESO AL LEAD
+        $this->authorizeLeadAccess($lead);
+        
         $comerciales = \App\Models\Comercial::with('personal')
             ->where('activo', 1)
             ->get()
@@ -186,11 +200,8 @@ class PresupuestosController extends Controller
                 ];
             });
         
-        $prefijos = PermissionHelper::getPrefijosPermitidos($usuario->id);
-        
-        if ($usuario->ve_todas_cuentas) {
-            $prefijos = \App\Models\Prefijo::where('activo', 1)->pluck('id')->toArray();
-        }
+        // 🔥 OBTENER PREFIJOS PERMITIDOS
+        $prefijos = $this->getPrefijosPermitidos();
         
         $promociones = $this->promocionService->getPromocionesVigentes();
         
@@ -245,6 +256,9 @@ class PresupuestosController extends Controller
 
     public function store(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO DE GESTIÓN
+        $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
+        
         \Log::info('=== PRESUPUESTO STORE - INICIO ===');
         \Log::info('Request data:', $request->all());
         
@@ -307,64 +321,64 @@ class PresupuestosController extends Controller
         }
     }
 
-public function show(Presupuesto $presupuesto)
-{
-    // Cargar todas las relaciones necesarias
-    $presupuesto->load([
-        'lead', 
-        'prefijo.comercial.personal', // ← Esto carga comercial y su personal
-        'tasa', 
-        'abono',
-        'promocion.productos',
-        'agregados.productoServicio.tipo',
-        'estado'
-    ]);
-
-    // Obtener el comercial correctamente (puede ser colección o modelo)
-    $comercial = null;
-    $comercialEmail = '';
-    $companiaNombre = 'LOCALSAT';
-    $companiaId = 1;
-
-    if ($presupuesto->prefijo) {
-        // prefijo->comercial puede ser una colección o un modelo
-        $comercial = $presupuesto->prefijo->comercial;
+    public function show(Presupuesto $presupuesto)
+    {
+        // 🔥 VERIFICAR ACCESO AL PRESUPUESTO (por prefijo)
+        $this->authorizeLeadAccess($presupuesto); // Reutilizamos la misma lógica
         
-        // Si es una colección, tomar el primero
-        if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
-            $comercial = $comercial->first();
-        }
-        
-        if ($comercial) {
-            // Obtener email del personal del comercial
-            if ($comercial->personal) {
-                $comercialEmail = $comercial->personal->email ?? '';
+        // Cargar todas las relaciones necesarias
+        $presupuesto->load([
+            'lead', 
+            'prefijo.comercial.personal',
+            'tasa', 
+            'abono',
+            'promocion.productos',
+            'agregados.productoServicio.tipo',
+            'estado'
+        ]);
+
+        // Obtener el comercial correctamente (puede ser colección o modelo)
+        $comercial = null;
+        $comercialEmail = '';
+        $companiaNombre = 'LOCALSAT';
+        $companiaId = 1;
+
+        if ($presupuesto->prefijo) {
+            $comercial = $presupuesto->prefijo->comercial;
+            
+            if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
+                $comercial = $comercial->first();
             }
             
-            // Obtener compañía
-            $companiaId = $comercial->compania_id ?? 1;
-            
-            // Obtener nombre de la compañía
-            if ($comercial->compania) {
-                $companiaNombre = $comercial->compania->nombre ?? 'LOCALSAT';
+            if ($comercial) {
+                if ($comercial->personal) {
+                    $comercialEmail = $comercial->personal->email ?? '';
+                }
+                
+                $companiaId = $comercial->compania_id ?? 1;
+                
+                if ($comercial->compania) {
+                    $companiaNombre = $comercial->compania->nombre ?? 'LOCALSAT';
+                }
             }
         }
+
+        $presupuesto->comercial_email = $comercialEmail;
+        $presupuesto->compania_nombre = $companiaNombre;
+        $presupuesto->compania_id = $companiaId;
+        $presupuesto->nombre_comercial = $presupuesto->nombre_comercial;
+        
+        return Inertia::render('Comercial/Presupuestos/Show', [
+            'presupuesto' => $presupuesto
+        ]);
     }
-
-    // Asignar al presupuesto
-    $presupuesto->comercial_email = $comercialEmail;
-    $presupuesto->compania_nombre = $companiaNombre;
-    $presupuesto->compania_id = $companiaId;
-    
-    $presupuesto->nombre_comercial = $presupuesto->nombre_comercial;
-    
-    return Inertia::render('Comercial/Presupuestos/Show', [
-        'presupuesto' => $presupuesto
-    ]);
-}
 
     public function edit(Presupuesto $presupuesto)
     {
+        // 🔥 VERIFICAR ACCESO Y PERMISO DE GESTIÓN
+        $this->authorizeLeadAccess($presupuesto);
+        $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
+        
         $usuario = auth()->user();
         
         $presupuesto->load([
@@ -411,6 +425,10 @@ public function show(Presupuesto $presupuesto)
 
     public function update(Request $request, Presupuesto $presupuesto)
     {
+        // 🔥 VERIFICAR ACCESO Y PERMISO DE GESTIÓN
+        $this->authorizeLeadAccess($presupuesto);
+        $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
+        
         \Log::info('=== PRESUPUESTO UPDATE - INICIO ===');
         \Log::info('Request data:', $request->all());
         
@@ -465,13 +483,19 @@ public function show(Presupuesto $presupuesto)
 
     public function destroy(Presupuesto $presupuesto)
     {
+        // 🔥 VERIFICAR ACCESO Y PERMISO DE GESTIÓN
+        $this->authorizeLeadAccess($presupuesto);
+        $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
+        
         $presupuesto->delete();
         return redirect()->route('comercial.presupuestos')->with('success', 'Presupuesto eliminado');
     }
 
-
     public function generarPdf(Request $request, Presupuesto $presupuesto)
     {
+        // 🔥 VERIFICAR ACCESO AL PRESUPUESTO
+        $this->authorizeLeadAccess($presupuesto);
+        
         // Recargar el presupuesto con todas las relaciones necesarias
         $presupuesto = Presupuesto::with([
             'lead',
@@ -486,7 +510,6 @@ public function show(Presupuesto $presupuesto)
             ->where('presupuesto_id', $presupuesto->id)
             ->get();
 
-        // Asignar los agregados al presupuesto
         $presupuesto->setRelation('agregados', $agregados);
 
         $codigoPrefijo = $presupuesto->prefijo?->codigo ?? 'LS';
@@ -494,12 +517,10 @@ public function show(Presupuesto $presupuesto)
         $referencia = sprintf('%s-%s-%s', $codigoPrefijo, $anio, $presupuesto->id);
         $presupuesto->referencia = $referencia;
 
-        // Calcular días de validez
         $fechaCreacion = \Carbon\Carbon::parse($presupuesto->created)->startOfDay();
         $fechaValidez = \Carbon\Carbon::parse($presupuesto->validez)->startOfDay();
         $presupuesto->dias_validez = (int) $fechaCreacion->diffInDays($fechaValidez);
 
-        // Preparar datos del lead
         if (empty($presupuesto->lead->empresa)) {
             $presupuesto->lead->empresa = $presupuesto->lead->nombre_completo;
         }
@@ -508,52 +529,27 @@ public function show(Presupuesto $presupuesto)
             $presupuesto->lead->contacto = $presupuesto->lead->nombre_completo;
         }
 
-        // Obtener datos de compañía
         $compania = $this->getCompaniaData($presupuesto);
 
-        // CLASIFICAR AGREGADOS
         $servicios_clasificados = [];
         $accesorios_clasificados = [];
 
         foreach ($agregados as $item) {
-            // Verificar que producto_servicio existe
             if (!$item->productoServicio) {
-                \Log::warning('Producto servicio no encontrado para agregado:', [
-                    'agregado_id' => $item->id,
-                    'prd_servicio_id' => $item->prd_servicio_id
-                ]);
                 continue;
             }
             
             $tipoId = $item->productoServicio->tipo_id;
-            $tipoNombre = $item->productoServicio->tipo->nombre_tipo_abono ?? '';
-            
-            \Log::info('CLASIFICANDO ITEM:', [
-                'id' => $item->id,
-                'prd_servicio_id' => $item->prd_servicio_id,
-                'nombre' => $item->productoServicio->nombre,
-                'tipo_id' => $tipoId,
-                'tipo_nombre' => $tipoNombre
-            ]);
             
             if ($tipoId == 5) {
                 $accesorios_clasificados[] = $item;
-                \Log::info('→ ACCESORIO');
             } elseif ($tipoId == 3) {
                 $servicios_clasificados[] = $item;
-                \Log::info('→ SERVICIO');
             }
         }
 
-        \Log::info('RESULTADO CLASIFICACION:', [
-            'servicios' => count($servicios_clasificados),
-            'accesorios' => count($accesorios_clasificados),
-            'total_agregados' => $agregados->count()
-        ]);
-
         $download = $request->has('download') && $request->download == 1;
 
-        // Generar PDF usando el Facade
         $pdf = Pdf::loadView('pdf.presupuesto', [
             'presupuesto' => $presupuesto,
             'compania' => $compania,
@@ -575,108 +571,109 @@ public function show(Presupuesto $presupuesto)
         }
     }
     
-public function generarPdfTemp(Request $request, Presupuesto $presupuesto)
-{
-    \Log::info('========== GENERAR PDF TEMP ==========');
-    \Log::info('Presupuesto ID: ' . $presupuesto->id);
-    
-    try {
-        $presupuesto->load([
-            'lead',
-            'tasa',
-            'abono',
-            'promocion.productos',
-            'agregados.productoServicio',
-            'prefijo.comercial.personal'
-        ]);
-
-        // Cargar tipos
-        foreach ($presupuesto->agregados as $agregado) {
-            if ($agregado->productoServicio) {
-                $agregado->productoServicio->load('tipo');
-            }
-        }
-
-        $codigoPrefijo = $presupuesto->prefijo?->codigo ?? 'LS';
-        $anio = date('Y', strtotime($presupuesto->created));
-        $referencia = sprintf('%s-%s-%s', $codigoPrefijo, $anio, $presupuesto->id);
-        $presupuesto->referencia = $referencia;
-
-        $fechaCreacion = \Carbon\Carbon::parse($presupuesto->created)->startOfDay();
-        $fechaValidez = \Carbon\Carbon::parse($presupuesto->validez)->startOfDay();
-        $presupuesto->dias_validez = (int) $fechaCreacion->diffInDays($fechaValidez);
-
-        if (empty($presupuesto->lead->empresa)) {
-            $presupuesto->lead->empresa = $presupuesto->lead->nombre_completo;
-        }
+    public function generarPdfTemp(Request $request, Presupuesto $presupuesto)
+    {
+        // 🔥 VERIFICAR ACCESO AL PRESUPUESTO
+        $this->authorizeLeadAccess($presupuesto);
         
-        if (empty($presupuesto->lead->contacto)) {
-            $presupuesto->lead->contacto = $presupuesto->lead->nombre_completo;
-        }
+        \Log::info('========== GENERAR PDF TEMP ==========');
+        \Log::info('Presupuesto ID: ' . $presupuesto->id);
+        
+        try {
+            $presupuesto->load([
+                'lead',
+                'tasa',
+                'abono',
+                'promocion.productos',
+                'agregados.productoServicio',
+                'prefijo.comercial.personal'
+            ]);
 
-        $compania = $this->getCompaniaData($presupuesto);
+            foreach ($presupuesto->agregados as $agregado) {
+                if ($agregado->productoServicio) {
+                    $agregado->productoServicio->load('tipo');
+                }
+            }
 
-        // CLASIFICAR AGREGADOS
-        $servicios_clasificados = [];
-        $accesorios_clasificados = [];
+            $codigoPrefijo = $presupuesto->prefijo?->codigo ?? 'LS';
+            $anio = date('Y', strtotime($presupuesto->created));
+            $referencia = sprintf('%s-%s-%s', $codigoPrefijo, $anio, $presupuesto->id);
+            $presupuesto->referencia = $referencia;
 
-        if ($presupuesto->agregados && $presupuesto->agregados->count() > 0) {
-            foreach ($presupuesto->agregados as $item) {
-                if ($item->productoServicio) {
-                    $tipoId = $item->productoServicio->tipo_id;
-                    
-                    if ($tipoId == 5) {
-                        $accesorios_clasificados[] = $item;
-                    } elseif ($tipoId == 3) {
-                        $servicios_clasificados[] = $item;
+            $fechaCreacion = \Carbon\Carbon::parse($presupuesto->created)->startOfDay();
+            $fechaValidez = \Carbon\Carbon::parse($presupuesto->validez)->startOfDay();
+            $presupuesto->dias_validez = (int) $fechaCreacion->diffInDays($fechaValidez);
+
+            if (empty($presupuesto->lead->empresa)) {
+                $presupuesto->lead->empresa = $presupuesto->lead->nombre_completo;
+            }
+            
+            if (empty($presupuesto->lead->contacto)) {
+                $presupuesto->lead->contacto = $presupuesto->lead->nombre_completo;
+            }
+
+            $compania = $this->getCompaniaData($presupuesto);
+
+            $servicios_clasificados = [];
+            $accesorios_clasificados = [];
+
+            if ($presupuesto->agregados && $presupuesto->agregados->count() > 0) {
+                foreach ($presupuesto->agregados as $item) {
+                    if ($item->productoServicio) {
+                        $tipoId = $item->productoServicio->tipo_id;
+                        
+                        if ($tipoId == 5) {
+                            $accesorios_clasificados[] = $item;
+                        } elseif ($tipoId == 3) {
+                            $servicios_clasificados[] = $item;
+                        }
                     }
                 }
             }
+            
+            $pdf = Pdf::loadView('pdf.presupuesto', [
+                'presupuesto' => $presupuesto,
+                'compania' => $compania,
+                'servicios_clasificados' => $servicios_clasificados,
+                'accesorios_clasificados' => $accesorios_clasificados
+            ])
+            ->setPaper('A4')
+            ->setOptions([
+                'defaultFont' => 'sans-serif',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'chroot' => public_path(),
+            ]);
+        
+            $filename = "presupuesto-{$presupuesto->id}-" . time() . ".pdf";
+            $path = storage_path("app/temp/{$filename}");
+            
+            if (!file_exists(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0755, true);
+            }
+            
+            file_put_contents($path, $pdf->output());
+            
+            $this->limpiarArchivosTemporales();
+        
+            return redirect()->back()->with('pdfData', [
+                'success' => true,
+                'url' => "/temp/presupuesto/{$presupuesto->id}?v=" . time(),
+                'filename' => "Presupuesto_{$referencia}.pdf"
+            ]);
+        
+        } catch (\Exception $e) {
+            \Log::error('❌ Error generando PDF temporal:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        
+            return redirect()->back()->with('pdfData', [
+                'success' => false,
+                'error' => 'Error al generar el PDF: ' . $e->getMessage()
+            ]);
         }
-        
-        $pdf = Pdf::loadView('pdf.presupuesto', [
-            'presupuesto' => $presupuesto,
-            'compania' => $compania,
-            'servicios_clasificados' => $servicios_clasificados,
-            'accesorios_clasificados' => $accesorios_clasificados
-        ])
-        ->setPaper('A4')
-        ->setOptions([
-            'defaultFont' => 'sans-serif',
-            'isHtml5ParserEnabled' => true,
-            'isRemoteEnabled' => true,
-            'chroot' => public_path(),
-        ]);
-    
-        $filename = "presupuesto-{$presupuesto->id}-" . time() . ".pdf";
-        $path = storage_path("app/temp/{$filename}");
-        
-        if (!file_exists(storage_path('app/temp'))) {
-            mkdir(storage_path('app/temp'), 0755, true);
-        }
-        
-        file_put_contents($path, $pdf->output());
-        
-        $this->limpiarArchivosTemporales();
-    
-        return redirect()->back()->with('pdfData', [
-            'success' => true,
-            'url' => "/temp/presupuesto/{$presupuesto->id}?v=" . time(),
-            'filename' => "Presupuesto_{$referencia}.pdf"
-        ]);
-    
-    } catch (\Exception $e) {
-        \Log::error('❌ Error generando PDF temporal:', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-    
-        return redirect()->back()->with('pdfData', [
-            'success' => false,
-            'error' => 'Error al generar el PDF: ' . $e->getMessage()
-        ]);
     }
-}
 
     private function getCompaniaData(Presupuesto $presupuesto)
     {
@@ -712,8 +709,6 @@ public function generarPdfTemp(Request $request, Presupuesto $presupuesto)
                 if ($compania['logo'] && !file_exists($compania['logo'])) {
                     \Log::warning('Logo no encontrado: ' . $compania['logo']);
                     $compania['logo'] = null;
-                } else {
-                    \Log::info('Logo encontrado: ' . $compania['logo']);
                 }
             }
         }

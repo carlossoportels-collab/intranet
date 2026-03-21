@@ -4,11 +4,18 @@
 namespace App\Services\Presupuesto;
 
 use App\Models\ProductoServicio;
-use App\Helpers\PermissionHelper;
+use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
 use Illuminate\Support\Collection;
 
 class ProductoServicioService
 {
+    use HasPermisosService; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializePermisoService(); // 🔥 INICIALIZAR
+    }
+
     /**
      * Obtener tasas disponibles (solo TASAS y presupuestables)
      */
@@ -17,9 +24,9 @@ class ProductoServicioService
         $query = ProductoServicio::with('tipo')
             ->tasas()
             ->activos()
-            ->presupuestables(); // ← NUEVO
+            ->presupuestables();
 
-        PermissionHelper::aplicarFiltroCompania($query, 'compania_id');
+        $this->applyCompaniaFilter($query);
 
         return $query->orderBy('nombre')->get();
     }
@@ -32,9 +39,9 @@ class ProductoServicioService
         $query = ProductoServicio::with('tipo')
             ->abonos()
             ->activos()
-            ->presupuestables(); // ← NUEVO
+            ->presupuestables();
 
-        PermissionHelper::aplicarFiltroCompania($query, 'compania_id');
+        $this->applyCompaniaFilter($query);
 
         return $query->orderBy('nombre')->get();
     }
@@ -47,9 +54,9 @@ class ProductoServicioService
         $query = ProductoServicio::with('tipo')
             ->soloAbonos()
             ->activos()
-            ->presupuestables(); // ← NUEVO
+            ->presupuestables();
 
-        PermissionHelper::aplicarFiltroCompania($query, 'compania_id');
+        $this->applyCompaniaFilter($query);
 
         return $query->orderBy('nombre')->get();
     }
@@ -62,9 +69,9 @@ class ProductoServicioService
         $query = ProductoServicio::with('tipo')
             ->soloConvenios()
             ->activos()
-            ->presupuestables(); // ← NUEVO
+            ->presupuestables();
 
-        PermissionHelper::aplicarFiltroCompania($query, 'compania_id');
+        $this->applyCompaniaFilter($query);
 
         return $query->orderBy('nombre')->get();
     }
@@ -77,9 +84,9 @@ class ProductoServicioService
         $query = ProductoServicio::with('tipo')
             ->accesorios()
             ->activos()
-            ->presupuestables(); // ← NUEVO
+            ->presupuestables();
 
-        PermissionHelper::aplicarFiltroCompania($query, 'compania_id');
+        $this->applyCompaniaFilter($query);
 
         return $query->orderBy('nombre')->get();
     }
@@ -92,9 +99,9 @@ class ProductoServicioService
         $query = ProductoServicio::with('tipo')
             ->servicios()
             ->activos()
-            ->presupuestables(); // ← NUEVO
+            ->presupuestables();
 
-        PermissionHelper::aplicarFiltroCompania($query, 'compania_id');
+        $this->applyCompaniaFilter($query);
 
         return $query->orderBy('nombre')->get();
     }
@@ -106,7 +113,7 @@ class ProductoServicioService
     {
         $producto = ProductoServicio::with('tipo')
             ->activos()
-            ->presupuestables() // ← NUEVO
+            ->presupuestables()
             ->find($id);
         
         if (!$producto) {
@@ -114,7 +121,7 @@ class ProductoServicioService
         }
 
         // Verificar permisos de compañía
-        $companiasPermitidas = PermissionHelper::getCompaniasPermitidas();
+        $companiasPermitidas = $this->getCompaniasPermitidas();
         
         if (!in_array($producto->compania_id, $companiasPermitidas)) {
             return null;

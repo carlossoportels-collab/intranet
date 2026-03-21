@@ -10,9 +10,31 @@ interface DetalleEmpresaCompactoProps {
 const DetalleEmpresaCompacto: React.FC<DetalleEmpresaCompactoProps> = ({ empresa }) => {
     const [showFullInfo, setShowFullInfo] = useState(false);
     const contactosActivos = empresa.contactos.filter(c => c.es_activo);
-    const totalAbonosMonto = empresa.vehiculos.reduce((acc, v) => 
-        acc + (v.abonos?.reduce((sum, a) => sum + a.abono_precio, 0) || 0), 0
-    );
+    
+    // Calcular totales de abonos
+    const calcularTotalesAbonos = () => {
+        let totalSinDescuento = 0;
+        let totalConDescuento = 0;
+        
+        empresa.vehiculos.forEach(vehiculo => {
+            vehiculo.abonos?.forEach(abono => {
+                totalSinDescuento += abono.abono_precio;
+                
+                // Calcular con descuento si existe
+                if (abono.abono_descuento && abono.abono_descuento > 0) {
+                    const descuento = abono.abono_precio * (abono.abono_descuento / 100);
+                    totalConDescuento += (abono.abono_precio - descuento);
+                } else {
+                    totalConDescuento += abono.abono_precio;
+                }
+            });
+        });
+        
+        return { totalSinDescuento, totalConDescuento };
+    };
+
+    const { totalSinDescuento, totalConDescuento } = calcularTotalesAbonos();
+    const tieneDescuentos = totalSinDescuento !== totalConDescuento;
 
     const getDireccionCompleta = () => {
         const partes = [];
@@ -31,7 +53,7 @@ const DetalleEmpresaCompacto: React.FC<DetalleEmpresaCompactoProps> = ({ empresa
         <div className="bg-white border-b border-slate-200">
             {/* Versión móvil: resumen ejecutivo */}
             <div className="block sm:hidden p-4">
-                {/* Stats rápidas en fila */}
+                {/* Stats rápidas en fila - ACTUALIZADO */}
                 <div className="flex items-center justify-between mb-4 bg-indigo-50 rounded-lg p-3">
                     <div className="text-center flex-1">
                         <span className="block text-xs text-indigo-600">Vehículos</span>
@@ -45,7 +67,20 @@ const DetalleEmpresaCompacto: React.FC<DetalleEmpresaCompactoProps> = ({ empresa
                     </div>
                     <div className="text-center flex-1 border-l border-indigo-200">
                         <span className="block text-xs text-indigo-600">Total $</span>
-                        <span className="block text-sm font-bold text-indigo-900">{formatMoney(totalAbonosMonto)}</span>
+                        {tieneDescuentos ? (
+                            <>
+                                <span className="block text-xs line-through text-indigo-400">
+                                    {formatMoney(totalSinDescuento)}
+                                </span>
+                                <span className="block text-sm font-bold text-indigo-900">
+                                    {formatMoney(totalConDescuento)}
+                                </span>
+                            </>
+                        ) : (
+                            <span className="block text-sm font-bold text-indigo-900">
+                                {formatMoney(totalSinDescuento)}
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -124,7 +159,7 @@ const DetalleEmpresaCompacto: React.FC<DetalleEmpresaCompactoProps> = ({ empresa
                 )}
             </div>
 
-            {/* Versión desktop: grid original */}
+            {/* Versión desktop: grid original - ACTUALIZADO */}
             <div className="hidden sm:block bg-gray-50 border-b border-gray-200 px-4 py-3">
                 <div className="grid grid-cols-4 gap-4 text-sm">
                     <div>
@@ -185,15 +220,22 @@ const DetalleEmpresaCompacto: React.FC<DetalleEmpresaCompactoProps> = ({ empresa
                         <div className="space-y-1">
                             <div>
                                 <span className="text-xs text-gray-500">Total abonos:</span>
-                                <span className="text-xs font-medium ml-1">{formatMoney(totalAbonosMonto)}</span>
+                                {tieneDescuentos ? (
+                                    <div className="inline-block ml-1">
+                                        <span className="text-xs line-through text-gray-400 mr-1">
+                                            {formatMoney(totalSinDescuento)}
+                                        </span>
+                                        <span className="text-xs font-medium text-indigo-600">
+                                            {formatMoney(totalConDescuento)}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <span className="text-xs font-medium ml-1">{formatMoney(totalSinDescuento)}</span>
+                                )}
                             </div>
                             <div>
                                 <span className="text-xs text-gray-500">Vehículos:</span>
                                 <span className="text-xs font-medium ml-1">{empresa.vehiculos.length}</span>
-                            </div>
-                            <div>
-                                <span className="text-xs text-gray-500">ID:</span>
-                                <span className="text-xs font-mono ml-1">{empresa.id}</span>
                             </div>
                         </div>
                     </div>

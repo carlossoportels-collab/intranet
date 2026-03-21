@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Prefijo extends Model
 {
@@ -34,9 +35,9 @@ class Prefijo extends Model
         return $this->hasMany(Lead::class, 'prefijo_id');
     }
     
-    public function comercial()
+    public function comercial(): HasOne
     {
-        return $this->hasMany(Comercial::class, 'prefijo_id', 'id');
+        return $this->hasOne(Comercial::class, 'prefijo_id', 'id')->where('activo', 1);
     }
     
     public function getComercialActivoAttribute()

@@ -1,8 +1,10 @@
 <?php
+// app/Http/Controllers/Comercial/Cuentas/CambioTitularidadController.php
 
 namespace App\Http\Controllers\Comercial\Cuentas;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Empresa;
@@ -16,7 +18,6 @@ use App\Models\Nacionalidad;
 use App\Models\TipoResponsabilidad;
 use App\Models\CategoriaFiscal;
 use App\Models\Plataforma;
-use App\Helpers\PermissionHelper;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,13 +25,23 @@ use Carbon\Carbon;
 
 class CambioTitularidadController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     /**
      * Mostrar formulario de cambio de titularidad
      */
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
+        
         $usuario = Auth::user();
-        $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
         
         // ============================================
         // 1. OBTENER VEHÍCULOS CON FILTROS DE PERMISOS
@@ -200,6 +211,9 @@ class CambioTitularidadController extends Controller
      */
     public function store(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
+        
         $request->validate([
             'tipo_operacion' => 'required|in:entre_empresas,nueva_empresa',
             'empresa_origen_id' => 'required|exists:empresas,id',
@@ -214,7 +228,7 @@ class CambioTitularidadController extends Controller
         ]);
 
         $usuario = Auth::user();
-        $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
         
         DB::beginTransaction();
         
@@ -335,7 +349,7 @@ class CambioTitularidadController extends Controller
     public function show($id)
     {
         $usuario = Auth::user();
-        $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
         
         $cambio = CambioTitularidad::with([
             'empresaOrigen',
@@ -388,7 +402,7 @@ class CambioTitularidadController extends Controller
     public function getVehiculosEmpresa($id)
     {
         $usuario = Auth::user();
-        $prefijosPermitidos = PermissionHelper::getPrefijosPermitidos($usuario->id);
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
         
         $empresa = Empresa::find($id);
         if (!$empresa) {

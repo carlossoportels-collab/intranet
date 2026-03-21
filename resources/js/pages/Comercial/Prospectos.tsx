@@ -165,167 +165,177 @@ export default function Prospectos({
   }, []);
   
   return (
-    <AppLayout title="Prospectos">
+ <AppLayout title="Prospectos">
       <Head title="Prospectos" />
       
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Prospectos</h1>
-            <p className="mt-1 text-gray-600 text-base">
-              Gestión de leads y prospectos comerciales
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap gap-2">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-              usuario.ve_todas_cuentas 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-blue-100 text-blue-800'
-            }`}>
-              {usuario.ve_todas_cuentas ? '🔓 Ve todos los prospectos' : '🔒 Prospectos limitados'}
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="md:hidden inline-flex items-center px-3 py-1 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50"
-            >
-              {showMobileFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
-            </button>
+      {/* 🔥 ELIMINAMOS EL HEADER CON MARGEN y ponemos título dentro del pipeline */}
+      
+      {/* Pipeline - SIN PADDING EXTRA */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-4 md:p-6 border-b border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Prospectos</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Gestión de leads y prospectos comerciales
+              </p>
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                usuario.ve_todas_cuentas 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {usuario.ve_todas_cuentas ? '🔓 Ve todos los prospectos' : '🔒 Prospectos limitados'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowMobileFilters(!showMobileFilters)}
+                className="md:hidden inline-flex items-center px-3 py-1 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50"
+              >
+                {showMobileFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      
-      {/* Pipeline */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">
+        
+        {/* Pipeline Statistics - dentro del mismo contenedor blanco */}
+        <div className="p-4 md:p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Pipeline de Prospectos
           </h2>
+          <PipelineStatistics 
+            estadisticas={estadisticas}
+            estadosLead={estadosLead}         
+          />
         </div>
         
-        <PipelineStatistics 
-        estadisticas={estadisticas}
-        estadosLead={estadosLead}         
-        />
-        
-        {/* Filtros */}
-        <FilterBar 
-          showMobileFilters={showMobileFilters}
-          searchValue={activeFilters.search}
-          onSearchChange={(value) => updateFilter('search', value)}
-          estadoValue={activeFilters.estado_id}
-          onEstadoChange={(value) => updateFilter('estado_id', value)}
-          origenValue={activeFilters.origen_id}
-          onOrigenChange={(value) => updateFilter('origen_id', value)}
-          prefijoValue={activeFilters.prefijo_id}
-          onPrefijoChange={(value) => updateFilter('prefijo_id', value)}
-          fechaInicio={activeFilters.fecha_inicio}
-          fechaFin={activeFilters.fecha_fin}
-          onFechaInicioChange={(value) => updateFilter('fecha_inicio', value)}
-          onFechaFinChange={(value) => updateFilter('fecha_fin', value)}
-          estadosLead={estadosLead}
-          origenes={origenes}
-          prefijosFiltro={prefijosFiltro}
-          prefijoUsuario={prefijoUsuario}
-          usuarioEsComercial={usuarioEsComercial}
-        />
-        
-        {hasActiveFilters && (
-          <ActiveFilters 
-            filters={activeFilters}
-            onClearFilter={(key: string, value: string) => updateFilter(key as any, value)}
-            onClearAll={clearFilters}
+        {/* Filtros - dentro del mismo contenedor blanco */}
+        <div className="p-4 md:p-6 border-b border-gray-200">
+          <FilterBar 
+            showMobileFilters={showMobileFilters}
+            searchValue={activeFilters.search}
+            onSearchChange={(value) => updateFilter('search', value)}
+            estadoValue={activeFilters.estado_id}
+            onEstadoChange={(value) => updateFilter('estado_id', value)}
+            origenValue={activeFilters.origen_id}
+            onOrigenChange={(value) => updateFilter('origen_id', value)}
+            prefijoValue={activeFilters.prefijo_id}
+            onPrefijoChange={(value) => updateFilter('prefijo_id', value)}
+            fechaInicio={activeFilters.fecha_inicio}
+            fechaFin={activeFilters.fecha_fin}
+            onFechaInicioChange={(value) => updateFilter('fecha_inicio', value)}
+            onFechaFinChange={(value) => updateFilter('fecha_fin', value)}
             estadosLead={estadosLead}
             origenes={origenes}
             prefijosFiltro={prefijosFiltro}
+            prefijoUsuario={prefijoUsuario}
+            usuarioEsComercial={usuarioEsComercial}
           />
+        </div>
+        
+        {/* Active Filters */}
+        {hasActiveFilters && (
+          <div className="px-4 md:px-6 py-3 border-b border-gray-200 bg-gray-50">
+            <ActiveFilters 
+              filters={activeFilters}
+              onClearFilter={(key: string, value: string) => updateFilter(key as any, value)}
+              onClearAll={clearFilters}
+              estadosLead={estadosLead}
+              origenes={origenes}
+              prefijosFiltro={prefijosFiltro}
+            />
+          </div>
         )}
         
         {/* Lista de Leads */}
-        {leadsData.length === 0 ? (
-          <EmptyState 
-            hasFilters={hasActiveFilters}
-            onClearFilters={clearFilters}
-          />
-        ) : (
-          <>
-            {/* Versión móvil */}
-            <div className="md:hidden space-y-4">
-              {leadsData.map((lead) => (
-                <LeadCardMobile
-                  key={lead.id}
-                  lead={lead}
-                  origenes={origenes}
-                  estadosLead={estadosLead}
-                  comentariosCount={contarComentariosDeLead(lead.id)}
-                  presupuestosCount={contarPresupuestosDeLead(lead.id)}
-                  usuario={usuario}
-                  onNuevoComentario={(lead) => handleOpenModal('nuevoComentario', lead)}
-                  onVerNota={(lead) => handleOpenModal('verNota', lead)}
-                  onTiemposEstados={(lead) => handleOpenModal('tiemposEstados', lead)}
-                />
-              ))}
-            </div>
-            
-            {/* Versión desktop */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Prospecto
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contacto
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Estado
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Presupuestos
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Comentarios
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Registro
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {leadsData.map((lead) => (
-                    <LeadTableRow
-                      key={lead.id}
-                      lead={lead}
-                      origenes={origenes}
-                      estadosLead={estadosLead}
-                      comentariosCount={contarComentariosDeLead(lead.id)}
-                      presupuestosCount={contarPresupuestosDeLead(lead.id)}
-                      usuario={usuario}
-                      onNuevoComentario={(lead) => handleOpenModal('nuevoComentario', lead)}
-                      onVerNota={(lead) => handleOpenModal('verNota', lead)}
-                      onTiemposEstados={(lead) => handleOpenModal('tiemposEstados', lead)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            {/* Paginación */}
-            <Pagination
-              currentPage={current_page}
-              lastPage={last_page}
-              total={total}
-              perPage={per_page}
-              only={['leads', 'comentariosPorLead', 'presupuestosPorLead']}
+        <div className="p-4 md:p-6">
+          {leadsData.length === 0 ? (
+            <EmptyState 
+              hasFilters={hasActiveFilters}
+              onClearFilters={clearFilters}
             />
-          </>
-        )}
+          ) : (
+            <>
+              {/* Versión móvil */}
+              <div className="md:hidden space-y-4">
+                {leadsData.map((lead) => (
+                  <LeadCardMobile
+                    key={lead.id}
+                    lead={lead}
+                    origenes={origenes}
+                    estadosLead={estadosLead}
+                    comentariosCount={contarComentariosDeLead(lead.id)}
+                    presupuestosCount={contarPresupuestosDeLead(lead.id)}
+                    usuario={usuario}
+                    onNuevoComentario={(lead) => handleOpenModal('nuevoComentario', lead)}
+                    onVerNota={(lead) => handleOpenModal('verNota', lead)}
+                    onTiemposEstados={(lead) => handleOpenModal('tiemposEstados', lead)}
+                  />
+                ))}
+              </div>
+              
+              {/* Versión desktop */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Prospecto
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contacto
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Estado
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Presupuestos
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Comentarios
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Registro
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {leadsData.map((lead) => (
+                      <LeadTableRow
+                        key={lead.id}
+                        lead={lead}
+                        origenes={origenes}
+                        estadosLead={estadosLead}
+                        comentariosCount={contarComentariosDeLead(lead.id)}
+                        presupuestosCount={contarPresupuestosDeLead(lead.id)}
+                        usuario={usuario}
+                        onNuevoComentario={(lead) => handleOpenModal('nuevoComentario', lead)}
+                        onVerNota={(lead) => handleOpenModal('verNota', lead)}
+                        onTiemposEstados={(lead) => handleOpenModal('tiemposEstados', lead)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Paginación */}
+              <div className="mt-6">
+                <Pagination
+                  currentPage={current_page}
+                  lastPage={last_page}
+                  total={total}
+                  perPage={per_page}
+                  only={['leads', 'comentariosPorLead', 'presupuestosPorLead']}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Modales */}

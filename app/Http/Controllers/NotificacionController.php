@@ -1,7 +1,9 @@
 <?php
+// app/Http/Controllers/NotificacionController.php
 
 namespace App\Http\Controllers;
 
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -10,11 +12,21 @@ use Carbon\Carbon;
 
 class NotificacionController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     /**
      * Vista principal de notificaciones (página completa)
      */
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.VER_NOTIFICACIONES'));
+        
         $usuarioId = Auth::id();
         
         // Query base - NOTIFICACIONES ACTIVAS (fecha <= ahora)
@@ -45,126 +57,44 @@ class NotificacionController extends Controller
     /**
      * Vista de notificaciones programadas (futuras)
      */
-public function programadas(Request $request)
-{
-    $usuarioId = Auth::id();
-    
-    // Query base - NOTIFICACIONES FUTURAS (fecha > ahora)
-    $query = $this->baseQuery($usuarioId)
-        ->where('fecha_notificacion', '>', Carbon::now());
-    
-    // Aplicar filtros
-    if ($request->filled('tipo')) {
-        $query->where('tipo', $request->tipo);
-    }
-    
-    if ($request->filled('prioridad')) {
-        $query->where('prioridad', $request->prioridad);
-    }
-    
-    if ($request->filled('busqueda')) {
-        $busqueda = $request->busqueda;
-        $query->where(function($q) use ($busqueda) {
-            $q->where('titulo', 'like', "%{$busqueda}%")
-              ->orWhere('mensaje', 'like', "%{$busqueda}%");
-        });
-    }
-    
-    // Paginación
-    $programadas = $query->paginate(10);
-    
-    // Transformar resultados con información adicional
-    $programadas->getCollection()->transform(function($notificacion) {
-        $notif = $this->transformarNotificacion($notificacion);
-        $notif->fecha_programada = Carbon::parse($notif->fecha_notificacion);
-        $notif->dias_faltantes = Carbon::now()->diffInDays($notif->fecha_programada, false);
+    public function programadas(Request $request)
+    {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.VER_NOTIFICACIONES_PROGRAMADAS'));
         
-        // Información adicional según el tipo de entidad
-        $notif->lead_nombre = null;
-        $notif->lead_id = null;
+        $usuarioId = Auth::id();
         
-        if ($notif->entidad_tipo === 'comentario') {
-            $comentario = DB::table('comentarios')
-                ->select('comentarios.lead_id', 'leads.nombre_completo')
-                ->join('leads', 'comentarios.lead_id', '=', 'leads.id')
-                ->where('comentarios.id', $notif->entidad_id)
-                ->first();
-            if ($comentario) {
-                $notif->lead_id = $comentario->lead_id;
-                $notif->lead_nombre = $comentario->nombre_completo;
-            }
+        // Query base - NOTIFICACIONES FUTURAS (fecha > ahora)
+        $query = $this->baseQuery($usuarioId)
+            ->where('fecha_notificacion', '>', Carbon::now());
+        
+        // Aplicar filtros
+        if ($request->filled('tipo')) {
+            $query->where('tipo', $request->tipo);
         }
         
-        if ($notif->entidad_tipo === 'lead') {
-            $lead = DB::table('leads')
-                ->select('nombre_completo')
-                ->where('id', $notif->entidad_id)
-                ->first();
-            if ($lead) {
-                $notif->lead_nombre = $lead->nombre_completo;
-                $notif->lead_id = $notif->entidad_id;
-            }
+        if ($request->filled('prioridad')) {
+            $query->where('prioridad', $request->prioridad);
         }
         
-        if ($notif->entidad_tipo === 'seguimiento_perdida') {
-            $seguimiento = DB::table('seguimientos_perdida')
-                ->select('seguimientos_perdida.lead_id', 'leads.nombre_completo')
-                ->join('leads', 'seguimientos_perdida.lead_id', '=', 'leads.id')
-                ->where('seguimientos_perdida.id', $notif->entidad_id)
-                ->first();
-            if ($seguimiento) {
-                $notif->lead_id = $seguimiento->lead_id;
-                $notif->lead_nombre = $seguimiento->nombre_completo;
-            }
+        if ($request->filled('busqueda')) {
+            $busqueda = $request->busqueda;
+            $query->where(function($q) use ($busqueda) {
+                $q->where('titulo', 'like', "%{$busqueda}%")
+                  ->orWhere('mensaje', 'like', "%{$busqueda}%");
+            });
         }
         
-        return $notif;
-    });
-    
-    // Estadísticas
-    $estadisticas = [
-        'total' => $this->baseQuery($usuarioId)->where('fecha_notificacion', '>', Carbon::now())->count(),
-        'hoy' => $this->baseQuery($usuarioId)->whereDate('fecha_notificacion', Carbon::today())->count(),
-        'semana' => $this->baseQuery($usuarioId)
-            ->whereBetween('fecha_notificacion', [Carbon::now(), Carbon::now()->addDays(7)])
-            ->count(),
-        'mes' => $this->baseQuery($usuarioId)
-            ->whereBetween('fecha_notificacion', [Carbon::now(), Carbon::now()->addDays(30)])
-            ->count(),
-    ];
-    
-    return Inertia::render('Notificaciones/Programadas', [
-        'programadas' => $programadas,
-        'estadisticas' => $estadisticas,
-        'filtros' => $request->only(['tipo', 'prioridad', 'busqueda']),
-        'tipos' => $this->getTiposNotificaciones(),
-    ]);
-}
-    
-    /**
-     * API para dropdown - solo notificaciones NO LEÍDAS
-     */
-public function ajaxIndex(Request $request)
-{
-    $usuarioId = Auth::id();
-    
-    if (!$usuarioId) {
-        return $this->jsonError('No autenticado', 401);
-    }
-    
-    $query = $this->baseQuery($usuarioId)
-        ->where('fecha_notificacion', '<=', Carbon::now());
-    
-    if (!$request->get('todas', false)) {
-        $query->where('leida', false);
-    }
-    
-    $limit = $request->get('limit', 10);
-    $notificaciones = $query->limit($limit)->get()
-        ->map(function($notif) {
-            $notif = $this->transformarNotificacion($notif);
+        // Paginación
+        $programadas = $query->paginate(10);
+        
+        // Transformar resultados con información adicional
+        $programadas->getCollection()->transform(function($notificacion) {
+            $notif = $this->transformarNotificacion($notificacion);
+            $notif->fecha_programada = Carbon::parse($notif->fecha_notificacion);
+            $notif->dias_faltantes = Carbon::now()->diffInDays($notif->fecha_programada, false);
             
-            // Incluir información del lead
+            // Información adicional según el tipo de entidad
             $notif->lead_nombre = null;
             $notif->lead_id = null;
             
@@ -191,17 +121,102 @@ public function ajaxIndex(Request $request)
                 }
             }
             
+            if ($notif->entidad_tipo === 'seguimiento_perdida') {
+                $seguimiento = DB::table('seguimientos_perdida')
+                    ->select('seguimientos_perdida.lead_id', 'leads.nombre_completo')
+                    ->join('leads', 'seguimientos_perdida.lead_id', '=', 'leads.id')
+                    ->where('seguimientos_perdida.id', $notif->entidad_id)
+                    ->first();
+                if ($seguimiento) {
+                    $notif->lead_id = $seguimiento->lead_id;
+                    $notif->lead_nombre = $seguimiento->nombre_completo;
+                }
+            }
+            
             return $notif;
         });
+        
+        // Estadísticas
+        $estadisticas = [
+            'total' => $this->baseQuery($usuarioId)->where('fecha_notificacion', '>', Carbon::now())->count(),
+            'hoy' => $this->baseQuery($usuarioId)->whereDate('fecha_notificacion', Carbon::today())->count(),
+            'semana' => $this->baseQuery($usuarioId)
+                ->whereBetween('fecha_notificacion', [Carbon::now(), Carbon::now()->addDays(7)])
+                ->count(),
+            'mes' => $this->baseQuery($usuarioId)
+                ->whereBetween('fecha_notificacion', [Carbon::now(), Carbon::now()->addDays(30)])
+                ->count(),
+        ];
+        
+        return Inertia::render('Notificaciones/Programadas', [
+            'programadas' => $programadas,
+            'estadisticas' => $estadisticas,
+            'filtros' => $request->only(['tipo', 'prioridad', 'busqueda']),
+            'tipos' => $this->getTiposNotificaciones(),
+        ]);
+    }
     
-    return response()->json([
-        'success' => true,
-        'data' => $notificaciones,
-        'meta' => [
-            'total_no_leidas' => $this->contarNoLeidas($usuarioId)
-        ]
-    ]);
-}
+    /**
+     * API para dropdown - solo notificaciones NO LEÍDAS
+     */
+    public function ajaxIndex(Request $request)
+    {
+        $usuarioId = Auth::id();
+        
+        if (!$usuarioId) {
+            return $this->jsonError('No autenticado', 401);
+        }
+        
+        $query = $this->baseQuery($usuarioId)
+            ->where('fecha_notificacion', '<=', Carbon::now());
+        
+        if (!$request->get('todas', false)) {
+            $query->where('leida', false);
+        }
+        
+        $limit = $request->get('limit', 10);
+        $notificaciones = $query->limit($limit)->get()
+            ->map(function($notif) {
+                $notif = $this->transformarNotificacion($notif);
+                
+                // Incluir información del lead
+                $notif->lead_nombre = null;
+                $notif->lead_id = null;
+                
+                if ($notif->entidad_tipo === 'comentario') {
+                    $comentario = DB::table('comentarios')
+                        ->select('comentarios.lead_id', 'leads.nombre_completo')
+                        ->join('leads', 'comentarios.lead_id', '=', 'leads.id')
+                        ->where('comentarios.id', $notif->entidad_id)
+                        ->first();
+                    if ($comentario) {
+                        $notif->lead_id = $comentario->lead_id;
+                        $notif->lead_nombre = $comentario->nombre_completo;
+                    }
+                }
+                
+                if ($notif->entidad_tipo === 'lead') {
+                    $lead = DB::table('leads')
+                        ->select('nombre_completo')
+                        ->where('id', $notif->entidad_id)
+                        ->first();
+                    if ($lead) {
+                        $notif->lead_nombre = $lead->nombre_completo;
+                        $notif->lead_id = $notif->entidad_id;
+                    }
+                }
+                
+                return $notif;
+            });
+        
+        return response()->json([
+            'success' => true,
+            'data' => $notificaciones,
+            'meta' => [
+                'total_no_leidas' => $this->contarNoLeidas($usuarioId)
+            ]
+        ]);
+    }
     
     /**
      * Marcar una notificación como leída
@@ -414,6 +429,8 @@ public function ajaxIndex(Request $request)
             'asignacion_lead' => 'Asignación lead',
             'comentario_recordatorio' => 'Recordatorio comentario',
             'lead_posible_recontacto' => 'Posible recontacto de lead perdido',
+            'actividad_sospechosa' => 'Actividad sospechosa', // 🔥 AGREGADO
+            'error_servidor' => 'Error del servidor', // 🔥 AGREGADO
         ];
     }
 }

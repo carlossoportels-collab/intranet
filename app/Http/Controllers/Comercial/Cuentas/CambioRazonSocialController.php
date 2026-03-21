@@ -1,8 +1,10 @@
 <?php
+// app/Http/Controllers/Comercial/Cuentas/CambioRazonSocialController.php
 
 namespace App\Http\Controllers\Comercial\Cuentas;
 
 use App\Http\Controllers\Controller;
+use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Empresa;
@@ -23,18 +25,40 @@ use Illuminate\Support\Facades\Log;
 
 class CambioRazonSocialController extends Controller
 {
+    use Authorizable; // 🔥 AGREGAR TRAIT
+
+    public function __construct()
+    {
+        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+    }
+
     /**
      * Mostrar listado de cambios y formulario
      */
     public function index(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_CAMBIO_RAZON_SOCIAL'));
+        
         $usuario = Auth::user();
         
-        // Empresas para el buscador
-        $empresas = Empresa::whereNull('deleted_at')
+        // Obtener prefijos permitidos
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
+        
+        // Empresas para el buscador (con filtro de permisos)
+        $empresasQuery = Empresa::whereNull('deleted_at')
             ->with('prefijo')
-            ->orderBy('nombre_fantasia')
-            ->get()
+            ->orderBy('nombre_fantasia');
+        
+        if (!$this->canViewAllRecords()) {
+            if (!empty($prefijosPermitidos)) {
+                $empresasQuery->whereIn('prefijo_id', $prefijosPermitidos);
+            } else {
+                $empresasQuery->whereRaw('1 = 0');
+            }
+        }
+        
+        $empresas = $empresasQuery->get()
             ->map(function ($empresa) {
                 $codigoPrefijo = $empresa->prefijo ? $empresa->prefijo->codigo : 'EMP';
                 return [
@@ -46,10 +70,17 @@ class CambioRazonSocialController extends Controller
                 ];
             });
 
-        // Historial de cambios
-        $historial = CambioRazonSocial::with(['empresa.prefijo', 'usuario.personal'])
-            ->orderBy('fecha_cambio', 'desc')
-            ->paginate(5)
+        // Historial de cambios (con filtro de permisos)
+        $historialQuery = CambioRazonSocial::with(['empresa.prefijo', 'usuario.personal'])
+            ->orderBy('fecha_cambio', 'desc');
+        
+        if (!$this->canViewAllRecords()) {
+            $historialQuery->whereHas('empresa', function($q) use ($prefijosPermitidos) {
+                $q->whereIn('prefijo_id', $prefijosPermitidos);
+            });
+        }
+
+        $historial = $historialQuery->paginate(5)
             ->through(function ($cambio) {
                 $codigoPrefijo = $cambio->empresa->prefijo ? $cambio->empresa->prefijo->codigo : 'EMP';
                 $nombreUsuario = 'Sistema';
@@ -105,20 +136,30 @@ class CambioRazonSocialController extends Controller
      */
     public function getEmpresaDataCompleta($id)
     {
+        $usuario = Auth::user();
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
+        
         $empresa = Empresa::with([
-        'prefijo',
-        'localidadFiscal.provincia',
-        'rubro',
-        'categoriaFiscal',
-        'plataforma',
-        'contactos' => function ($query) {
-            $query->where('es_activo', true)
-                ->with('lead.localidad.provincia'); // ← Cambio aquí
-        },
-        'responsables' => function ($query) {
-            $query->where('es_activo', true);
+            'prefijo',
+            'localidadFiscal.provincia',
+            'rubro',
+            'categoriaFiscal',
+            'plataforma',
+            'contactos' => function ($query) {
+                $query->where('es_activo', true)
+                    ->with('lead.localidad.provincia');
+            },
+            'responsables' => function ($query) {
+                $query->where('es_activo', true);
+            }
+        ])->findOrFail($id);
+
+        // Verificar permisos
+        if (!$this->canViewAllRecords()) {
+            if (empty($prefijosPermitidos) || !in_array($empresa->prefijo_id, $prefijosPermitidos)) {
+                abort(403, 'No tiene permisos para ver esta empresa');
+            }
         }
-    ])->findOrFail($id);
 
         $codigoPrefijo = $empresa->prefijo ? $empresa->prefijo->codigo : 'EMP';
 
@@ -155,35 +196,35 @@ class CambioRazonSocialController extends Controller
                         : $contacto->fecha_nacimiento;
                 }
                 
-            return [
-                'id' => $contacto->id,
-                'empresa_id' => $contacto->empresa_id,
-                'es_contacto_principal' => $contacto->es_contacto_principal,
-                'tipo_responsabilidad_id' => $contacto->tipo_responsabilidad_id,
-                'tipo_documento_id' => $contacto->tipo_documento_id,
-                'nro_documento' => $contacto->nro_documento,
-                'nacionalidad_id' => $contacto->nacionalidad_id,
-                'fecha_nacimiento' => $fechaNacimiento,
-                'direccion_personal' => $contacto->direccion_personal,
-                'codigo_postal_personal' => $contacto->codigo_postal_personal,
-                'lead' => $contacto->lead ? [
-                    'id' => $contacto->lead->id,
-                    'nombre_completo' => $contacto->lead->nombre_completo,
-                    'genero' => $contacto->lead->genero,
-                    'telefono' => $contacto->lead->telefono,
-                    'email' => $contacto->lead->email,
-                    'localidad_id' => $contacto->lead->localidad_id,
-                    'localidad' => $contacto->lead->localidad ? [
-                        'id' => $contacto->lead->localidad->id,
-                        'nombre' => $contacto->lead->localidad->nombre,
-                        'provincia_id' => $contacto->lead->localidad->provincia_id,
-                        'provincia' => $contacto->lead->localidad->provincia?->nombre,
+                return [
+                    'id' => $contacto->id,
+                    'empresa_id' => $contacto->empresa_id,
+                    'es_contacto_principal' => $contacto->es_contacto_principal,
+                    'tipo_responsabilidad_id' => $contacto->tipo_responsabilidad_id,
+                    'tipo_documento_id' => $contacto->tipo_documento_id,
+                    'nro_documento' => $contacto->nro_documento,
+                    'nacionalidad_id' => $contacto->nacionalidad_id,
+                    'fecha_nacimiento' => $fechaNacimiento,
+                    'direccion_personal' => $contacto->direccion_personal,
+                    'codigo_postal_personal' => $contacto->codigo_postal_personal,
+                    'lead' => $contacto->lead ? [
+                        'id' => $contacto->lead->id,
+                        'nombre_completo' => $contacto->lead->nombre_completo,
+                        'genero' => $contacto->lead->genero,
+                        'telefono' => $contacto->lead->telefono,
+                        'email' => $contacto->lead->email,
+                        'localidad_id' => $contacto->lead->localidad_id,
+                        'localidad' => $contacto->lead->localidad ? [
+                            'id' => $contacto->lead->localidad->id,
+                            'nombre' => $contacto->lead->localidad->nombre,
+                            'provincia_id' => $contacto->lead->localidad->provincia_id,
+                            'provincia' => $contacto->lead->localidad->provincia?->nombre,
+                        ] : null,
+                        'rubro_id' => $contacto->lead->rubro_id,
+                        'rubro' => $contacto->lead->rubro ? $contacto->lead->rubro->nombre : null,
+                        'origen_id' => $contacto->lead->origen_id,
+                        'origen' => $contacto->lead->origen ? $contacto->lead->origen->nombre : null,
                     ] : null,
-                    'rubro_id' => $contacto->lead->rubro_id,
-                    'rubro' => $contacto->lead->rubro ? $contacto->lead->rubro->nombre : null,
-                    'origen_id' => $contacto->lead->origen_id,
-                    'origen' => $contacto->lead->origen ? $contacto->lead->origen->nombre : null,
-                ] : null,
                 ];
             }),
             'responsables' => $empresa->responsables->map(function ($responsable) {
@@ -206,6 +247,9 @@ class CambioRazonSocialController extends Controller
      */
     public function updateCompleto(Request $request)
     {
+        // 🔥 VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.GESTIONAR_CAMBIO_RAZON_SOCIAL'));
+        
         $request->validate([
             'empresa_id' => 'required|exists:empresas,id',
             
@@ -243,11 +287,19 @@ class CambioRazonSocialController extends Controller
         ]);
 
         $usuario = Auth::user();
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
         
         DB::beginTransaction();
         
         try {
             $empresa = Empresa::findOrFail($request->empresa_id);
+            
+            // Verificar permisos
+            if (!$this->canViewAllRecords()) {
+                if (empty($prefijosPermitidos) || !in_array($empresa->prefijo_id, $prefijosPermitidos)) {
+                    throw new \Exception('No tiene permisos para modificar esta empresa');
+                }
+            }
             
             // Buscar contacto principal
             $contacto = EmpresaContacto::where('empresa_id', $empresa->id)
@@ -371,7 +423,17 @@ class CambioRazonSocialController extends Controller
      */
     public function show($id)
     {
+        $usuario = Auth::user();
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
+        
         $cambio = CambioRazonSocial::with(['empresa.prefijo', 'usuario.personal'])->findOrFail($id);
+        
+        // Verificar permisos
+        if (!$this->canViewAllRecords()) {
+            if (empty($prefijosPermitidos) || !in_array($cambio->empresa->prefijo_id, $prefijosPermitidos)) {
+                abort(403, 'No tiene permisos para ver este cambio');
+            }
+        }
 
         $codigoPrefijo = $cambio->empresa->prefijo ? $cambio->empresa->prefijo->codigo : 'EMP';
         $codigoEmpresa = $codigoPrefijo . '-' . $cambio->empresa->numeroalfa;

@@ -1,10 +1,10 @@
 <?php
-
-use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-
-// Importaciones
 use App\Http\Controllers\DashboardController;
+
+// Auth
+use App\Http\Controllers\Auth\LoginController;
+
+// Comercial
 use App\Http\Controllers\Comercial\ActividadController;
 use App\Http\Controllers\Comercial\ContactosController;
 use App\Http\Controllers\Comercial\PresupuestosController;
@@ -15,10 +15,31 @@ use App\Http\Controllers\Comercial\LeadController;
 use App\Http\Controllers\Comercial\MotivoPerdidaController;
 use App\Http\Controllers\Comercial\LeadsPerdidosController;
 use App\Http\Controllers\Comercial\LocalidadController;
+use App\Http\Controllers\Comercial\DocumentacionController;
+use App\Http\Controllers\Comercial\ContratoController;
+
+// Comercial - Cuentas
 use App\Http\Controllers\Comercial\Cuentas\DetallesController;
 use App\Http\Controllers\Comercial\Cuentas\CertificadosFlotaController;
 use App\Http\Controllers\Comercial\Cuentas\CambioTitularidadController;
 use App\Http\Controllers\Comercial\Cuentas\CambioRazonSocialController;
+use App\Http\Controllers\Comercial\Cuentas\ExternoController;
+
+// Comercial - Utils
+use App\Http\Controllers\Comercial\Utils\TipoResponsabilidadController;
+use App\Http\Controllers\Comercial\Utils\TipoDocumentoController;
+use App\Http\Controllers\Comercial\Utils\PaisController;
+use App\Http\Controllers\Comercial\Utils\CategoriaFiscalController;
+use App\Http\Controllers\Comercial\Utils\PlataformaController;
+use App\Http\Controllers\Comercial\Utils\RubroController;
+use App\Http\Controllers\Comercial\Utils\LeadDataController;
+use App\Http\Controllers\Comercial\Utils\NacionalidadController;
+use App\Http\Controllers\Comercial\Utils\Paso1LeadController;
+use App\Http\Controllers\Comercial\Utils\Paso2ContactoController;
+use App\Http\Controllers\Comercial\Utils\Paso3EmpresaController;
+use App\Http\Controllers\Comercial\Utils\AuditoriaDatoSensibleController;
+
+// Configuración
 use App\Http\Controllers\Config\Parametros\EstadosLeadController;
 use App\Http\Controllers\Config\Parametros\MediosPagoController;
 use App\Http\Controllers\Config\Parametros\MotivosBajaController;
@@ -29,214 +50,253 @@ use App\Http\Controllers\Config\TarifasController;
 use App\Http\Controllers\Config\PromocionController;
 use App\Http\Controllers\Config\Usuarios\UsuariosSistemaController;
 use App\Http\Controllers\Config\Usuarios\RolesPermisosController;
+
+// Condiciones Comerciales
 use App\Http\Controllers\CondComerciales\TarifasConsultaController;
 use App\Http\Controllers\CondComerciales\ConveniosVigentesController;
 use App\Http\Controllers\CondComerciales\NovedadesController;
 use App\Http\Controllers\CondComerciales\ReenviosActivosController;
+
+// RRHH
 use App\Http\Controllers\RRHH\Equipos\EquipoComercialController;
 use App\Http\Controllers\RRHH\Equipos\EquipoTecnicoController;
 use App\Http\Controllers\RRHH\Equipos\ComercialController;
+use App\Http\Controllers\RRHH\Equipos\TecnicoController;
 use App\Http\Controllers\RRHH\Personal\CumpleanosController;
 use App\Http\Controllers\RRHH\Personal\DatosPersonalesController;
 use App\Http\Controllers\RRHH\Personal\LicenciasController;
-use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\RRHH\Equipos\TecnicoController;
-use App\Http\Controllers\NotificacionController;
-use App\Http\Controllers\PresupuestoLegacyController;
-use App\Http\Controllers\ContratoLegacyController;
-use App\Http\Controllers\Comercial\DocumentacionController;
+
+// Estadísticas
 use App\Http\Controllers\Estadisticas\ComercialGrupalController;
 use App\Http\Controllers\Estadisticas\ComercialIndividualController;
-use App\Http\Controllers\Comercial\ContratoController;
 
-// ==================== NUEVOS CONTROLADORES PARA CONTRATOS ====================
-use App\Http\Controllers\Comercial\Utils\TipoResponsabilidadController;
-use App\Http\Controllers\Comercial\Utils\TipoDocumentoController;
-use App\Http\Controllers\Comercial\Utils\PaisController;
-use App\Http\Controllers\Comercial\Utils\CategoriaFiscalController;
-use App\Http\Controllers\Comercial\Utils\PlataformaController;
-use App\Http\Controllers\Comercial\Utils\RubroController;
-use App\Http\Controllers\Comercial\Utils\LeadDataController;
-use App\Http\Controllers\Comercial\Utils\NacionalidadController;
+// Notificaciones
+use App\Http\Controllers\NotificacionController;
 
-// Rutas públicas
+// Legacy
+use App\Http\Controllers\PresupuestoLegacyController;
+use App\Http\Controllers\ContratoLegacyController;
+
+// API
+use App\Http\Controllers\Api\EnvioEmailController;
+use App\Http\Controllers\Comercial\EmpresaResponsableController;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+
+
+// ============================================
+// RUTAS PÚBLICAS
+// ============================================
 Route::get('/login', [LoginController::class, 'show'])->name('login');
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
+// ============================================
+// RUTAS PÚBLICAS PARA USUARIOS EXTERNOS 
+// ============================================
+
+Route::prefix('cuentas')->name('cuentas.')->middleware(['throttle:10,1'])->group(function () {
+    Route::get('/moviles', [ExternoController::class, 'index'])->name('moviles');
+    Route::post('/moviles/login', [ExternoController::class, 'login'])->name('moviles.login');
+    Route::get('/moviles/vehiculos', [ExternoController::class, 'listarVehiculos'])->name('moviles.listar');
+    Route::get('/moviles/certificado/{vehiculoId}', [ExternoController::class, 'generarCertificado'])->name('moviles.certificado');
+    Route::get('/moviles/certificado-flota/{empresaId}', [ExternoController::class, 'generarCertificadoFlota'])->name('moviles.certificado-flota');
+    Route::post('/moviles/logout', [ExternoController::class, 'logout'])->name('moviles.logout');
+});
+
+// ============================================
+// RUTAS TEMPORALES (PDFs)
+// ============================================
+Route::prefix('temp')->name('temp.')->group(function () {
+    Route::get('/presupuesto/{id}', function ($id) {
+        $path = storage_path("app/temp/presupuesto-{$id}-*.pdf");
+        $archivos = glob($path);
+        
+        if (empty($archivos)) {
+            abort(404, 'Archivo no encontrado');
+        }
+        
+        $archivo = $archivos[0];
+        
+        if (filemtime($archivo) < now()->subMinutes(10)->timestamp) {
+            unlink($archivo);
+            abort(404, 'Link expirado');
+        }
+        
+        return response()->file($archivo, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="presupuesto.pdf"'
+        ]);
+    })->name('presupuesto');
+    
+    Route::get('/contrato/{id}', function ($id) {
+        $path = storage_path("app/temp/contrato-{$id}-*.pdf");
+        $archivos = glob($path);
+        
+        if (empty($archivos)) {
+            abort(404, 'Archivo no encontrado');
+        }
+        
+        $archivo = $archivos[0];
+        
+        if (filemtime($archivo) < now()->subMinutes(10)->timestamp) {
+            unlink($archivo);
+            abort(404, 'Link expirado');
+        }
+        
+        return response()->file($archivo, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="contrato.pdf"'
+        ]);
+    })->name('contrato');
+});
+
+// ============================================
+// RUTAS PROTEGIDAS (requieren autenticación)
+// ============================================
 Route::middleware(['auth', 'usuario.activo'])->group(function () {
-    // ==================== RUTAS PRINCIPALES ====================
+    
+    // ========== RUTAS PRINCIPALES ==========
     Route::get('/welcome', [LoginController::class, 'welcome'])->name('welcome');
     Route::get('/', [DashboardController::class, 'index'])->name('home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     
-    // ==================== GESTIÓN COMERCIAL ====================
-    Route::prefix('comercial')->group(function () {
-        // ========== RUTAS SIMPLES (SIN PARÁMETROS) ==========
-        Route::get('/actividad', [ActividadController::class, 'index'])->name('comercial.actividad');
-        Route::get('/contactos', [ContactosController::class, 'index'])->name('comercial.contactos');
-        Route::get('/prospectos', [ProspectosController::class, 'index'])->name('comercial.prospectos');
-        Route::get('/leads-perdidos', [LeadsPerdidosController::class, 'index'])->name('comercial.leadsperdidos');
-        Route::get('/tarifas', [TarifasConsultaController::class, 'index'])->name('comercial.tarifas');
-        Route::get('/convenios', [ConveniosVigentesController::class, 'index'])->name('comercial.convenios');
-        Route::get('/novedades', [NovedadesController::class, 'index'])->name('comercial.novedades');
-        Route::get('/reenvios', [ReenviosActivosController::class, 'index'])->name('comercial.reenvios');
+    // ========== GESTIÓN COMERCIAL ==========
+    Route::prefix('comercial')->name('comercial.')->group(function () {
         
-        // Rutas para documentación
-        Route::get('/documentacion', [DocumentacionController::class, 'index'])->name('documentacion.index');
-        Route::get('/documentacion/browse', [DocumentacionController::class, 'browse'])->name('documentacion.browse');
-        Route::get('/documentacion/download', [DocumentacionController::class, 'download'])->name('documentacion.download');
-
-        // ========== ENDPOINTS API (SIN PARÁMETROS) ==========
+        // Rutas simples (sin parámetros)
+        Route::get('/actividad', [ActividadController::class, 'index'])->name('actividad')->middleware('permiso:' . config('permisos.VER_ACTIVIDAD'));
+        Route::get('/contactos', [ContactosController::class, 'index'])->name('contactos')->middleware('permiso:' . config('permisos.VER_CONTACTOS'));
+        Route::get('/prospectos', [ProspectosController::class, 'index'])->name('prospectos')->middleware('permiso:' . config('permisos.VER_PROSPECTOS'));
+        Route::get('/leads-perdidos', [LeadsPerdidosController::class, 'index'])->name('leadsperdidos')->middleware('permiso:' . config('permisos.VER_LEADS_PERDIDOS'));
+        Route::get('/tarifas', [TarifasConsultaController::class, 'index'])->name('tarifas')->middleware('permiso:' . config('permisos.VER_TARIFAS_CONSULTA'));
+        Route::get('/convenios', [ConveniosVigentesController::class, 'index'])->name('convenios')->middleware('permiso:' . config('permisos.VER_CONVENIOS'));
+        Route::get('/novedades', [NovedadesController::class, 'index'])->name('novedades')->middleware('permiso:' . config('permisos.VER_NOVEDADES'));
+        Route::get('/reenvios', [ReenviosActivosController::class, 'index'])->name('reenvios')->middleware('permiso:' . config('permisos.VER_REENVIOS'));
+        Route::get('/documentacion', [DocumentacionController::class, 'index'])->name('documentacion.index')->middleware('permiso:' . config('permisos.VER_DOCUMENTACION'));
+        Route::get('/documentacion/browse', [DocumentacionController::class, 'browse'])->name('documentacion.browse')->middleware('permiso:' . config('permisos.VER_DOCUMENTACION'));
+        Route::get('/documentacion/download', [DocumentacionController::class, 'download'])->name('documentacion.download')->middleware('permiso:' . config('permisos.VER_DOCUMENTACION'));
+        
+        // Endpoints API
         Route::get('/motivos-perdida-activos', [MotivoPerdidaController::class, 'getMotivosActivos']);
-        Route::get('/localidades/buscar', [LocalidadController::class, 'buscar'])->name('comercial.localidades.buscar');
+        Route::get('/localidades/buscar', [LocalidadController::class, 'buscar'])->name('localidades.buscar');
         
-        // ========== TIPOS DE COMENTARIO (SIN PARÁMETROS DE LEAD) ==========
-        Route::get('/tipos-comentario/cliente', [ProspectosController::class, 'tiposComentarioCliente']);
-        Route::get('/tipos-comentario/recontacto', [ProspectosController::class, 'tiposComentarioRecontacto']);
-        Route::get('/tipos-comentario/lead', [ProspectosController::class, 'tiposComentarioLead']);
-        
-        // ========== PRESUPUESTOS ==========
-        Route::get('/presupuestos', [PresupuestosController::class, 'index'])->name('comercial.presupuestos');
-        Route::get('/presupuestos/create', [PresupuestosController::class, 'create'])->name('comercial.presupuestos.create');
-        Route::post('/presupuestos', [PresupuestosController::class, 'store'])->name('comercial.presupuestos.store');
-        Route::get('/presupuestos/{presupuesto}', [PresupuestosController::class, 'show'])->name('comercial.presupuestos.show');
-        Route::get('/presupuestos/{presupuesto}/edit', [PresupuestosController::class, 'edit'])->name('comercial.presupuestos.edit');
-        Route::put('/presupuestos/{presupuesto}', [PresupuestosController::class, 'update'])->name('comercial.presupuestos.update');
-        Route::delete('/presupuestos/{presupuesto}', [PresupuestosController::class, 'destroy'])->name('comercial.presupuestos.destroy');
-        Route::get('/presupuestos/{presupuesto}/pdf', [PresupuestosController::class, 'generarPdf'])->name('comercial.presupuestos.pdf');
-        Route::post('/presupuestos/{presupuesto}/enviar-email', [PresupuestosController::class, 'enviarEmail'])->name('comercial.presupuestos.enviar-email');
-        
-        // ========== NUEVA RUTA PARA GENERAR PDF TEMPORAL ==========
-        Route::post('/presupuestos/{presupuesto}/generar-pdf-temp', [PresupuestosController::class, 'generarPdfTemp'])
-            ->name('comercial.presupuestos.generar-pdf-temp');
-            
-
-        // ========== API PARA ENVÍO DE EMAILS ==========
-        Route::prefix('api')->group(function () {
-            Route::post('/presupuestos/{presupuesto}/enviar-email', [App\Http\Controllers\Api\EnvioEmailController::class, 'enviarPresupuesto'])
-                ->name('api.presupuestos.enviar-email');
-            Route::post('/contratos/{contrato}/enviar-email', [App\Http\Controllers\Api\EnvioEmailController::class, 'enviarContrato'])
-                ->name('api.contratos.enviar-email');
-        });
-
-        // ========== ENDPOINTS AJAX PARA PRESUPUESTOS ==========
+            // ========== ENDPOINTS AJAX PARA PRESUPUESTOS ==========
         Route::prefix('api/presupuestos')->group(function () {
             Route::get('/tasas', [PresupuestosController::class, 'getTasas']);
             Route::get('/abonos', [PresupuestosController::class, 'getAbonos']);
             Route::get('/accesorios', [PresupuestosController::class, 'getAccesorios']);
             Route::get('/servicios', [PresupuestosController::class, 'getServicios']);
         });
+        // Tipos de comentario
+        Route::get('/tipos-comentario/cliente', [ProspectosController::class, 'tiposComentarioCliente']);
+        Route::get('/tipos-comentario/recontacto', [ProspectosController::class, 'tiposComentarioRecontacto']);
+        Route::get('/tipos-comentario/lead', [ProspectosController::class, 'tiposComentarioLead']);
         
-        // ========== EMPRESAS ==========
-        Route::post('/empresa/responsables', [App\Http\Controllers\Comercial\EmpresaResponsableController::class, 'store'])->name('comercial.empresa.responsables.store');
-        Route::delete('/empresa/responsables/{id}', [App\Http\Controllers\Comercial\EmpresaResponsableController::class, 'destroy'])->name('comercial.empresa.responsables.destroy');
+        // ===== PRESUPUESTOS =====
+        Route::prefix('presupuestos')->name('presupuestos.')->group(function () {
+            Route::get('/', [PresupuestosController::class, 'index'])->name('index')->middleware('permiso:' . config('permisos.VER_PRESUPUESTOS'));
+            Route::get('/create', [PresupuestosController::class, 'create'])->name('create')->middleware('permiso:' . config('permisos.GESTIONAR_PRESUPUESTOS'));
+            Route::post('/', [PresupuestosController::class, 'store'])->name('store')->middleware('permiso:' . config('permisos.GESTIONAR_PRESUPUESTOS'));
+            Route::get('/{presupuesto}', [PresupuestosController::class, 'show'])->name('show')->middleware('permiso:' . config('permisos.VER_PRESUPUESTOS'));
+            Route::get('/{presupuesto}/edit', [PresupuestosController::class, 'edit'])->name('edit')->middleware('permiso:' . config('permisos.GESTIONAR_PRESUPUESTOS'));
+            Route::put('/{presupuesto}', [PresupuestosController::class, 'update'])->name('update')->middleware('permiso:' . config('permisos.GESTIONAR_PRESUPUESTOS'));
+            Route::delete('/{presupuesto}', [PresupuestosController::class, 'destroy'])->name('destroy')->middleware('permiso:' . config('permisos.GESTIONAR_PRESUPUESTOS'));
+            Route::get('/{presupuesto}/pdf', [PresupuestosController::class, 'generarPdf'])->name('pdf')->middleware('permiso:' . config('permisos.VER_PRESUPUESTOS'));
+            Route::post('/{presupuesto}/enviar-email', [PresupuestosController::class, 'enviarEmail'])->name('enviar-email')->middleware('permiso:' . config('permisos.GESTIONAR_PRESUPUESTOS'));
+            Route::post('/{presupuesto}/generar-pdf-temp', [PresupuestosController::class, 'generarPdfTemp'])->name('generar-pdf-temp')->middleware('permiso:' . config('permisos.VER_PRESUPUESTOS'));
+        });
         
-        // ========== UTILS PARA CONTRATOS ==========
-        Route::prefix('utils')->group(function () {
+        // ===== CONTRATOS =====
+        Route::prefix('contratos')->name('contratos.')->group(function () {
+            Route::get('/', [ContratoController::class, 'index'])->name('index')->middleware('permiso:' . config('permisos.VER_CONTRATOS'));
+            Route::get('/crear/{presupuestoId}', [ContratoController::class, 'create'])->name('create')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
+            Route::post('/', [ContratoController::class, 'store'])->name('store')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
+            Route::get('/{id}/pdf', [ContratoController::class, 'generarPdf'])->name('pdf')->middleware('permiso:' . config('permisos.VER_CONTRATOS'));
+            Route::get('/{id}', [ContratoController::class, 'show'])->name('show')->middleware('permiso:' . config('permisos.VER_CONTRATOS'));
+            Route::post('/{contrato}/generar-pdf-temp', [ContratoController::class, 'generarPdfTemp'])->name('generar-pdf-temp')->middleware('permiso:' . config('permisos.VER_CONTRATOS'));
+            Route::get('/desde-empresa/{empresaId}', [ContratoController::class, 'createFromEmpresa'])->name('desde-empresa')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
+            Route::post('/desde-empresa', [ContratoController::class, 'storeFromEmpresa'])->name('store-from-empresa')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
+        });
+        
+        // ===== CUENTAS =====
+        Route::prefix('cuentas')->name('cuentas.')->group(function () {
+            Route::get('/', [DetallesController::class, 'index'])->name('detalles')->middleware('permiso:' . config('permisos.VER_DETALLES_CUENTA'));
+            Route::get('/certificados', [CertificadosFlotaController::class, 'index'])->name('certificados')->middleware('permiso:' . config('permisos.VER_CERTIFICADOS_FLOTA'));
+Route::get('/certificados/flota/{empresaId}', [CertificadosFlotaController::class, 'generarCertificadoFlota'])->name('certificados.flota');
+Route::get('/certificados/vehiculo/{vehiculoId}', [CertificadosFlotaController::class, 'generarCertificadoVehiculo'])->name('certificados.vehiculo');
+            Route::get('/cambio-titularidad', [CambioTitularidadController::class, 'index'])->name('cambio-titularidad')->middleware('permiso:' . config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
+            Route::get('/cambio-razon-social', [CambioRazonSocialController::class, 'index'])->name('cambio-razon-social')->middleware('permiso:' . config('permisos.GESTIONAR_CAMBIO_RAZON_SOCIAL'));
+            
+            // API endpoints para cuentas
+            Route::get('/cambio-razon-social/empresa/{id}/completa', [CambioRazonSocialController::class, 'getEmpresaDataCompleta'])->name('cambio-razon-social.empresa-completa');
+            Route::get('/cambio-razon-social/{id}', [CambioRazonSocialController::class, 'show'])->name('cambio-razon-social.show');
+            Route::get('/cambio-titularidad/empresa/{id}/vehiculos', [CambioTitularidadController::class, 'getVehiculosEmpresa'])->name('cambio-titularidad.vehiculos');
+            Route::get('/cambio-titularidad/{id}', [CambioTitularidadController::class, 'show'])->name('cambio-titularidad.show');
+            
+            // POST endpoints
+            Route::post('/cambio-razon-social', [CambioRazonSocialController::class, 'store'])->name('cambio-razon-social.store');
+            Route::post('/actualizar-contacto', [CambioRazonSocialController::class, 'actualizarContacto'])->name('actualizar-contacto');
+            Route::post('/cambio-razon-social/completo', [CambioRazonSocialController::class, 'updateCompleto'])->name('cambio-razon-social.completo');
+            Route::post('/cambio-titularidad', [CambioTitularidadController::class, 'store'])->name('cambio-titularidad.store');
+        });
+        
+        // ===== LEADS =====
+        Route::get('/leads', [LeadController::class, 'index'])->name('leads.index')->middleware('permiso:' . config('permisos.VER_PROSPECTOS'));
+        Route::post('/leads', [LeadController::class, 'store'])->name('leads.store')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS'));
+        Route::get('/lead/{lead}/contactar-whatsapp', [LeadContactController::class, 'contactarWhatsApp'])->name('lead.contactar-whatsapp')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS'));
+        
+        Route::prefix('leads/{lead}')->name('leads.')->group(function () {
+            Route::get('/', [LeadController::class, 'show'])->name('show')->middleware('permiso:' . config('permisos.VER_PROSPECTOS'));
+            Route::put('/', [ProspectosController::class, 'update'])->name('update')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS'));
+            Route::post('/comentarios', [ProspectosController::class, 'guardarComentario'])->name('comentarios')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS'));
+            Route::get('/tiempos-estados', [ProspectosController::class, 'tiemposEntreEstados'])->name('tiempos-estados')->middleware('permiso:' . config('permisos.VER_PROSPECTOS'));
+            Route::get('/comentarios-modal-data', [ProspectosController::class, 'comentariosModalData'])->name('comentarios-modal-data');
+            Route::get('/datos-alta', [LeadDataController::class, 'getDatosAlta'])->name('datos-alta');
+            Route::get('/verificar-datos-contrato', [LeadController::class, 'verificarDatosContrato'])->name('verificar-datos-contrato');
+        });
+        
+        // ===== LEADS PERDIDOS =====
+        Route::prefix('leads-perdidos/{lead}')->name('leads-perdidos.')->group(function () {
+            Route::get('/modal-seguimiento', [LeadsPerdidosController::class, 'modalSeguimiento'])->name('modal-seguimiento')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS_PERDIDOS'));
+            Route::post('/seguimiento', [LeadsPerdidosController::class, 'procesarSeguimiento'])->name('seguimiento')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS_PERDIDOS'));
+        });
+        
+        // ===== EMPRESAS Y UTILS =====
+        Route::post('/empresa/responsables', [EmpresaResponsableController::class, 'store'])->name('empresa.responsables.store');
+        Route::delete('/empresa/responsables/{id}', [EmpresaResponsableController::class, 'destroy'])->name('empresa.responsables.destroy');
+        
+        Route::prefix('utils')->name('utils.')->group(function () {
             Route::get('/tipos-responsabilidad/activos', [TipoResponsabilidadController::class, 'activos']);
             Route::get('/tipos-documento/activos', [TipoDocumentoController::class, 'activos']);
             Route::get('/nacionalidades', [NacionalidadController::class, 'index']);
             Route::get('/categorias-fiscales/activas', [CategoriaFiscalController::class, 'activas']);
             Route::get('/plataformas/activas', [PlataformaController::class, 'activas']);
             Route::get('/rubros/activos', [RubroController::class, 'activos']);
-            Route::post('/empresa/paso1', [App\Http\Controllers\Comercial\Utils\Paso1LeadController::class, 'update']);
-            Route::post('/empresa/paso2', [App\Http\Controllers\Comercial\Utils\Paso2ContactoController::class, 'store']);
-            Route::post('/empresa/paso3', [App\Http\Controllers\Comercial\Utils\Paso3EmpresaController::class, 'store']);
-            Route::post('/auditoria/dato-sensible', [App\Http\Controllers\Comercial\Utils\AuditoriaDatoSensibleController::class, 'store'])->name('comercial.utils.auditoria.dato-sensible');
-        });
-        
-        // ========== CONTRATOS ==========
-        Route::prefix('contratos')->group(function () {
-            Route::get('/', [ContratoController::class, 'index'])->name('comercial.contratos.index');
-            Route::get('/crear/{presupuestoId}', [ContratoController::class, 'create'])->name('comercial.contratos.create');
-            Route::post('/', [ContratoController::class, 'store'])->name('comercial.contratos.store');
-            Route::get('/{id}/pdf', [ContratoController::class, 'generarPdf'])->name('comercial.contratos.pdf');
-            Route::get('/{id}', [ContratoController::class, 'show'])->name('comercial.contratos.show');
-            
-            // Ruta para generar PDF temporal
-            Route::post('/{contrato}/generar-pdf-temp', [ContratoController::class, 'generarPdfTemp'])->name('comercial.contratos.generar-pdf-temp');
-            
-            // Rutas para contrato desde empresa existente
-            Route::get('/desde-empresa/{empresaId}', [ContratoController::class, 'createFromEmpresa'])
-                ->name('comercial.contratos.desde-empresa');
-            
-            Route::post('/desde-empresa', [ContratoController::class, 'storeFromEmpresa'])
-                ->name('comercial.contratos.store-from-empresa');
-        });
-                
-        // ========== CUENTAS ==========
-        Route::prefix('cuentas')->group(function () {
-            // Rutas GET (vistas)
-            Route::get('/', [DetallesController::class, 'index'])->name('comercial.cuentas.detalles');
-            Route::get('/certificados', [CertificadosFlotaController::class, 'index'])->name('comercial.cuentas.certificados');
-            Route::get('/cambio-titularidad', [CambioTitularidadController::class, 'index'])->name('comercial.cuentas.cambio-titularidad');
-            Route::get('/cambio-razon-social', [CambioRazonSocialController::class, 'index'])->name('comercial.cuentas.cambio-razon-social');
-            
-            // Rutas POST para cambio de razón social
-            Route::post('/cambio-razon-social', [CambioRazonSocialController::class, 'store'])->name('comercial.cuentas.cambio-razon-social.store');
-            Route::post('/actualizar-contacto', [CambioRazonSocialController::class, 'actualizarContacto'])->name('comercial.cuentas.actualizar-contacto');
-            Route::post('/cambio-razon-social/completo', [CambioRazonSocialController::class, 'updateCompleto'])->name('comercial.cuentas.cambio-razon-social.completo');
-            
-            // Rutas POST para cambio de titularidad
-            Route::post('/cambio-titularidad', [CambioTitularidadController::class, 'store'])->name('comercial.cuentas.cambio-titularidad.store');
-            
-            // Rutas GET para datos (API)
-            Route::get('/cambio-razon-social/empresa/{id}/completa', [CambioRazonSocialController::class, 'getEmpresaDataCompleta'])->name('comercial.cuentas.cambio-razon-social.empresa-completa');
-            Route::get('/cambio-razon-social/{id}', [CambioRazonSocialController::class, 'show'])->name('comercial.cuentas.cambio-razon-social.show');
-            
-            // Rutas GET para datos de titularidad
-            Route::get('/cambio-titularidad/empresa/{id}/vehiculos', [CambioTitularidadController::class, 'getVehiculosEmpresa'])->name('comercial.cuentas.cambio-titularidad.vehiculos');
-            Route::get('/cambio-titularidad/{id}', [CambioTitularidadController::class, 'show'])->name('comercial.cuentas.cambio-titularidad.show');
-        });
-
-        // ========== RUTA PARA WHATSAPP TRACKING ==========
-        Route::get('/lead/{lead}/contactar-whatsapp', [LeadContactController::class, 'contactarWhatsApp'])
-            ->name('comercial.lead.contactar-whatsapp');
-
-        // ========== RUTAS CON PARÁMETROS LEAD ==========
-        Route::prefix('leads/{lead}')->group(function () {
-            Route::get('/', [LeadController::class, 'show'])->name('comercial.leads.show');
-            Route::put('/', [ProspectosController::class, 'update'])->name('leads.update');
-            Route::post('/comentarios', [ProspectosController::class, 'guardarComentario']);
-            Route::get('/tiempos-estados', [ProspectosController::class, 'tiemposEntreEstados'])->name('leads.tiempos-estados');
-            Route::get('/comentarios-modal-data', [ProspectosController::class, 'comentariosModalData'])->name('leads.comentarios-modal-data');
-            Route::get('/datos-alta', [App\Http\Controllers\Comercial\Utils\LeadDataController::class, 'getDatosAlta']);
-            Route::get('/verificar-datos-contrato', [LeadController::class, 'verificarDatosContrato'])->name('comercial.leads.verificar-datos-contrato');
-        });
-
-        // Rutas existentes fuera del grupo
-        Route::get('/leads', [LeadController::class, 'index'])->name('comercial.leads.index');
-        Route::post('/leads', [LeadController::class, 'store'])->name('comercial.leads.store');
-
-        // Ruta para crear contrato desde lead
-        Route::get('/contratos/create-from-lead/{presupuestoId}', [App\Http\Controllers\Comercial\ContratoController::class, 'createFromLead'])
-            ->name('comercial.contratos.create-from-lead');
-
-        // ========== LEADS PERDIDOS CON PARÁMETROS ==========
-        Route::prefix('leads-perdidos/{lead}')->group(function () {
-            Route::get('/modal-seguimiento', [LeadsPerdidosController::class, 'modalSeguimiento'])->name('leads-perdidos.modal-seguimiento');
-            Route::post('/seguimiento', [LeadsPerdidosController::class, 'procesarSeguimiento'])->name('leads-perdidos.seguimiento');
+            Route::post('/empresa/paso1', [Paso1LeadController::class, 'update']);
+            Route::post('/empresa/paso2', [Paso2ContactoController::class, 'store']);
+            Route::post('/empresa/paso3', [Paso3EmpresaController::class, 'store']);
+            Route::post('/auditoria/dato-sensible', [AuditoriaDatoSensibleController::class, 'store'])->name('auditoria.dato-sensible');
         });
     });
     
-    // ==================== CONFIGURACIÓN ====================
-    Route::prefix('config')->group(function () {
+    // ========== CONFIGURACIÓN ==========
+    Route::prefix('config')->name('config.')->middleware('permiso:' . config('permisos.VER_CONFIGURACION'))->group(function () {
+        
         // Parámetros
-        Route::prefix('parametros')->group(function () {
-            Route::get('/medios-pago', [MediosPagoController::class, 'index'])->name('config.medios-pago');
-            Route::get('/motivos-baja', [MotivosBajaController::class, 'index'])->name('config.motivos-baja');
-            Route::get('/origen-prospecto', [OrigenProspectoController::class, 'index'])->name('config.origen-prospecto');
-            Route::get('/rubros', [RubrosController::class, 'index'])->name('config.rubros');
-            Route::get('/terminos-condiciones', [TerminosCondicionesController::class, 'index'])->name('config.terminos-condiciones');
+        Route::prefix('parametros')->name('parametros.')->group(function () {
+            Route::get('/medios-pago', [MediosPagoController::class, 'index'])->name('medios-pago');
+            Route::get('/motivos-baja', [MotivosBajaController::class, 'index'])->name('motivos-baja');
+            Route::get('/origen-prospecto', [OrigenProspectoController::class, 'index'])->name('origen-prospecto');
+            Route::get('/rubros', [RubrosController::class, 'index'])->name('rubros');
+            Route::get('/terminos-condiciones', [TerminosCondicionesController::class, 'index'])->name('terminos-condiciones');
             
-            // Estados Lead CRUD
-            Route::prefix('estados-lead')->group(function () {
-                Route::get('/', [EstadosLeadController::class, 'index'])->name('config.estados-lead');
-                Route::post('/', [EstadosLeadController::class, 'store']);
-                Route::put('/{id}', [EstadosLeadController::class, 'update']);
-                Route::delete('/{id}', [EstadosLeadController::class, 'destroy']);
-                Route::post('/{id}/toggle-activo', [EstadosLeadController::class, 'toggleActivo']);
+            Route::prefix('estados-lead')->name('estados-lead.')->group(function () {
+                Route::get('/', [EstadosLeadController::class, 'index'])->name('index');
+                Route::post('/', [EstadosLeadController::class, 'store'])->name('store');
+                Route::put('/{id}', [EstadosLeadController::class, 'update'])->name('update');
+                Route::delete('/{id}', [EstadosLeadController::class, 'destroy'])->name('destroy');
+                Route::post('/{id}/toggle-activo', [EstadosLeadController::class, 'toggleActivo'])->name('toggle-activo');
             });
         });
         
@@ -246,7 +306,7 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
             Route::post('/', [TarifasController::class, 'store'])->name('store');
             Route::put('/{id}', [TarifasController::class, 'update'])->name('update');
             Route::put('/{id}/toggle-activo', [TarifasController::class, 'toggleActivo'])->name('toggle-activo');
-            Route::put('/{id}/toggle-presupuestable', [TarifasController::class, 'togglePresupuestable'])->name('tarifas.toggle-presupuestable');
+            Route::put('/{id}/toggle-presupuestable', [TarifasController::class, 'togglePresupuestable'])->name('toggle-presupuestable');
             Route::delete('/{id}', [TarifasController::class, 'destroy'])->name('destroy');
             Route::get('/export', [TarifasController::class, 'export'])->name('export');
             Route::post('/procesar-archivo', [TarifasController::class, 'procesarArchivo'])->name('procesar-archivo');
@@ -254,167 +314,129 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         });
 
         // Promociones
-        Route::prefix('promociones')->group(function () {
-            Route::get('/', [PromocionController::class, 'index'])->name('config.promociones.index');
-            Route::get('/create', [PromocionController::class, 'create'])->name('config.promociones.create');
-            Route::post('/', [PromocionController::class, 'store'])->name('config.promociones.store');
-            Route::get('/{promocione}/edit', [PromocionController::class, 'edit'])->name('config.promociones.edit');
-            Route::put('/{promocione}', [PromocionController::class, 'update'])->name('config.promociones.update');
-            Route::delete('/{promocione}', [PromocionController::class, 'destroy'])->name('config.promociones.destroy');
+        Route::prefix('promociones')->name('promociones.')->group(function () {
+            Route::get('/', [PromocionController::class, 'index'])->name('index');
+            Route::get('/create', [PromocionController::class, 'create'])->name('create');
+            Route::post('/', [PromocionController::class, 'store'])->name('store');
+            Route::get('/{promocione}/edit', [PromocionController::class, 'edit'])->name('edit');
+            Route::put('/{promocione}', [PromocionController::class, 'update'])->name('update');
+            Route::delete('/{promocione}', [PromocionController::class, 'destroy'])->name('destroy');
             
-            Route::prefix('api')->group(function () {
-                Route::get('/productos', [PromocionController::class, 'getProductos'])->name('config.promociones.api.productos');
-                Route::get('/productos/tipo/{tipo}', [PromocionController::class, 'getProductosPorTipo'])->name('config.promociones.api.productos-por-tipo');
+            Route::prefix('api')->name('api.')->group(function () {
+                Route::get('/productos', [PromocionController::class, 'getProductos'])->name('productos');
+                Route::get('/productos/tipo/{tipo}', [PromocionController::class, 'getProductosPorTipo'])->name('productos-por-tipo');
             });
         });
                             
         // Usuarios
-        Route::prefix('usuarios')->group(function () {
-            Route::get('/', [UsuariosSistemaController::class, 'index'])->name('config.usuarios');
+        Route::prefix('usuarios')->name('usuarios.')->group(function () {
+            Route::get('/', [UsuariosSistemaController::class, 'index'])->name('index');
         });
+         // Roles y Permisos
+        Route::prefix('usuarios')->name('usuarios.')->group(function () {
+                // Vista principal
+                Route::get('/roles', [RolesPermisosController::class, 'index'])->name('roles');
+                
+                // API endpoints
+                Route::get('/roles/{rol}', [RolesPermisosController::class, 'show'])->name('roles.show');
+                Route::put('/roles/{rol}/permisos', [RolesPermisosController::class, 'update'])->name('roles.permisos.update');
+                Route::post('/roles/{rol}/reset', [RolesPermisosController::class, 'reset'])->name('roles.reset');
+                
+                // Debug endpoints (opcional, podrías protegerlos con otro middleware)
+                Route::get('/permisos', [RolesPermisosController::class, 'getPermisos'])->name('permisos');
+                Route::get('/usuario/{usuario}/permisos', [RolesPermisosController::class, 'usuarioPermisos'])->name('usuario.permisos');
+            });
     });
     
-    // ==================== RRHH ====================
+
+
+
+
+    // ========== RRHH ==========
     Route::prefix('rrhh')->name('rrhh.')->group(function () {
         
-        // ===== EQUIPOS =====
-        Route::prefix('equipos')->name('equipos.')->group(function () {
-            // Equipo Técnico
-            Route::get('/tecnico', [EquipoTecnicoController::class, 'index'])->name('tecnico');
+        // Personal
+        Route::prefix('personal')->name('personal.')->group(function () {
+            Route::get('/datos', [DatosPersonalesController::class, 'index'])->name('datos')->middleware('permiso:' . config('permisos.VER_DATOS_PERSONALES'));
+            Route::get('/datos/crear', [DatosPersonalesController::class, 'create'])->name('datos.create')->middleware('permiso:' . config('permisos.GESTIONAR_DATOS_PERSONALES'));
+            Route::post('/datos', [DatosPersonalesController::class, 'store'])->name('datos.store')->middleware('permiso:' . config('permisos.GESTIONAR_DATOS_PERSONALES'));
+            Route::get('/datos/{id}/editar', [DatosPersonalesController::class, 'edit'])->name('datos.edit')->middleware('permiso:' . config('permisos.GESTIONAR_DATOS_PERSONALES'));
+            Route::put('/datos/{id}', [DatosPersonalesController::class, 'update'])->name('datos.update')->middleware('permiso:' . config('permisos.GESTIONAR_DATOS_PERSONALES'));
+            Route::delete('/datos/{id}', [DatosPersonalesController::class, 'destroy'])->name('datos.destroy')->middleware('permiso:' . config('permisos.GESTIONAR_DATOS_PERSONALES'));
             
-            // Equipo Comercial
-            Route::get('/comercial', [EquipoComercialController::class, 'index'])->name('comercial');
+            Route::get('/cumpleanos', [CumpleanosController::class, 'index'])->name('cumpleanos')->middleware('permiso:' . config('permisos.VER_CUMPLEANOS'));
             
-            // CRUD de técnicos
-            Route::prefix('tecnicos')->name('tecnicos.')->group(function () {
-                Route::get('/create', [TecnicoController::class, 'create'])->name('create');
-                Route::post('/', [TecnicoController::class, 'store'])->name('store');
-                Route::get('/{tecnico}/edit', [TecnicoController::class, 'edit'])->name('edit');
-                Route::put('/{tecnico}', [TecnicoController::class, 'update'])->name('update');
-                Route::delete('/{tecnico}', [TecnicoController::class, 'destroy'])->name('destroy');
-            });
-
-            // CRUD de comerciales
-            Route::prefix('comerciales')->name('comerciales.')->group(function () {
-                Route::get('/create', [ComercialController::class, 'create'])->name('create');
-                Route::post('/', [ComercialController::class, 'store'])->name('store');
-                Route::get('/{comercial}/edit', [ComercialController::class, 'edit'])->name('edit');
-                Route::put('/{comercial}', [ComercialController::class, 'update'])->name('update');
-                Route::delete('/{comercial}', [ComercialController::class, 'destroy'])->name('destroy');
+            Route::prefix('licencias')->name('licencias.')->group(function () {
+                Route::get('/', [LicenciasController::class, 'index'])->name('index')->middleware('permiso:' . config('permisos.VER_LICENCIAS'));
+                Route::get('/crear', [LicenciasController::class, 'create'])->name('create')->middleware('permiso:' . config('permisos.GESTIONAR_LICENCIAS'));
+                Route::post('/', [LicenciasController::class, 'store'])->name('store')->middleware('permiso:' . config('permisos.GESTIONAR_LICENCIAS'));
+                Route::get('/{id}', [LicenciasController::class, 'show'])->name('show')->middleware('permiso:' . config('permisos.VER_LICENCIAS'));
+                Route::get('/{id}/editar', [LicenciasController::class, 'edit'])->name('edit')->middleware('permiso:' . config('permisos.GESTIONAR_LICENCIAS'));
+                Route::put('/{id}', [LicenciasController::class, 'update'])->name('update')->middleware('permiso:' . config('permisos.GESTIONAR_LICENCIAS'));
+                Route::delete('/{id}', [LicenciasController::class, 'destroy'])->name('destroy')->middleware('permiso:' . config('permisos.GESTIONAR_LICENCIAS'));
             });
         });
         
-        // ===== PERSONAL =====
-        Route::prefix('personal')->name('personal.')->group(function () {
-            // Datos personales
-            Route::get('/datos', [DatosPersonalesController::class, 'index'])->name('datos');
-            Route::get('/datos/crear', [DatosPersonalesController::class, 'create'])->name('datos.create');
-            Route::post('/datos', [DatosPersonalesController::class, 'store'])->name('datos.store');
-            Route::get('/datos/{id}/editar', [DatosPersonalesController::class, 'edit'])->name('datos.edit');
-            Route::put('/datos/{id}', [DatosPersonalesController::class, 'update'])->name('datos.update');
-            Route::delete('/datos/{id}', [DatosPersonalesController::class, 'destroy'])->name('datos.destroy');
+        // Equipos
+        Route::prefix('equipos')->name('equipos.')->group(function () {
+            Route::get('/tecnico', [EquipoTecnicoController::class, 'index'])->name('tecnico')->middleware('permiso:' . config('permisos.VER_EQUIPOS'));
+            Route::get('/comercial', [EquipoComercialController::class, 'index'])->name('comercial')->middleware('permiso:' . config('permisos.VER_EQUIPOS'));
             
-            // Cumpleaños
-            Route::get('/cumpleanos', [CumpleanosController::class, 'index'])->name('cumpleanos');
-            
-            // Licencias
-            Route::prefix('licencias')->name('licencias.')->group(function () {
-                Route::get('/', [LicenciasController::class, 'index'])->name('index');
-                Route::get('/crear', [LicenciasController::class, 'create'])->name('create');
-                Route::post('/', [LicenciasController::class, 'store'])->name('store');
-                Route::get('/{id}', [LicenciasController::class, 'show'])->name('show');
-                Route::get('/{id}/editar', [LicenciasController::class, 'edit'])->name('edit');
-                Route::put('/{id}', [LicenciasController::class, 'update'])->name('update');
-                Route::delete('/{id}', [LicenciasController::class, 'destroy'])->name('destroy');
+            Route::prefix('tecnicos')->name('tecnicos.')->group(function () {
+                Route::get('/create', [TecnicoController::class, 'create'])->name('create')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+                Route::post('/', [TecnicoController::class, 'store'])->name('store')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+                Route::get('/{tecnico}/edit', [TecnicoController::class, 'edit'])->name('edit')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+                Route::put('/{tecnico}', [TecnicoController::class, 'update'])->name('update')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+                Route::delete('/{tecnico}', [TecnicoController::class, 'destroy'])->name('destroy')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_TECNICO'));
+            });
+
+            Route::prefix('comerciales')->name('comerciales.')->group(function () {
+                Route::get('/create', [ComercialController::class, 'create'])->name('create')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_COMERCIAL'));
+                Route::post('/', [ComercialController::class, 'store'])->name('store')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_COMERCIAL'));
+                Route::get('/{comercial}/edit', [ComercialController::class, 'edit'])->name('edit')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_COMERCIAL'));
+                Route::put('/{comercial}', [ComercialController::class, 'update'])->name('update')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_COMERCIAL'));
+                Route::delete('/{comercial}', [ComercialController::class, 'destroy'])->name('destroy')->middleware('permiso:' . config('permisos.GESTIONAR_EQUIPO_COMERCIAL'));
             });
         });
     });
 
-    // ==================== ESTADÍSTICAS ====================
-    Route::prefix('estadisticas')->name('estadisticas.')->group(function () {
+    // ========== ESTADÍSTICAS (solo usuarios 3 y 5) ==========
+    Route::prefix('estadisticas')->name('estadisticas.')->middleware('usuario:3,5')->group(function () {
         Route::get('/comercial-grupal', [ComercialGrupalController::class, 'index'])->name('comercial-grupal');
         Route::get('/comercial-individual/{id}', [ComercialIndividualController::class, 'show'])->name('comercial-individual');
     });
 
-    // ==================== NOTIFICACIONES ====================
-    Route::prefix('notificaciones')->group(function () {
-        Route::get('/', [NotificacionController::class, 'index'])->name('notificaciones.index');
-        Route::get('/programadas', [NotificacionController::class, 'programadas'])->name('notificaciones.programadas');
+    // ========== NOTIFICACIONES ==========
+    Route::prefix('notificaciones')->name('notificaciones.')->group(function () {
+        Route::get('/', [NotificacionController::class, 'index'])->name('index')->middleware('permiso:' . config('permisos.VER_NOTIFICACIONES'));
+        Route::get('/programadas', [NotificacionController::class, 'programadas'])->name('programadas')->middleware('permiso:' . config('permisos.VER_NOTIFICACIONES_PROGRAMADAS'));
         
-        Route::prefix('ajax')->group(function () {
-            Route::get('/', [NotificacionController::class, 'ajaxIndex'])->name('notificaciones.ajax.index');
-            Route::post('/{id}/marcar-leida', [NotificacionController::class, 'marcarLeida'])->name('notificaciones.marcar-leida');
-            Route::post('/marcar-todas-leidas', [NotificacionController::class, 'marcarTodasLeidas'])->name('notificaciones.marcar-todas');
-            Route::delete('/{id}', [NotificacionController::class, 'destroy'])->name('notificaciones.destroy');
-            Route::get('/contador', [NotificacionController::class, 'contador'])->name('notificaciones.contador');
+        Route::prefix('ajax')->name('ajax.')->group(function () {
+            Route::get('/', [NotificacionController::class, 'ajaxIndex'])->name('index');
+            Route::post('/{id}/marcar-leida', [NotificacionController::class, 'marcarLeida'])->name('marcar-leida');
+            Route::post('/marcar-todas-leidas', [NotificacionController::class, 'marcarTodasLeidas'])->name('marcar-todas');
+            Route::delete('/{id}', [NotificacionController::class, 'destroy'])->name('destroy');
+            Route::get('/contador', [NotificacionController::class, 'contador'])->name('contador');
         });
     });
 
-    // ==================== PRESUPUESTOS LEGACY ====================
-    Route::prefix('presupuestos-legacy')->group(function () {
-        Route::get('/{id}/pdf', [PresupuestoLegacyController::class, 'verPdf'])->name('presupuestos-legacy.pdf');
-        Route::get('/{id}/descargar', [PresupuestoLegacyController::class, 'descargarPdf'])->name('presupuestos-legacy.descargar');
+    // ========== RUTAS LEGACY ==========
+    Route::prefix('presupuestos-legacy')->name('presupuestos-legacy.')->group(function () {
+        Route::get('/{id}/pdf', [PresupuestoLegacyController::class, 'verPdf'])->name('pdf');
+        Route::get('/{id}/descargar', [PresupuestoLegacyController::class, 'descargarPdf'])->name('descargar');
     });
     
-    // ==================== CONTRATOS LEGACY ====================
-    Route::prefix('contratos-legacy')->group(function () {
-        Route::get('/{id}/pdf', [ContratoLegacyController::class, 'verPdf'])->name('contratos-legacy.pdf');
-        Route::get('/{id}/descargar', [ContratoLegacyController::class, 'descargarPdf'])->name('contratos-legacy.descargar');
+    Route::prefix('contratos-legacy')->name('contratos-legacy.')->group(function () {
+        Route::get('/{id}/pdf', [ContratoLegacyController::class, 'verPdf'])->name('pdf');
+        Route::get('/{id}/descargar', [ContratoLegacyController::class, 'descargarPdf'])->name('descargar');
     });
-
-
 });
 
-// ===== RUTAS PÚBLICAS TEMPORALES (FUERA DEL GRUPO AUTH) =====
-Route::get('/temp/presupuesto/{id}', function ($id) {
-    $path = storage_path("app/temp/presupuesto-{$id}-*.pdf");
-    $archivos = glob($path);
-    
-    if (empty($archivos)) {
-        abort(404, 'Archivo no encontrado');
-    }
-    
-    // Tomar el archivo más reciente
-    $archivo = $archivos[0];
-    
-    // Verificar que tenga menos de 10 minutos
-    if (filemtime($archivo) < now()->subMinutes(10)->timestamp) {
-        unlink($archivo); // Eliminar archivo expirado
-        abort(404, 'Link expirado');
-    }
-    
-    return response()->file($archivo, [
-        'Content-Type' => 'application/pdf',
-        'Content-Disposition' => 'inline; filename="presupuesto.pdf"'
-    ]);
-})->name('temp.presupuesto');
-
-Route::get('/temp/contrato/{id}', function ($id) {
-    $path = storage_path("app/temp/contrato-{$id}-*.pdf");
-    $archivos = glob($path);
-    
-    if (empty($archivos)) {
-        abort(404, 'Archivo no encontrado');
-    }
-    
-    $archivo = $archivos[0];
-    
-    if (filemtime($archivo) < now()->subMinutes(10)->timestamp) {
-        unlink($archivo);
-        abort(404, 'Link expirado');
-    }
-    
-    return response()->file($archivo, [
-        'Content-Type' => 'application/pdf',
-        'Content-Disposition' => 'inline; filename="contrato.pdf"'
-    ]);
-})->name('temp.contrato');
-
-// ===== ENDPOINTS API (fuera del prefijo rrhh pero con auth) =====
+// ============================================
+// ENDPOINTS API (con auth)
+// ============================================
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
-    // Búsqueda de personal para modales
     Route::get('/personal/buscar', [DatosPersonalesController::class, 'buscar'])->name('personal.buscar');
-    // Obtener datos de un empleado por ID para cumpleaños y WhatsApp
     Route::get('/personal/{id}', function ($id) {
         $personal = App\Models\Personal::find($id);
         if (!$personal) {
@@ -429,4 +451,10 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
             'email' => $personal->email,
         ]);
     })->name('personal.show');
+    
+    // API para envío de emails
+    Route::post('/presupuestos/{presupuesto}/enviar-email', [EnvioEmailController::class, 'enviarPresupuesto'])->name('presupuestos.enviar-email');
+    Route::post('/contratos/{contrato}/enviar-email', [EnvioEmailController::class, 'enviarContrato'])->name('contratos.enviar-email');
+
 });
+

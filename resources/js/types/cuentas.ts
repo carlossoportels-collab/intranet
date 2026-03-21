@@ -1,27 +1,29 @@
 // resources/js/types/cuentas.ts
 
-export interface AbonoVehiculo {
+export interface Abono {
     id: number;
-    abono_codigo: string;
+    abono_codigo: string | null;
     abono_nombre: string;
     abono_precio: number;
+    abono_descuento?: number | null;
+    abono_descmotivo?: string | null;
     created_at: string | null;
 }
 
 export interface Vehiculo {
     id: number;
     codigo_alfa: string;
-    nombre_mix: string;
+    nombre_mix: string | null;
     ab_alta: string | null;
     avl_anio: number | null;
-    avl_color: string;
-    avl_identificador: string;
-    avl_marca: string;
-    avl_modelo: string;
-    avl_patente: string;
-    categoria: string;
+    avl_color: string | null;
+    avl_identificador: string | null;
+    avl_marca: string | null;
+    avl_modelo: string | null;
+    avl_patente: string | null;
+    categoria: string | null;
     empresa_id: number;
-    abonos: AbonoVehiculo[];
+    abonos: Abono[];
 }
 
 export interface LocalidadFiscal {
@@ -71,13 +73,65 @@ export interface EstadisticasCuentas {
     nuevas: number;
 }
 
+export interface PrefijoFiltro {
+    id: string | number;
+    codigo: string;
+    descripcion: string;
+    comercial_nombre?: string;
+    display_text: string;
+}
+
 export interface UsuarioPermisos {
     ve_todas_cuentas: boolean;
     prefijos: number[];
+    rol_id: number;
+    puede_ver_montos: boolean;
+    prefijo_usuario?: PrefijoFiltro | null;
+}
+
+export interface AbonoDetallePorNombre {
+    nombre: string;
+    cantidad: number;
+    total_sin_descuento: number;
+    total_con_descuento: number;
+}
+
+export interface EstadisticaAbonoPorTipo {
+    tipo_id: number;
+    tipo_nombre: string;
+    cantidad: number;
+    total_sin_descuento: number;
+    total_con_descuento: number;
+    abonos: AbonoDetallePorNombre[];
+}
+
+export interface EstadisticasAbonos {
+    tipos_principales: EstadisticaAbonoPorTipo[];
+    total_abonos: number;
+    total_monto: number;
+}
+
+export interface Comercial {
+    id: number;
+    nombre: string;
+    prefijo_id: number;
+    prefijo_codigo: string;
+    email: string | null;
+    compania_id: number;
 }
 
 export interface DetallesCuentasProps {
     empresas: Empresa[];
-    estadisticas: EstadisticasCuentas;
+    estadisticas: {
+        total: number;
+        abonos: number;
+        nuevas: number;
+    };
+    estadisticas_abonos: EstadisticasAbonos;
+    comerciales: Comercial[];
     usuario: UsuarioPermisos;
+    prefijosFiltro?: PrefijoFiltro[];
+    filters?: {
+        comercial_id?: number | null;
+    };
 }
