@@ -140,7 +140,7 @@ class LoginController extends Controller
         if (!$comercial || !$comercial->compania_id) {
             return [
                 'nombre' => 'Intranet',
-                'logo' => 'logo.webp',
+                'logo' => 'logo.png',
                 'colores' => [
                     'primary' => '#fa6400',
                     'secondary' => '#3b3b3d',
@@ -151,7 +151,7 @@ class LoginController extends Controller
         $companias = [
             1 => [
                 'nombre' => 'LocalSat',
-                'logo' => 'logo.webp',
+                'logo' => 'logo.png',
                 'colores' => [
                     'primary' => '#fa6400',
                     'secondary' => '#3b3b3d',
@@ -167,7 +167,7 @@ class LoginController extends Controller
             ],
             3 => [
                 'nombre' => '360',
-                'logo' => '360-logo.webp',
+                'logo' => '360-logo.png',
                 'colores' => [
                     'primary' => '#fa6400',
                     'secondary' => '#3b3b3d',
@@ -177,7 +177,7 @@ class LoginController extends Controller
         
         return $companias[$comercial->compania_id] ?? [
             'nombre' => 'Compañía ' . $comercial->compania_id,
-            'logo' => 'logo-generic.webp',
+            'logo' => 'logo-generic.png',
             'colores' => [
                 'primary' => '#fa6400',
                 'secondary' => '#3b3b3d',

@@ -84,7 +84,7 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
                                         height="56"     
                                         onError={(e) => {
                                             const target = e.target as HTMLImageElement;
-                                            target.src = '/images/logos/logo.webp';
+                                            target.src = '/images/logos/logo.png';
                                         }}
                                     />
                                 </Link>

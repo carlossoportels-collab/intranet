@@ -296,7 +296,7 @@ export default function Cumpleanos({ personal, departamentos }: Props) {
             }
         }
 
-        const mensaje = `¡Feliz cumpleaños ${empleado.nombre}! 🎂🎉\n\nQue tengas un excelente día y que se cumplan todos tus deseos.`;
+        const mensaje = `¡Feliz cumpleaños ${empleado.nombre}! \n\nQue tengas un excelente día y que se cumplan todos tus deseos.`;
         
         const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
         window.open(url, '_blank');

@@ -111,7 +111,7 @@ export default function Welcome({ compania, logo, colores, nombre, redirect_to }
                                     className="h-16 md:h-20 w-auto max-w-[70%] object-contain"
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
-                                        target.src = '/images/logos/logo.webp';
+                                        target.src = '/images/logos/logo.png';
                                     }}
                                 />
                             </div>

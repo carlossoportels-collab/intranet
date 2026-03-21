@@ -163,7 +163,7 @@ class HandleInertiaRequests extends Middleware
         $companias = [
             1 => [
                 'nombre' => 'LocalSat',
-                'logo' => 'logo.webp',
+                'logo' => 'logo.png',
                 'short_name' => 'LS',
                 'colores' => [
                     'primary' => '#fa6400',
@@ -181,7 +181,7 @@ class HandleInertiaRequests extends Middleware
             ],
             3 => [
                 'nombre' => '360',
-                'logo' => '360-logo.webp',
+                'logo' => '360-logo.png',
                 'short_name' => '360',
                 'colores' => [
                     'primary' => '#fa6400',
@@ -197,7 +197,7 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             'nombre' => 'Intranet 2026',
-            'logo' => 'logo.webp',
+            'logo' => 'logo.png',
             'short_name' => 'LS',
             'colores' => [
                 'primary' => '#fa6400',

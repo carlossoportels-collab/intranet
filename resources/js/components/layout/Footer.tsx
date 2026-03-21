@@ -45,7 +45,7 @@ export default function Footer({ className = '' }: { className?: string }) {
 
                 <div className="pt-3 text-center">
                     <p className="text-xs text-gray-400">
-                        Intranet 2026 v0.1
+                        Intranet 2026 v1.0
                     </p>
                 </div>
             </div>

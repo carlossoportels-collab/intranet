@@ -213,7 +213,7 @@ const NotificacionesDropdown: React.FC = () => {
         }
       }
 
-      const mensaje = `¡Feliz cumpleaños ${data.nombre}! 🎉🎂`;
+      const mensaje = `¡Feliz cumpleaños ${data.nombre}!`;
       
       const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
       window.open(url, '_blank');

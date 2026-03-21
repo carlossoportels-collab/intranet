@@ -121,7 +121,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             permiso: 'ver_tarifas_consulta',
             children: [
                 { id: 'tarifas-consulta', name: 'Tarifas (consulta)', href: '/comercial/tarifas', icon: <Eye size={14} />, permiso: 'ver_tarifas_consulta' },
-                { id: 'convenios-vigentes', name: 'Convenios vigentes', href: '/comercial/convenios', icon: <FileCheck size={14} />, permiso: 'ver_convenios_vigentes' },
+             //   { id: 'convenios-vigentes', name: 'Convenios vigentes', href: '/comercial/convenios', icon: <FileCheck size={14} />, permiso: 'ver_convenios_vigentes' },
                 { 
                     id: 'documentacion', 
                     name: 'Documentación', 
@@ -129,7 +129,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     icon: <Folder size={14} />,
                     permiso: 'ver_documentacion'
                 },
-                { id: 'novedades', name: 'Novedades', href: '/comercial/novedades', icon: <Megaphone size={14} />, permiso: 'ver_novedades' },
+               // { id: 'novedades', name: 'Novedades', href: '/comercial/novedades', icon: <Megaphone size={14} />, permiso: 'ver_novedades' },
                 { id: 'reenvios-activos', name: 'Reenvíos activos', href: '/comercial/reenvios', icon: <Mail size={14} />, permiso: 'ver_reenvios_activos' },
             ]
         },

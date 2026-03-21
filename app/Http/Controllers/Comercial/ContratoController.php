@@ -639,7 +639,7 @@ class ContratoController extends Controller
                     'logo' => match($companiaId) {
                         1 => '/images/logos/logo.png',
                         2 => '/images/logos/logosmart.png',
-                        3 => '/images/logos/360-logo.webp',
+                        3 => '/images/logos/360-logo.png',
                         default => '/images/logos/logo.png'
                     }
                 ];
@@ -730,7 +730,7 @@ class ContratoController extends Controller
                     'logo' => public_path(match($companiaId) {
                         1 => 'images/logos/logo.png',
                         2 => 'images/logos/logosmart.png',
-                        3 => 'images/logos/360-logo.webp',
+                        3 => 'images/logos/360-logo.png',
                         default => 'images/logos/logo.png'
                     })
                 ];
@@ -1302,7 +1302,7 @@ class ContratoController extends Controller
                         'logo' => public_path(match($companiaId) {
                             1 => 'images/logos/logo.png',
                             2 => 'images/logos/logosmart.png',
-                            3 => 'images/logos/360-logo.webp',
+                            3 => 'images/logos/360-logo.png',
                             default => 'images/logos/logo.png'
                         })
                     ];
