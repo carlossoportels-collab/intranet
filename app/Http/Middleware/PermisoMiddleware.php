@@ -27,21 +27,9 @@ class PermisoMiddleware
         $usuario = auth()->user();
         $usuarioId = $usuario->id;
         
-        // LOG 1: Ver qué permiso se está pidiendo
-        Log::info('========== PERMISO MIDDLEWARE ==========', [
-            'usuario_id' => $usuarioId,
-            'usuario_nombre' => $usuario->nombre_usuario,
-            'rol_id' => $usuario->rol_id,
-            'permiso_requerido' => $permisoNombre,
-            'url' => $request->fullUrl()
-        ]);
-        
         // LOG 2: Verificar si el servicio responde
         $tienePermiso = $this->permisoService->usuarioTienePermiso($usuarioId, $permisoNombre);
-        
-        Log::info('Resultado de usuarioTienePermiso', [
-            'tiene_permiso' => $tienePermiso
-        ]);
+
         
         if (!$tienePermiso) {
             Log::warning('ACCESO DENEGADO - 403', [

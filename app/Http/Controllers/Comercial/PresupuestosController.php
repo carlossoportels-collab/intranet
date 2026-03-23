@@ -259,9 +259,6 @@ class PresupuestosController extends Controller
         // 🔥 VERIFICAR PERMISO DE GESTIÓN
         $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
         
-        \Log::info('=== PRESUPUESTO STORE - INICIO ===');
-        \Log::info('Request data:', $request->all());
-        
         try {
             $diasValidez = (int) $request->input('validez', 7);
             $fechaValidez = now()->addDays($diasValidez)->format('Y-m-d');
@@ -288,13 +285,13 @@ class PresupuestosController extends Controller
                 'agregados.*.bonificacion' => 'nullable|numeric|min:0|max:100',
             ]);
 
-            \Log::info('Validación exitosa', $validated);
+
 
             $validated['validez'] = $fechaValidez;
 
             $presupuesto = $this->presupuestoService->createPresupuesto($validated);
             
-            \Log::info('Presupuesto creado con ID: ' . $presupuesto->id);
+
             
             $lead = Lead::find($request->lead_id);
             if ($lead && !$lead->es_cliente) {
@@ -302,7 +299,6 @@ class PresupuestosController extends Controller
                     'estado_lead_id' => 4,
                     'modified_by' => auth()->id(),
                 ]);
-                \Log::info('Lead actualizado a propuesta enviada', ['lead_id' => $lead->id]);
             }
         
             return redirect()->route('comercial.presupuestos.show', $presupuesto->id)
@@ -429,9 +425,6 @@ class PresupuestosController extends Controller
         $this->authorizeLeadAccess($presupuesto);
         $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
         
-        \Log::info('=== PRESUPUESTO UPDATE - INICIO ===');
-        \Log::info('Request data:', $request->all());
-        
         try {
             $diasValidez = (int) $request->input('validez', 7);
             $fechaValidez = now()->addDays($diasValidez)->format('Y-m-d');
@@ -457,13 +450,11 @@ class PresupuestosController extends Controller
                 'agregados.*.bonificacion' => 'nullable|numeric|min:0|max:100',
             ]);
 
-            \Log::info('Validación exitosa', $validated);
 
             $validated['validez'] = $fechaValidez;
 
             $presupuestoActualizado = $this->presupuestoService->updatePresupuesto($presupuesto, $validated);
             
-            \Log::info('Presupuesto actualizado con ID: ' . $presupuestoActualizado->id);
         
             return redirect()->route('comercial.presupuestos.show', $presupuestoActualizado->id)
                 ->with('success', 'Presupuesto actualizado correctamente');
@@ -576,8 +567,6 @@ class PresupuestosController extends Controller
         // 🔥 VERIFICAR ACCESO AL PRESUPUESTO
         $this->authorizeLeadAccess($presupuesto);
         
-        \Log::info('========== GENERAR PDF TEMP ==========');
-        \Log::info('Presupuesto ID: ' . $presupuesto->id);
         
         try {
             $presupuesto->load([

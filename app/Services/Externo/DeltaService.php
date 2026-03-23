@@ -25,24 +25,36 @@ class DeltaService
         ]);
     }
 
+
     /**
      * Obtener datos actuales de vehículos
      */
     public function getDatosActuales(array $vehiculos, string $tipoId = 'patente')
     {
+        // Si el tipo es patente, normalizar las patentes
+        $vehiculosNormalizados = $vehiculos;
+        if ($tipoId === 'patente') {
+            $vehiculosNormalizados = $this->normalizarPatentes($vehiculos);
+            Log::info('DeltaService - Patentes normalizadas', [
+                'originales' => $vehiculos,
+                'normalizadas' => $vehiculosNormalizados
+            ]);
+        }
+        
         $payload = [
             'user' => $this->user,
             'pwd' => $this->pass,
             'action' => 'DATOSACTUALES',
-            'vehiculos' => $vehiculos,
+            'vehiculos' => $vehiculosNormalizados,
             'TipoID' => $tipoId,
-            'output' => ['la', 'lo', 'fc'] // La API ignora esto, pero lo dejamos
+            'output' => ['la', 'lo', 'fc']
         ];
 
         Log::info('DeltaService - Consultando API', [
             'tipo_id' => $tipoId,
             'cantidad_vehiculos' => count($vehiculos),
-            'primer_vehiculo' => $vehiculos[0] ?? null
+            'primer_vehiculo' => $vehiculos[0] ?? null,
+            'normalizado' => $vehiculosNormalizados[0] ?? null
         ]);
 
         return $this->consultar($payload);
@@ -285,7 +297,27 @@ public function obtenerDireccionDesdeCoordenadas($lat, $lng)
         return 'alpha';
     }
 
+/**
+ * Normalizar patente: eliminar espacios y convertir a mayúsculas
+ */
+private function normalizarPatente(string $patente): string
+{
+    // Eliminar todos los espacios
+    $patente = preg_replace('/\s+/', '', $patente);
+    // Convertir a mayúsculas
+    $patente = strtoupper($patente);
+    return $patente;
+}
 
+/**
+ * Normalizar array de patentes
+ */
+private function normalizarPatentes(array $patentes): array
+{
+    return array_map(function($patente) {
+        return $this->normalizarPatente($patente);
+    }, $patentes);
+}
 
 /**
  * Generar imagen de mapa estático con timeout y fallback

@@ -136,30 +136,35 @@ class Presupuesto extends Model
         );
     }
 
-    public function getNombreComercialAttribute()
-    {
-        if (!$this->prefijo_id) {
-            return 'No asignado';
-        }
+public function getNombreComercialAttribute()
+{
+    if (!$this->prefijo_id) {
+        return 'No asignado';
+    }
+    
+    if (!$this->relationLoaded('prefijo')) {
+        $this->load('prefijo.comercial.personal');
+    }
+    
+    if ($this->prefijo) {
+        $comerciales = $this->prefijo->comercial;
         
-        if (!$this->relationLoaded('prefijo')) {
-            $this->load('prefijo.comercial.personal');
-        }
+        // 🔥 Convertir a colección siempre
+        $coleccion = $comerciales instanceof \Illuminate\Database\Eloquent\Collection 
+            ? $comerciales 
+            : collect([$comerciales]);
         
-        if ($this->prefijo) {
-            $comerciales = $this->prefijo->comercial;
+        if ($coleccion->isNotEmpty()) {
+            $comercial = $coleccion->firstWhere('activo', true) ?? $coleccion->first();
             
-            if ($comerciales && $comerciales->isNotEmpty()) {
-                $comercial = $comerciales->firstWhere('activo', true) ?? $comerciales->first();
-                
-                if ($comercial && $comercial->personal) {
-                    return $comercial->personal->nombre_completo;
-                }
+            if ($comercial && $comercial->personal) {
+                return $comercial->personal->nombre_completo;
             }
         }
-        
-        return $this->prefijo?->codigo ?? 'No asignado';
     }
+    
+    return $this->prefijo?->codigo ?? 'No asignado';
+}
 
     public function getComercialAttribute()
     {

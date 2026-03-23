@@ -105,6 +105,13 @@ Route::prefix('cuentas')->name('cuentas.')->middleware(['throttle:10,1'])->group
 });
 
 // ============================================
+// RUTAS PÚBLICAS PARA WHATSAPP (sin autenticación)
+// ============================================
+Route::get('/comercial/lead/{lead}/contactar-whatsapp', [LeadContactController::class, 'contactarWhatsApp'])
+    ->name('lead.contactar-whatsapp');
+
+    
+// ============================================
 // RUTAS TEMPORALES (PDFs)
 // ============================================
 Route::prefix('temp')->name('temp.')->group(function () {
@@ -154,8 +161,8 @@ Route::prefix('temp')->name('temp.')->group(function () {
 // ============================================
 // RUTAS PROTEGIDAS (requieren autenticación)
 // ============================================
-Route::middleware(['auth', 'usuario.activo'])->group(function () {
-    
+// Route::middleware(['auth', 'usuario.activo'])->group(function () {
+    Route::middleware(['auth'])->group(function () {
     // ========== RUTAS PRINCIPALES ==========
     Route::get('/welcome', [LoginController::class, 'welcome'])->name('welcome');
     Route::get('/', [DashboardController::class, 'index'])->name('home');
@@ -223,8 +230,8 @@ Route::middleware(['auth', 'usuario.activo'])->group(function () {
         Route::prefix('cuentas')->name('cuentas.')->group(function () {
             Route::get('/', [DetallesController::class, 'index'])->name('detalles')->middleware('permiso:' . config('permisos.VER_DETALLES_CUENTA'));
             Route::get('/certificados', [CertificadosFlotaController::class, 'index'])->name('certificados')->middleware('permiso:' . config('permisos.VER_CERTIFICADOS_FLOTA'));
-Route::get('/certificados/flota/{empresaId}', [CertificadosFlotaController::class, 'generarCertificadoFlota'])->name('certificados.flota');
-Route::get('/certificados/vehiculo/{vehiculoId}', [CertificadosFlotaController::class, 'generarCertificadoVehiculo'])->name('certificados.vehiculo');
+            Route::get('/certificados/flota/{empresaId}', [CertificadosFlotaController::class, 'generarCertificadoFlota'])->name('certificados.flota');
+            Route::get('/certificados/vehiculo/{vehiculoId}', [CertificadosFlotaController::class, 'generarCertificadoVehiculo'])->name('certificados.vehiculo');
             Route::get('/cambio-titularidad', [CambioTitularidadController::class, 'index'])->name('cambio-titularidad')->middleware('permiso:' . config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
             Route::get('/cambio-razon-social', [CambioRazonSocialController::class, 'index'])->name('cambio-razon-social')->middleware('permiso:' . config('permisos.GESTIONAR_CAMBIO_RAZON_SOCIAL'));
             
@@ -244,7 +251,7 @@ Route::get('/certificados/vehiculo/{vehiculoId}', [CertificadosFlotaController::
         // ===== LEADS =====
         Route::get('/leads', [LeadController::class, 'index'])->name('leads.index')->middleware('permiso:' . config('permisos.VER_PROSPECTOS'));
         Route::post('/leads', [LeadController::class, 'store'])->name('leads.store')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS'));
-        Route::get('/lead/{lead}/contactar-whatsapp', [LeadContactController::class, 'contactarWhatsApp'])->name('lead.contactar-whatsapp')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS'));
+        
         
         Route::prefix('leads/{lead}')->name('leads.')->group(function () {
             Route::get('/', [LeadController::class, 'show'])->name('show')->middleware('permiso:' . config('permisos.VER_PROSPECTOS'));
@@ -453,8 +460,8 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     })->name('personal.show');
     
     // API para envío de emails
-    Route::post('/presupuestos/{presupuesto}/enviar-email', [EnvioEmailController::class, 'enviarPresupuesto'])->name('presupuestos.enviar-email');
-    Route::post('/contratos/{contrato}/enviar-email', [EnvioEmailController::class, 'enviarContrato'])->name('contratos.enviar-email');
+        Route::post('/email/enviar-presupuesto', [App\Http\Controllers\Api\EmailController::class, 'enviarPresupuesto'])->name('email.enviar-presupuesto');
+        Route::post('/email/enviar-contrato', [App\Http\Controllers\Api\EmailController::class, 'enviarContrato'])->name('email.enviar-contrato');
 
 });
 

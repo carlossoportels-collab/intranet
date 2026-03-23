@@ -18,12 +18,6 @@ class UsuarioEspecificoMiddleware
         $usuarioId = Auth::id();
         $idsPermitidos = array_map('intval', $ids);
         
-        \Log::info('========== USUARIO ESPECIFICO MIDDLEWARE ==========', [
-            'usuario_id' => $usuarioId,
-            'ids_permitidos' => $idsPermitidos,
-            'url' => $request->fullUrl(),
-            'tiene_acceso' => in_array($usuarioId, $idsPermitidos)
-        ]);
         
         if (!in_array($usuarioId, $idsPermitidos)) {
             \Log::warning('ACCESO DENEGADO - 403', [

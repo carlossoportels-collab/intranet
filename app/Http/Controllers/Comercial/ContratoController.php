@@ -65,16 +65,15 @@ class ContratoController extends Controller
                 $prefijo = \App\Models\Prefijo::with('comercial.personal')
                     ->where('id', $comercial->prefijo_id)
                     ->first();
-                if ($prefijo) {
-                    $comercialPrefijo = $prefijo->comercial->first();
-                    $prefijoUsuario = [
-                        'id' => (string) $prefijo->id,
-                        'codigo' => $prefijo->codigo,
-                        'descripcion' => $prefijo->descripcion,
-                        'comercial_nombre' => $comercialPrefijo?->personal?->nombre_completo,
-                        'display_text' => $prefijo->codigo . ' - ' . ($comercialPrefijo?->personal?->nombre_completo ?? 'Sin comercial')
+                     
+                     $prefijoUsuario = [
+                        'id' => (string) $comercial->prefijo->id,
+                        'codigo' => $comercial->prefijo->codigo,
+                        'descripcion' => $comercial->prefijo->descripcion,
+                        'comercial_nombre' => $comercial->personal?->nombre_completo,
+                        'display_text' => $comercial->prefijo->codigo . ' - ' . ($comercial->personal?->nombre_completo ?? 'Sin comercial')
                     ];
-                }
+                
             }
         }
 
@@ -554,16 +553,6 @@ class ContratoController extends Controller
                     $agregado->producto_nombre = $agregado->productoServicio->nombre ?? 'Sin nombre';
                     $agregado->tipo_nombre = $agregado->productoServicio->tipo?->nombre_tipo_abono ?? 'Otros';
                     
-                    \Log::info('Producto agregado:', [
-                        'id' => $agregado->id,
-                        'codigo' => $agregado->producto_codigo,
-                        'nombre' => $agregado->producto_nombre,
-                        'tipo' => $agregado->tipo_nombre,
-                        'valor' => $agregado->valor,
-                        'cantidad' => $agregado->cantidad,
-                        'bonificacion' => $agregado->bonificacion,
-                        'subtotal' => $agregado->subtotal
-                    ]);
                 }
             }
         }
@@ -1232,8 +1221,6 @@ class ContratoController extends Controller
             $this->authorizeLeadAccess($lead);
         }
         
-        \Log::info('========== GENERAR PDF TEMP CONTRATO ==========');
-        \Log::info('Contrato ID: ' . $id);
         
         try {
             $contrato = Contrato::with([

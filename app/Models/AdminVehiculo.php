@@ -83,4 +83,20 @@ class AdminVehiculo extends Model
     {
         return $this->prefijo_codigo ? $this->prefijo_codigo . '-' . $this->numero_alfa : $this->codigoalfa;
     }
+
+    /**
+     * Relación con la empresa del sistema a través de admin_empresas
+     */
+    public function empresaSistema()
+    {
+        return $this->hasOneThrough(
+            Empresa::class,
+            AdminEmpresa::class,
+            'id',           // admin_empresas.id
+            'numeroalfa',   // empresas.numeroalfa
+            'empresa_id',   // admin_vehiculos.empresa_id
+            'codigoalf2'    // admin_empresas.codigoalf2
+        );
+    }
+
 }

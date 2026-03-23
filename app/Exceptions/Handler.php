@@ -6,6 +6,8 @@ use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
 use App\Services\Error\ErrorNotificationService;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class Handler extends ExceptionHandler
 {
@@ -36,39 +38,71 @@ class Handler extends ExceptionHandler
         });
     }
 
-public function render($request, Throwable $exception)
-{
-    if ($this->isHttpException($exception)) {
-        $statusCode = $exception->getStatusCode();
-        
-        $errorViews = [
-            403 => 'errors.403',
-            404 => 'errors.404',
-            419 => 'errors.419',
-            500 => 'errors.500',
-            503 => 'errors.503',
-        ];
-
-        if (isset($errorViews[$statusCode])) {
-            $defaultMessages = [
-                403 => 'NO TIENES PERMISOS<br>PARA ACCEDER A ESTE RECURSO.',
-                404 => 'LA PÁGINA QUE BUSCAS<br>NO EXISTE O FUE MOVIDA.',
-                419 => 'TU SESIÓN HA CADUCADO<br>POR SEGURIDAD.',
-                500 => 'ERROR INTERNO DEL SERVIDOR.<br>LOS TÉCNICOS HAN SIDO NOTIFICADOS.',
-                503 => 'EL SISTEMA ESTÁ<br>TEMPORALMENTE EN MANTENIMIENTO.',
+    public function render($request, Throwable $exception)
+    {
+        // 🔥 Si es una petición de Inertia, también usar vistas Blade
+        if ($request->header('X-Inertia') && $this->isHttpException($exception)) {
+            $statusCode = $exception->getStatusCode();
+            
+            $errorViews = [
+                403 => 'errors.403',
+                404 => 'errors.404',
+                419 => 'errors.419',
+                500 => 'errors.500',
+                503 => 'errors.503',
             ];
             
-            $message = $exception->getMessage() ?: $defaultMessages[$statusCode];
-            
-            return response()->view($errorViews[$statusCode], [
-                'code' => $statusCode,
-                'message' => $message,
-            ], $statusCode);
+            if (isset($errorViews[$statusCode]) && view()->exists($errorViews[$statusCode])) {
+                $defaultMessages = [
+                    403 => 'NO TIENES PERMISOS<br>PARA ACCEDER A ESTE RECURSO.',
+                    404 => 'LA PÁGINA QUE BUSCAS<br>NO EXISTE O FUE MOVIDA.',
+                    419 => 'TU SESIÓN HA CADUCADO<br>POR SEGURIDAD.',
+                    500 => 'ERROR INTERNO DEL SERVIDOR.<br>LOS TÉCNICOS HAN SIDO NOTIFICADOS.',
+                    503 => 'EL SISTEMA ESTÁ<br>TEMPORALMENTE EN MANTENIMIENTO.',
+                ];
+                
+                $message = $exception->getMessage() ?: $defaultMessages[$statusCode];
+                
+                // 🔥 Devolver vista Blade para Inertia también
+                return response()->view($errorViews[$statusCode], [
+                    'code' => $statusCode,
+                    'message' => $message,
+                ], $statusCode);
+            }
         }
-    }
+        
+        // Para peticiones normales
+        if ($this->isHttpException($exception)) {
+            $statusCode = $exception->getStatusCode();
+            
+            $errorViews = [
+                403 => 'errors.403',
+                404 => 'errors.404',
+                419 => 'errors.419',
+                500 => 'errors.500',
+                503 => 'errors.503',
+            ];
 
-    return parent::render($request, $exception);
-}
+            if (isset($errorViews[$statusCode])) {
+                $defaultMessages = [
+                    403 => 'NO TIENES PERMISOS<br>PARA ACCEDER A ESTE RECURSO.',
+                    404 => 'LA PÁGINA QUE BUSCAS<br>NO EXISTE O FUE MOVIDA.',
+                    419 => 'TU SESIÓN HA CADUCADO<br>POR SEGURIDAD.',
+                    500 => 'ERROR INTERNO DEL SERVIDOR.<br>LOS TÉCNICOS HAN SIDO NOTIFICADOS.',
+                    503 => 'EL SISTEMA ESTÁ<br>TEMPORALMENTE EN MANTENIMIENTO.',
+                ];
+                
+                $message = $exception->getMessage() ?: $defaultMessages[$statusCode];
+                
+                return response()->view($errorViews[$statusCode], [
+                    'code' => $statusCode,
+                    'message' => $message,
+                ], $statusCode);
+            }
+        }
+
+        return parent::render($request, $exception);
+    }
 
     private function getTitle(int $statusCode): string
     {

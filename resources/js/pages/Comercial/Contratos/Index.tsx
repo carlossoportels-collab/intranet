@@ -71,7 +71,8 @@ export default function ContratosIndex({
     prefijoUsuario = null,
     estados = []
 }: Props) {
-    const usuarioEsComercial = usuario.rol_id === 5;
+    // 🔥 CAMBIADO: Usar la misma lógica que en Detalles.tsx
+    const usuarioEsComercial = !usuario.ve_todas_cuentas;
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [expandedMobileCard, setExpandedMobileCard] = useState<number | null>(null);
 
@@ -83,8 +84,12 @@ export default function ContratosIndex({
             search: ''
         };
         
+        // Si el usuario es comercial, no mostrar filtro de prefijo
         if (!usuarioEsComercial) {
             initialFilters.prefijo_id = '';
+        } else if (prefijoUsuario?.id) {
+            // Si es comercial, inicializar con su prefijo
+            initialFilters.prefijo_id = prefijoUsuario.id;
         }
         
         return initialFilters;
@@ -92,12 +97,12 @@ export default function ContratosIndex({
 
     const getEstadoColor = (estadoId?: number) => {
         switch(estadoId) {
-            case 1: return 'green';  // activo
-            case 2: return 'yellow'; // vencido
-            case 3: return 'blue';   // aprobado
-            case 4: return 'red';     // rechazado
-            case 5: return 'orange';  // pendiente
-            case 6: return 'purple';  // instalado
+            case 1: return 'green';
+            case 2: return 'yellow';
+            case 3: return 'blue';
+            case 4: return 'red';
+            case 5: return 'orange';
+            case 6: return 'purple';
             default: return 'gray';
         }
     };
@@ -122,6 +127,7 @@ export default function ContratosIndex({
     };
 
     const handleFilterChange = (key: string, value: string) => {
+        // Si es comercial, no permitir cambiar el filtro de prefijo
         if (usuarioEsComercial && key === 'prefijo_id') return;
         
         const newFilters = { ...filters, [key]: value, page: 1 };
@@ -142,7 +148,10 @@ export default function ContratosIndex({
             search: ''
         };
         
-        if (!usuarioEsComercial) {
+        // Si es comercial, mantener su prefijo
+        if (usuarioEsComercial && prefijoUsuario?.id) {
+            newFilters.prefijo_id = prefijoUsuario.id;
+        } else if (!usuarioEsComercial) {
             newFilters.prefijo_id = '';
         }
         
@@ -151,10 +160,14 @@ export default function ContratosIndex({
     };
 
     const hayFiltrosActivos = () => {
-        if (usuarioEsComercial) {
-            return filters.estado_id || filters.fecha_inicio || filters.fecha_fin || filters.search;
+        let hasFilters = filters.estado_id || filters.fecha_inicio || filters.fecha_fin || filters.search;
+        
+        // Para no comerciales, verificar también prefijo_id
+        if (!usuarioEsComercial && filters.prefijo_id) {
+            hasFilters = true;
         }
-        return filters.estado_id || filters.prefijo_id || filters.fecha_inicio || filters.fecha_fin || filters.search;
+        
+        return hasFilters;
     };
 
     const handleVerPDF = (contratoId: number) => {
@@ -200,7 +213,7 @@ export default function ContratosIndex({
                     </div>
                 </div>
                 
-                {/* Stats Cards - Responsive */}
+                {/* Stats Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
                     <div className="p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
                         <h3 className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Total</h3>
@@ -220,7 +233,7 @@ export default function ContratosIndex({
                     </div>
                 </div>
 
-                {/* Buscador - Responsive */}
+                {/* Buscador */}
                 <div className="mb-4 sm:mb-6">
                     <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
                         <div className="relative flex-1">
@@ -241,7 +254,7 @@ export default function ContratosIndex({
                     </form>
                 </div>
 
-                {/* Filtros - Mobile conditional */}
+                {/* Filtros */}
                 {(showMobileFilters || !window.matchMedia('(max-width: 640px)').matches) && (
                     <div className="mb-4 sm:mb-6">
                         <ContratoFilterBar
@@ -359,7 +372,7 @@ export default function ContratosIndex({
                         <div className="md:hidden divide-y divide-gray-200">
                             {contratos.data.map((contrato) => (
                                 <div key={contrato.id} className="p-4 hover:bg-gray-50">
-                                    {/* Cabecera de la tarjeta - siempre visible */}
+                                    {/* Cabecera de la tarjeta */}
                                     <div className="flex items-start justify-between mb-2">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
@@ -391,7 +404,7 @@ export default function ContratosIndex({
                                         </button>
                                     </div>
 
-                                    {/* Información resumida siempre visible */}
+                                    {/* Información resumida */}
                                     <div className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
                                             <Truck className="h-4 w-4 text-gray-400" />

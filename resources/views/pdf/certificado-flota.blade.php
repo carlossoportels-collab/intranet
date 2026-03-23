@@ -300,7 +300,7 @@
                 </div>
             @endif
             
-            <p>Dicha unidad{{ $cantidadVehiculos > 1 ? 's están' : ' está' }} equipada{{ $cantidadVehiculos > 1 ? 's' : '' }} con las siguientes alarmas:</p>
+            <p>{{ $cantidadVehiculos > 1 ? 'Dichas unidades están' : 'Dicha unidad está' }} equipada{{ $cantidadVehiculos > 1 ? 's' : '' }} con las siguientes alarmas:</p>
             
             <ul class="lista-alarmas">
                 <li>Alarma por encendido de motor</li>

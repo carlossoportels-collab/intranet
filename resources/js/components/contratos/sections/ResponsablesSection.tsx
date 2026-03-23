@@ -246,19 +246,7 @@ export default function ResponsablesSection({
                                     required
                                 />
                             </div>
-                            <div className="col-span-2">
-                                <label className="block text-xs text-gray-600 mb-1">
-                                    Cargo
-                                </label>
-                                <input
-                                    type="text"
-                                    value={nuevoResponsable.cargo}
-                                    onChange={(e) => handleInputChange('cargo', e.target.value)}
-                                    maxLength={100}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
-                                    placeholder="Ej: Gerente de flota"
-                                />
-                            </div>
+
                             <div>
                                 <label className="block text-xs text-gray-600 mb-1">
                                     Teléfono <span className="text-gray-400 text-[10px]">(solo números)</span>

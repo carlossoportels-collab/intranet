@@ -48,11 +48,17 @@ interface Props {
         motivo_id?: number;
         empleado?: string;
     };
-    userRole: number;
-    esComercial: boolean;
+    auth?: {
+        user?: {
+            id: number;
+            permisos: string[];
+            rol_id: number;
+            rol_nombre: string;
+        };
+    };
 }
 
-export default function Licencias({ licencias, motivos, filters, userRole, esComercial }: Props) {
+export default function Licencias({ licencias, motivos, filters, auth }: Props) {
     const toast = useToast();
     const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
     const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
@@ -64,12 +70,18 @@ export default function Licencias({ licencias, motivos, filters, userRole, esCom
     const [filtroMotivo, setFiltroMotivo] = useState<number | 'todos'>(filters.motivo_id || 'todos');
     const [filtroEmpleado, setFiltroEmpleado] = useState<string>(filters.empleado || '');
 
-    // Permisos por rol
-    const esAdmin = userRole === 2; // Solo rol 2 puede hacer todo
-    const puedeVerTodo = esAdmin; // Solo admin ve todo
-    const puedeCrear = esAdmin;
-    const puedeEditar = esAdmin;
-    const puedeEliminar = esAdmin;
+    // Obtener permisos del usuario desde auth
+    const permisos = auth?.user?.permisos || [];
+    
+    // Verificar permisos específicos desde el backend
+    const puedeVerLicencias = permisos.includes('ver_licencias');
+    const puedeGestionarLicencias = permisos.includes('gestionar_licencias');
+    
+    // Definir capacidades basadas únicamente en permisos del backend
+    const puedeVerTodo = puedeVerLicencias;
+    const puedeCrear = puedeGestionarLicencias;
+    const puedeEditar = puedeGestionarLicencias;
+    const puedeEliminar = puedeGestionarLicencias;
 
     const getTipoColor = (tipo: string) => {
         const tipoLower = tipo.toLowerCase();
@@ -241,13 +253,11 @@ export default function Licencias({ licencias, motivos, filters, userRole, esCom
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Tipo</th>
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Período</th>
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Días</th>
-                                {/* Columna Observación - Solo visible para admin */}
                                 {puedeVerTodo && (
                                     <th className="py-3 px-4 text-left font-medium text-gray-700">Observación</th>
                                 )}
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Solicitado</th>
                                 <th className="py-3 px-4 text-left font-medium text-gray-700">Estado</th>
-                                {/* Columna Acciones - Solo visible para admin */}
                                 {(puedeEditar || puedeEliminar) && (
                                     <th className="py-3 px-4 text-left font-medium text-gray-700">Acciones</th>
                                 )}
@@ -285,9 +295,10 @@ export default function Licencias({ licencias, motivos, filters, userRole, esCom
                                             </div>
                                         </div>
                                     </td>
-                                    {/* Observación - Solo visible para admin */}
                                     {puedeVerTodo && (
-                                        <td className="py-3 px-4 text-gray-600 max-w-xs truncate">{licencia.observacion}</td>
+                                        <td className="py-3 px-4 text-gray-600 max-w-xs truncate" title={licencia.observacion}>
+                                            {licencia.observacion}
+                                        </td>
                                     )}
                                     <td className="py-3 px-4">{licencia.fecha_solicitud}</td>
                                     <td className="py-3 px-4">
@@ -295,7 +306,6 @@ export default function Licencias({ licencias, motivos, filters, userRole, esCom
                                             {licencia.estado}
                                         </span>
                                     </td>
-                                    {/* Acciones - Solo visible para admin */}
                                     {(puedeEditar || puedeEliminar) && (
                                         <td className="py-3 px-4">
                                             <div className="flex gap-2">
@@ -363,7 +373,6 @@ export default function Licencias({ licencias, motivos, filters, userRole, esCom
                                 </div>
                             </div>
                             
-                            {/* Observación - Solo visible para admin */}
                             {puedeVerTodo && (
                                 <div className="mb-3">
                                     <div className="text-sm font-medium text-gray-700 mb-1">Observación</div>
@@ -371,7 +380,6 @@ export default function Licencias({ licencias, motivos, filters, userRole, esCom
                                 </div>
                             )}
                             
-                            {/* Acciones - Solo visible para admin */}
                             {(puedeEditar || puedeEliminar) && (
                                 <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
                                     {puedeEditar && (

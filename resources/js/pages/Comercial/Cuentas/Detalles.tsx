@@ -188,7 +188,7 @@ const clearAllFilters = () => {
                 </div>
             </div>
 
-            {/* Estadísticas de abonos */}
+            {/* Estadísticas de abonos 
             {estadisticas_abonos.tipos_principales.length > 0 && (
                 <div className="mb-6">
                     <EstadisticasAbonosCards

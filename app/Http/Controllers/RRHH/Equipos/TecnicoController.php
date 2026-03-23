@@ -29,7 +29,6 @@ class TecnicoController extends Controller
         // 🔥 VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
         
-        \Log::info('Accediendo a create técnico');
         
         // Obtener personal disponible que no sea técnico
         $personalDisponible = Personal::where('activo', 1)
@@ -51,8 +50,6 @@ class TecnicoController extends Controller
                 ];
             });
 
-        \Log::info('Personal disponible:', ['count' => $personalDisponible->count()]);
-
         return Inertia::render('rrhh/Equipos/TecnicoForm', [
             'personalDisponible' => $personalDisponible,
             'modo' => 'crear',
@@ -72,11 +69,7 @@ class TecnicoController extends Controller
     {
         // 🔥 VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
-        
-        \Log::info('=== STORE TÉCNICO ===');
-        \Log::info('Request data:', $request->all());
-        \Log::info('User ID:', ['user_id' => auth()->id()]);
-        
+
         $validator = Validator::make($request->all(), [
             'personal_id' => 'required|exists:personal,id',
             'direccion' => 'required|string|max:255',
@@ -94,13 +87,11 @@ class TecnicoController extends Controller
         try {
             DB::beginTransaction();
             
-            \Log::info('Iniciando transacción para crear técnico');
 
             // Verificar si ya existe un registro para este personal
             $tecnicoExistente = Tecnico::where('personal_id', $request->personal_id)->first();
             
             if ($tecnicoExistente) {
-                \Log::info('Técnico existente encontrado, actualizando:', ['id' => $tecnicoExistente->id]);
                 
                 // Actualizar el técnico existente
                 $tecnicoExistente->update([
@@ -114,7 +105,6 @@ class TecnicoController extends Controller
                 ]);
                 $tecnico = $tecnicoExistente;
             } else {
-                \Log::info('Creando nuevo técnico');
                 
                 // Crear nuevo técnico - El modelo manejará created_by, modified_by, created, modified
                 $tecnico = Tecnico::create([
@@ -131,9 +121,6 @@ class TecnicoController extends Controller
             }
 
             DB::commit();
-            
-            \Log::info('Transacción completada. Técnico ID:', ['id' => $tecnico->id]);
-            \Log::info('Datos del técnico creado:', $tecnico->toArray());
 
             return redirect()->route('rrhh.equipos.tecnico')
                 ->with('success', 'Técnico creado exitosamente.');
@@ -159,17 +146,9 @@ class TecnicoController extends Controller
         // 🔥 VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
         
-        \Log::info('=== EDIT TÉCNICO ===');
-        \Log::info('ID recibido:', ['id' => $id]);
-        
         try {
             $tecnico = Tecnico::with('personal')->findOrFail($id);
             
-            \Log::info('Técnico encontrado:', [
-                'id' => $tecnico->id,
-                'personal_id' => $tecnico->personal_id,
-                'activo' => $tecnico->activo
-            ]);
 
             return Inertia::render('rrhh/Equipos/TecnicoForm', [
                 'tecnico' => [
@@ -199,18 +178,9 @@ class TecnicoController extends Controller
         // 🔥 VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
         
-        \Log::info('=== UPDATE TÉCNICO ===');
-        \Log::info('ID:', ['id' => $id]);
-        \Log::info('Request data:', $request->all());
-        \Log::info('Auth ID:', ['auth_id' => auth()->id()]);
-        
         try {
             $tecnico = Tecnico::findOrFail($id);
             
-            \Log::info('Técnico encontrado para update:', [
-                'id' => $tecnico->id,
-                'activo_actual' => $tecnico->activo
-            ]);
             
             $validator = Validator::make($request->all(), [
                 'direccion' => 'required|string|max:255',
@@ -228,7 +198,6 @@ class TecnicoController extends Controller
 
             DB::beginTransaction();
             
-            \Log::info('Iniciando transacción para update');
 
             $updateData = [
                 'direccion' => $request->direccion,
@@ -249,17 +218,10 @@ class TecnicoController extends Controller
                 $updateData['deleted_by'] = null;
             }
 
-            \Log::info('Update data:', $updateData);
             $tecnico->update($updateData);
 
             DB::commit();
             
-            \Log::info('Técnico actualizado:', [
-                'id' => $tecnico->id,
-                'nuevo_activo' => $tecnico->activo,
-                'deleted_at' => $tecnico->deleted_at,
-                'modified_by' => $tecnico->modified_by
-            ]);
 
             return redirect()->route('rrhh.equipos.tecnico')
                 ->with('success', 'Técnico actualizado exitosamente.');
@@ -282,17 +244,10 @@ class TecnicoController extends Controller
         // 🔥 VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.GESTIONAR_EQUIPO_TECNICO'));
         
-        \Log::info('=== DESTROY TÉCNICO ===');
-        \Log::info('ID:', ['id' => $id]);
-        \Log::info('Auth ID:', ['auth_id' => auth()->id()]);
         
         try {
             $tecnico = Tecnico::findOrFail($id);
-            
-            \Log::info('Técnico encontrado para delete:', [
-                'id' => $tecnico->id,
-                'activo_actual' => $tecnico->activo
-            ]);
+;
             
             DB::beginTransaction();
 
@@ -306,13 +261,6 @@ class TecnicoController extends Controller
             ]);
 
             DB::commit();
-            
-            \Log::info('Técnico eliminado (soft):', [
-                'id' => $tecnico->id,
-                'nuevo_activo' => $tecnico->activo,
-                'deleted_at' => $tecnico->deleted_at,
-                'deleted_by' => $tecnico->deleted_by
-            ]);
 
             return redirect()->route('rrhh.equipos.tecnico')
                 ->with('success', 'Técnico eliminado exitosamente.');

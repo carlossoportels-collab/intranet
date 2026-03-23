@@ -127,13 +127,8 @@ export default function CambioTitularidad({
     const [searchDestinoTerm, setSearchDestinoTerm] = useState('');
     const [showDestinoResults, setShowDestinoResults] = useState(false);
     
-    // Estado para nueva empresa (solo datos mínimos)
+    // Estado para nueva empresa
     const [showAltaEmpresaModal, setShowAltaEmpresaModal] = useState(false);
-    const [nuevaEmpresaData, setNuevaEmpresaData] = useState({
-        nombre_fantasia: '',
-        razon_social: '',
-        cuit: '',
-    });
 
     // Filtros de empresas según permisos
     const empresasFiltradas = useMemo(() => {
@@ -243,19 +238,19 @@ export default function CambioTitularidad({
         }
     };
 
-    const handleEmpresaCreada = (empresaData: any) => {
-        setEmpresaDestino({
-            id: empresaData.id,
-            codigo: empresaData.codigo || `${empresaData.prefijo_id || 'EMP'}-${empresaData.numeroalfa || ''}`,
-            numeroalfa: empresaData.numeroalfa,
-            nombre_fantasia: empresaData.nombre_fantasia,
-            razon_social: empresaData.razon_social,
-            cuit: empresaData.cuit,
-            prefijo_id: empresaData.prefijo_id || 1,
-            es_activo: true,
-        });
+    // 🔥 Handler para cuando se cierra el modal con éxito
+    const handleModalClose = (empresaGuardada?: boolean, irAContrato?: boolean) => {
         setShowAltaEmpresaModal(false);
-        toast.success('Empresa creada correctamente');
+        
+        if (empresaGuardada) {
+            // Recargar las empresas para obtener la nueva
+            router.reload({
+                only: ['empresas'],
+                onSuccess: () => {
+                    toast.success('Empresa creada correctamente');
+                }
+            });
+        }
     };
 
     // Validaciones
@@ -274,10 +269,8 @@ export default function CambioTitularidad({
             if (tipoOperacion === 'entre_empresas' && !empresaDestino) {
                 nuevosErrores['empresa_destino'] = 'Debe seleccionar una empresa destino';
             }
-            if (tipoOperacion === 'nueva_empresa') {
-                if (!nuevaEmpresaData.nombre_fantasia) nuevosErrores['nombre_fantasia'] = 'El nombre de fantasía es requerido';
-                if (!nuevaEmpresaData.razon_social) nuevosErrores['razon_social'] = 'La razón social es requerida';
-                if (!nuevaEmpresaData.cuit) nuevosErrores['cuit'] = 'El CUIT es requerido';
+            if (tipoOperacion === 'nueva_empresa' && !empresaDestino) {
+                nuevosErrores['empresa_destino'] = 'Debe completar el alta de la empresa';
             }
         }
 
@@ -309,10 +302,14 @@ export default function CambioTitularidad({
         setEmpresaOrigen(null);
         setVehiculosSeleccionados([]);
         setEmpresaDestino(null);
-        setNuevaEmpresaData({ nombre_fantasia: '', razon_social: '', cuit: '' });
     };
 
     const handleGuardar = () => {
+        if (tipoOperacion === 'nueva_empresa' && !empresaDestino) {
+            toast.error('Debe completar el alta de la empresa');
+            return;
+        }
+
         setLoading(true);
 
         const datosEnvio: any = {
@@ -324,16 +321,16 @@ export default function CambioTitularidad({
         if (tipoOperacion === 'entre_empresas') {
             datosEnvio.empresa_destino_id = empresaDestino?.id;
         } else {
-            datosEnvio.nombre_fantasia = nuevaEmpresaData.nombre_fantasia;
-            datosEnvio.razon_social = nuevaEmpresaData.razon_social;
-            datosEnvio.cuit = nuevaEmpresaData.cuit;
+            datosEnvio.empresa_destino_id = empresaDestino?.id;
         }
 
         router.post('/comercial/cuentas/cambio-titularidad', datosEnvio, {
-            onSuccess: (response) => {
+            onSuccess: () => {
                 toast.success('Cambio de titularidad registrado');
                 setLoading(false);
-                // La redirección la maneja el backend
+                handleCancelar();
+                // Recargar historial
+                router.reload({ only: ['historial'] });
             },
             onError: (errors) => {
                 setErrores(errors);
@@ -593,7 +590,7 @@ export default function CambioTitularidad({
                             {pasoActual === 4 && (
                                 <div className="space-y-4">
                                     <h2 className="text-lg font-semibold text-gray-900">
-                                        {tipoOperacion === 'entre_empresas' ? 'Seleccionar Empresa Destino' : 'Datos de la Nueva Empresa'}
+                                        {tipoOperacion === 'entre_empresas' ? 'Seleccionar Empresa Destino' : 'Nueva Empresa'}
                                     </h2>
                                     
                                     {tipoOperacion === 'entre_empresas' ? (
@@ -654,62 +651,22 @@ export default function CambioTitularidad({
                                             )}
                                         </>
                                     ) : (
-                                        // FORMULARIO MÍNIMO PARA NUEVA EMPRESA
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                    Nombre de Fantasía <span className="text-red-500">*</span>
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={nuevaEmpresaData.nombre_fantasia}
-                                                    onChange={(e) => setNuevaEmpresaData({...nuevaEmpresaData, nombre_fantasia: e.target.value})}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                                    placeholder="Ej: Empresa SRL"
-                                                />
-                                                {errores.nombre_fantasia && (
-                                                    <p className="text-xs text-red-600 mt-1">{errores.nombre_fantasia}</p>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                    Razón Social <span className="text-red-500">*</span>
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={nuevaEmpresaData.razon_social}
-                                                    onChange={(e) => setNuevaEmpresaData({...nuevaEmpresaData, razon_social: e.target.value})}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                                    placeholder="Ej: Empresa SRL"
-                                                />
-                                                {errores.razon_social && (
-                                                    <p className="text-xs text-red-600 mt-1">{errores.razon_social}</p>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                    CUIT <span className="text-red-500">*</span>
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={nuevaEmpresaData.cuit}
-                                                    onChange={(e) => setNuevaEmpresaData({...nuevaEmpresaData, cuit: e.target.value})}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                                    placeholder="30-12345678-9"
-                                                />
-                                                {errores.cuit && (
-                                                    <p className="text-xs text-red-600 mt-1">{errores.cuit}</p>
-                                                )}
-                                            </div>
-                                            <div className="flex justify-end">
-                                                <button
-                                                    onClick={() => setShowAltaEmpresaModal(true)}
-                                                    className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 flex items-center gap-2"
-                                                >
-                                                    <Building className="h-4 w-4" />
-                                                    Usar modal de alta completo
-                                                </button>
-                                            </div>
+                                        // NUEVA EMPRESA: Mostrar solo botón para abrir modal
+                                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                                            <Building className="h-12 w-12 text-gray-400 mb-3" />
+                                            <p className="text-gray-600 text-center mb-4">
+                                                Complete los datos de la nueva empresa
+                                            </p>
+                                            <button
+                                                onClick={() => setShowAltaEmpresaModal(true)}
+                                                className="px-6 py-3 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 flex items-center gap-2 transition-colors"
+                                            >
+                                                <Building className="h-4 w-4" />
+                                                Completar alta de empresa
+                                            </button>
+                                            <p className="text-xs text-gray-400 mt-3">
+                                                Se abrirá un formulario con todos los campos necesarios
+                                            </p>
                                         </div>
                                     )}
 
@@ -850,13 +807,12 @@ export default function CambioTitularidad({
             {/* MODAL DE ALTA DE EMPRESA */}
             <AltaEmpresaModal
                 isOpen={showAltaEmpresaModal}
-                onClose={() => setShowAltaEmpresaModal(false)}
+                onClose={handleModalClose}
                 presupuestoId={null}
                 lead={null}
                 origenes={origenes}
                 rubros={rubros}
                 provincias={provincias}
-                onSuccess={handleEmpresaCreada}
             />
 
             {/* MODAL DE DETALLE */}

@@ -33,15 +33,8 @@ class LeadContactController extends Controller
             
             // Cargar el lead con relaciones necesarias
             $lead = Lead::with(['comercial.personal', 'estadoLead'])->findOrFail($leadId);
-            
-            // 🔥 VERIFICAR ACCESO AL LEAD
-            $this->authorizeLeadAccess($lead);
-            
-            $telefono = $request->query('phone');
-            $mensaje = $request->query('msg', '');
-            
-            $usuarioSistemaId = 9999; // Usuario de sistema
-            
+                    
+           
             // Verificar que el lead tiene un comercial asignado
             if (!$lead->comercial) {
                 Log::warning('Lead sin comercial asignado', ['lead_id' => $leadId]);
@@ -51,6 +44,11 @@ class LeadContactController extends Controller
                 }
                 abort(404, 'Lead sin comercial asignado');
             }
+
+            $telefono = $request->query('phone');
+            $mensaje = $request->query('msg', '');
+            
+            $usuarioSistemaId = 9999; // Usuario de sistema
             
             // Obtener datos del comercial ASIGNADO al lead
             $comercial = $lead->comercial;
@@ -78,7 +76,6 @@ class LeadContactController extends Controller
                 'created' => now()
             ]);
             
-            Log::info('Comentario creado', ['comentario_id' => $comentario->id]);
             
             // ===== 2. CAMBIAR ESTADO DEL LEAD A "CONTACTADO" (ID 2) =====
             $estadoAnterior = $lead->estado_lead_id;

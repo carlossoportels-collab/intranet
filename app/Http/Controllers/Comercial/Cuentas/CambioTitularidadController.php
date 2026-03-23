@@ -4,11 +4,11 @@
 namespace App\Http\Controllers\Comercial\Cuentas;
 
 use App\Http\Controllers\Controller;
-use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
+use App\Traits\Authorizable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Empresa;
-use App\Models\Vehiculo;
+use App\Models\AdminVehiculo;
 use App\Models\CambioTitularidad;
 use App\Models\OrigenContacto;
 use App\Models\Rubro;
@@ -25,11 +25,11 @@ use Carbon\Carbon;
 
 class CambioTitularidadController extends Controller
 {
-    use Authorizable; // 🔥 AGREGAR TRAIT
+    use Authorizable;
 
     public function __construct()
     {
-        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+        $this->initializeAuthorization();
     }
 
     /**
@@ -37,7 +37,6 @@ class CambioTitularidadController extends Controller
      */
     public function index(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
         
         $usuario = Auth::user();
@@ -46,10 +45,8 @@ class CambioTitularidadController extends Controller
         // ============================================
         // 1. OBTENER VEHÍCULOS CON FILTROS DE PERMISOS
         // ============================================
-        $vehiculosQuery = Vehiculo::with('empresa')
-            ->whereHas('empresa', function($query) use ($usuario, $prefijosPermitidos) {
-                $query->whereNull('deleted_at');
-                
+        $vehiculosQuery = AdminVehiculo::with('empresaSistema')
+            ->whereHas('empresaSistema', function($query) use ($usuario, $prefijosPermitidos) {
                 if (!$usuario->ve_todas_cuentas) {
                     if (!empty($prefijosPermitidos)) {
                         $query->whereIn('prefijo_id', $prefijosPermitidos);
@@ -64,19 +61,24 @@ class CambioTitularidadController extends Controller
         // Indexar vehículos por empresa_id
         $vehiculosPorEmpresa = [];
         foreach ($vehiculos as $vehiculo) {
-            if (!isset($vehiculosPorEmpresa[$vehiculo->empresa_id])) {
-                $vehiculosPorEmpresa[$vehiculo->empresa_id] = [];
+            $empresaSistema = $vehiculo->empresaSistema;
+            if (!$empresaSistema) continue;
+            
+            $empresaId = $empresaSistema->id;
+            
+            if (!isset($vehiculosPorEmpresa[$empresaId])) {
+                $vehiculosPorEmpresa[$empresaId] = [];
             }
             
-            $vehiculosPorEmpresa[$vehiculo->empresa_id][] = [
+            $vehiculosPorEmpresa[$empresaId][] = [
                 'id' => $vehiculo->id,
-                'codigo_alfa' => $vehiculo->codigo_alfa ?? '',
+                'codigo_alfa' => $vehiculo->codigoalfa ?? $vehiculo->codigo_completo,
                 'avl_patente' => $vehiculo->avl_patente ?? '',
                 'avl_marca' => $vehiculo->avl_marca ?? '',
                 'avl_modelo' => $vehiculo->avl_modelo ?? '',
                 'avl_anio' => $vehiculo->avl_anio,
                 'avl_color' => $vehiculo->avl_color ?? '',
-                'empresa_id' => $vehiculo->empresa_id,
+                'empresa_id' => $empresaId,
                 'nombre_mix' => $vehiculo->nombre_mix ?? '',
             ];
         }
@@ -190,6 +192,7 @@ class CambioTitularidadController extends Controller
             'prefijos' => $prefijosPermitidos,
         ];
 
+        // 🔥 IMPORTANTE: AGREGAR EL RETURN DE LA VISTA
         return Inertia::render('Comercial/Cuentas/CambioTitularidad', [
             'vehiculos' => $vehiculosPorEmpresa,
             'empresas' => $empresas,
@@ -211,14 +214,13 @@ class CambioTitularidadController extends Controller
      */
     public function store(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
         
         $request->validate([
             'tipo_operacion' => 'required|in:entre_empresas,nueva_empresa',
             'empresa_origen_id' => 'required|exists:empresas,id',
             'vehiculos' => 'required|array|min:1',
-            'vehiculos.*' => 'exists:vehiculos,id',
+            'vehiculos.*' => 'exists:admin_vehiculos,id', // 🔥 CAMBIADO: validar en admin_vehiculos
             'empresa_destino_id' => 'required_if:tipo_operacion,entre_empresas|nullable|exists:empresas,id',
             
             // Solo para nueva empresa
@@ -248,9 +250,9 @@ class CambioTitularidadController extends Controller
             }
             
             // ============================================
-            // VALIDAR VEHÍCULOS
+            // VALIDAR VEHÍCULOS (USANDO ADMIN_VEHICULO)
             // ============================================
-            $vehiculos = Vehiculo::whereIn('id', $request->vehiculos)
+            $vehiculos = AdminVehiculo::whereIn('id', $request->vehiculos)
                 ->where('empresa_id', $empresaOrigen->id)
                 ->get();
             
@@ -294,7 +296,7 @@ class CambioTitularidadController extends Controller
             }
 
             // ============================================
-            // ACTUALIZAR VEHÍCULOS A NUEVA EMPRESA
+            // ACTUALIZAR VEHÍCULOS A NUEVA EMPRESA (USANDO ADMIN_VEHICULO)
             // ============================================
             foreach ($vehiculos as $vehiculo) {
                 $vehiculo->empresa_id = $empresaDestinoId;
@@ -307,7 +309,7 @@ class CambioTitularidadController extends Controller
             $vehiculosData = $vehiculos->map(function ($v) {
                 return [
                     'id' => $v->id,
-                    'codigo_alfa' => $v->codigo_alfa,
+                    'codigo_alfa' => $v->codigoalfa ?? $v->codigo_completo,
                     'patente' => $v->avl_patente,
                     'marca' => $v->avl_marca,
                     'modelo' => $v->avl_modelo,
@@ -327,9 +329,6 @@ class CambioTitularidadController extends Controller
 
             DB::commit();
 
-            // ============================================
-            // REDIRIGIR A CREACIÓN DE CONTRATO
-            // ============================================
             return redirect()->route('comercial.contratos.desde-empresa', ['empresaId' => $empresaDestinoId])
                 ->with('success', 'Cambio de titularidad registrado. Ahora complete el contrato.');
 
@@ -397,7 +396,7 @@ class CambioTitularidadController extends Controller
     }
 
     /**
-     * Obtener vehículos de una empresa
+     * Obtener vehículos de una empresa (USANDO ADMIN_VEHICULO)
      */
     public function getVehiculosEmpresa($id)
     {
@@ -415,13 +414,13 @@ class CambioTitularidadController extends Controller
             }
         }
         
-        $vehiculos = Vehiculo::where('empresa_id', $id)
-            ->orderBy('codigo_alfa')
+        $vehiculos = AdminVehiculo::where('empresa_id', $id) // 🔥 CAMBIADO: usar AdminVehiculo
+            ->orderBy('codigoalfa')
             ->get()
             ->map(function ($vehiculo) {
                 return [
                     'id' => $vehiculo->id,
-                    'codigo_alfa' => $vehiculo->codigo_alfa,
+                    'codigo_alfa' => $vehiculo->codigoalfa ?? $vehiculo->codigo_completo,
                     'avl_patente' => $vehiculo->avl_patente,
                     'avl_marca' => $vehiculo->avl_marca,
                     'avl_modelo' => $vehiculo->avl_modelo,

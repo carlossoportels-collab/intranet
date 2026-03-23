@@ -30,8 +30,6 @@ class VerificarContratosPendientes extends Command
             $this->info("✓ Contratos procesados: {$resultado['procesados']}");
             $this->info("✓ Notificaciones creadas: {$resultado['notificaciones']}");
             
-            Log::info('Verificación de contratos completada', $resultado);
-            
         } catch (\Exception $e) {
             $this->error('Error: ' . $e->getMessage());
             Log::error('Error en verificación de contratos: ' . $e->getMessage(), [

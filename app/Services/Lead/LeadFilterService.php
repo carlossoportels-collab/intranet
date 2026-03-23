@@ -82,8 +82,6 @@ class LeadFilterService
     
     public function getComercialesActivos($usuario): Collection
     {
-        \Log::info('=== DEBUG getComercialesActivos ===');
-        \Log::info('Usuario ID: ' . $usuario->id);
         
         $query = Comercial::with('personal')
             ->where('activo', 1);
@@ -91,7 +89,6 @@ class LeadFilterService
         // Aplicar filtro de permisos usando el trait
         if (!$usuario->ve_todas_cuentas) {
             $prefijosPermitidos = $this->getPrefijosPermitidos($usuario->id);
-            \Log::info('Prefijos permitidos:', $prefijosPermitidos);
             
             if (!empty($prefijosPermitidos)) {
                 $query->whereIn('prefijo_id', $prefijosPermitidos);
@@ -101,25 +98,11 @@ class LeadFilterService
         }
         
         $resultados = $query->get();
-        \Log::info('Cantidad de comerciales encontrados: ' . $resultados->count());
         
         // Log del primer comercial para ver qué datos tiene
         if ($resultados->isNotEmpty()) {
             $primerComercial = $resultados->first();
-            \Log::info('Primer comercial - ID: ' . $primerComercial->id);
-            \Log::info('Primer comercial - prefijo_id: ' . $primerComercial->prefijo_id);
-            \Log::info('Primer comercial - personal_id: ' . $primerComercial->personal_id);
             
-            // Verificar si la relación personal está cargada
-            \Log::info('¿Personal cargado? ' . ($primerComercial->relationLoaded('personal') ? 'SÍ' : 'NO'));
-            
-            if ($primerComercial->personal) {
-                \Log::info('Personal ID: ' . $primerComercial->personal->id);
-                \Log::info('Personal nombre: ' . $primerComercial->personal->nombre);
-                \Log::info('Personal teléfono: ' . $primerComercial->personal->telefono);
-            } else {
-                \Log::info('Personal es NULL');
-            }
         }
         
         $mapeados = $resultados->map(function ($comercial) {
@@ -139,12 +122,9 @@ class LeadFilterService
                 ] : null,
             ];
             
-            \Log::info('Comercial mapeado:', $datos);
             return $datos;
         });
-        
-        \Log::info('=== FIN DEBUG getComercialesActivos ===');
-        
+            
         return $mapeados;
     }
         

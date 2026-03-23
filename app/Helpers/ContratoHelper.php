@@ -36,11 +36,11 @@ class ContratoHelper
         
         // Rango según compañía
         if ($companiaId == 2) { // Smartsat
-            $min = 800000;
-            $max = 899999;
+            $min = 800622;
+            $max = 999999;
         } else { // Localsat (1) u otros
-            $min = 500000;
-            $max = 599999;
+            $min = 502445;
+            $max = 799999;
         }
         
         // Usar transacción para evitar condiciones de carrera

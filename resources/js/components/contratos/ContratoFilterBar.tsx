@@ -93,7 +93,7 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
                             disabled={disabled}
                             className={`
                                 h-7 w-7 flex items-center justify-center text-xs rounded
-                                ${isSelected ? 'bg-local text-white' : ''}
+                                ${isSelected ? 'bg-orange-600 text-white' : ''}
                                 ${!isSelected && isCurrentDay ? 'bg-orange-100 text-orange-600 font-bold' : ''}
                                 ${!isSelected && !isCurrentDay && isCurrentMonth ? 'text-gray-700 hover:bg-gray-100' : ''}
                                 ${!isSelected && !isCurrentMonth ? 'text-gray-400' : ''}
@@ -134,6 +134,7 @@ interface Props {
     prefijoUsuario?: PrefijoFiltro | null;
 }
 
+
 export const ContratoFilterBar: React.FC<Props> = ({
     estadoValue,
     onEstadoChange,
@@ -160,6 +161,42 @@ export const ContratoFilterBar: React.FC<Props> = ({
     const datePickerRef = useRef<HTMLDivElement>(null);
     const calendarDesdeRef = useRef<HTMLDivElement>(null);
     const calendarHastaRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+    console.log('🔍 DEBUG ContratoFilterBar:', {
+        usuarioEsComercial,
+        prefijoUsuario,
+        prefijoValue,
+        prefijosFiltro: prefijosFiltro.map(p => ({ id: p.id, display_text: p.display_text }))
+    });
+}, [usuarioEsComercial, prefijoUsuario, prefijoValue, prefijosFiltro]);
+
+    // 🔥 EFECTO CRÍTICO: Sincronizar el prefijoValue cuando el usuario es comercial
+    useEffect(() => {
+        if (usuarioEsComercial && prefijoUsuario?.id) {
+            // Si el usuario es comercial, forzar que el filtro use su prefijo
+            if (prefijoValue !== prefijoUsuario.id) {
+                onPrefijoChange(prefijoUsuario.id);
+            }
+        }
+    }, [usuarioEsComercial, prefijoUsuario?.id]);
+
+    // Cerrar calendarios al hacer click fuera
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (calendarDesdeRef.current && !calendarDesdeRef.current.contains(event.target as Node)) {
+                setShowCalendarDesde(false);
+            }
+            if (calendarHastaRef.current && !calendarHastaRef.current.contains(event.target as Node)) {
+                setShowCalendarHasta(false);
+            }
+            if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+                setShowDatePicker(false);
+            }
+        };
+        
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const formatDateForInput = (date: Date): string => {
         return format(date, 'yyyy-MM-dd');
@@ -222,6 +259,9 @@ export const ContratoFilterBar: React.FC<Props> = ({
         }
     };
 
+    // Determinar si debemos mostrar el selector de prefijo
+    const mostrarSelectorPrefijo = !usuarioEsComercial;
+
     return (
         <>
             {/* Mobile Toggle */}
@@ -233,7 +273,7 @@ export const ContratoFilterBar: React.FC<Props> = ({
                     <Filter className="h-4 w-4" />
                     Filtros
                     {hayFiltrosActivos && (
-                        <span className="ml-1 w-2 h-2 bg-sat rounded-full"></span>
+                        <span className="ml-1 w-2 h-2 bg-orange-500 rounded-full"></span>
                     )}
                 </button>
                 {hayFiltrosActivos && (
@@ -249,7 +289,7 @@ export const ContratoFilterBar: React.FC<Props> = ({
 
             {/* Filtros */}
             <div className={`${showMobileFilters ? 'block' : 'hidden md:block'} mb-6`}>
-                {/* Versión Desktop */}
+                {/* Versión Desktop - todos en una fila */}
                 <div className="hidden md:flex md:items-center md:gap-3">
                     {/* Filtro por Fecha */}
                     <div className="relative flex-1" ref={datePickerRef}>
@@ -406,16 +446,16 @@ export const ContratoFilterBar: React.FC<Props> = ({
                         ))}
                     </select>
                     
-                    {/* Comercial/Prefijo */}
+                    {/* Comercial/Prefijo - IGUAL QUE EN PresupuestoFilterBar */}
                     {usuarioEsComercial && prefijoUsuario ? (
-                        // Para comerciales: mostrar como texto
+                        // Para comerciales: mostrar como texto (solo lectura)
                         <div className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm bg-gray-50 flex items-center gap-2">
                             <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
                             <span className="text-gray-700 truncate" title={prefijoUsuario.display_text}>
                                 {prefijoUsuario.display_text}
                             </span>
                         </div>
-                    ) : !usuarioEsComercial ? (
+                    ) : mostrarSelectorPrefijo ? (
                         // Para otros usuarios: select normal
                         <select 
                             className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
@@ -443,7 +483,7 @@ export const ContratoFilterBar: React.FC<Props> = ({
                     )}
                 </div>
 
-                {/* Versión Mobile */}
+                {/* Versión Mobile - grid 2 columnas */}
                 <div className="md:hidden grid grid-cols-2 gap-3">
                     {/* Filtro por Fecha (ocupa 2 columnas) */}
                     <div className="relative col-span-2" ref={datePickerRef}>
@@ -478,15 +518,17 @@ export const ContratoFilterBar: React.FC<Props> = ({
 
                     <div className="col-span-2"></div>
                     
-                    {/* Comercial/Prefijo */}
+                    {/* Comercial/Prefijo - Versión Mobile */}
                     {usuarioEsComercial && prefijoUsuario ? (
+                        // Para comerciales: mostrar como texto
                         <div className="col-span-2 px-3 py-2 border border-gray-300 rounded text-sm bg-gray-50 flex items-center gap-2">
                             <User className="h-4 w-4 text-gray-500" />
                             <span className="text-gray-700 truncate">
                                 {prefijoUsuario.display_text}
                             </span>
                         </div>
-                    ) : !usuarioEsComercial ? (
+                    ) : mostrarSelectorPrefijo ? (
+                        // Para otros usuarios: select normal
                         <select 
                             className="col-span-2 px-3 py-2 border border-gray-300 rounded text-sm"
                             value={prefijoValue}

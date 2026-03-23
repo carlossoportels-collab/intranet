@@ -139,7 +139,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             icon: <Briefcase size={16} />,
             permiso: 'ver_prospectos_leads',
             children: [
-                { id: 'actividad', name: 'Actividad', href: '/comercial/actividad', icon: <Bell size={14} />, permiso: 'ver_actividad' },
+              //   { id: 'actividad', name: 'Actividad', href: '/comercial/actividad', icon: <Bell size={14} />, permiso: 'ver_actividad' },
                 { id: 'contactos', name: 'Contactos', href: '/comercial/contactos', icon: <Users size={14} />, permiso: 'ver_contactos' },
                 {
                     id: 'cuentas',
@@ -169,13 +169,13 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                 { 
                     id: 'comercial-grupal', 
                     name: 'Desempeño Grupal', 
-                    href: '/estadisticas/comercial-grupal', 
+                    href: '/estadisticas/comercial-ggrupal', 
                     icon: <Users size={14} />,
                 },
                 { 
                     id: 'comercial-individual', 
                     name: 'Rendimiento Individual', 
-                    href: '/estadisticas/comercial-individual', 
+                    href: '/estadisticas/comercial-iindividual', 
                     icon: <User size={14} />,
                 },
             ]
@@ -203,7 +203,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     icon: <Users size={14} />,
                     permiso: 'ver_equipos',
                     children: [
-                        { id: 'equipo-comercial', name: 'Comercial', href: '/rrhh/equipos/comercial', icon: <BriefcaseIcon size={12} />, permiso: 'gestionar_equipo_comercial' },
+                   //     { id: 'equipo-comercial', name: 'Comercial', href: '/rrhh/equipos/comercial', icon: <BriefcaseIcon size={12} />, permiso: 'gestionar_equipo_comercial' },
                         { id: 'equipo-tecnico', name: 'Técnico', href: '/rrhh/equipos/tecnico', icon: <Wrench size={12} />, permiso: 'gestionar_equipo_tecnico' },
                     ]
                 }

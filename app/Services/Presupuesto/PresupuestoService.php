@@ -68,8 +68,6 @@ class PresupuestoService
 
     public function createPresupuesto(array $data, Lead $lead = null)
     {
-        \Log::info('=== CREATE PRESUPUESTO SERVICE - INICIO ===');
-        \Log::info('Data completa:', $data);
         
         return DB::transaction(function () use ($data, $lead) {
             try {
@@ -120,14 +118,6 @@ class PresupuestoService
                     $data['cantidad_vehiculos']
                 );
                 
-                \Log::info('Subtotales calculados:', [
-                    'subtotalTasa' => $subtotalTasa,
-                    'subtotalAbono' => $subtotalAbono,
-                    'subtotalAgregados' => $subtotalAgregados,
-                    'tipoPromocionTasa' => $tipoPromocionTasa,
-                    'tipoPromocionAbono' => $tipoPromocionAbono,
-                    'total' => $subtotalTasa + $subtotalAbono + $subtotalAgregados
-                ]);
                 
                 // Crear presupuesto
                 $presupuestoData = [
@@ -153,8 +143,6 @@ class PresupuestoService
                     'created_by' => Auth::id(),
                 ];
 
-                \Log::info('Intentando crear presupuesto con datos:', $presupuestoData);
-
                 $presupuesto = Presupuesto::create($presupuestoData);
                 
                 if (!$presupuesto || !$presupuesto->id) {
@@ -162,11 +150,8 @@ class PresupuestoService
                     throw new \Exception('Error al crear el presupuesto en la base de datos');
                 }
 
-                \Log::info('Presupuesto insertado exitosamente:', ['id' => $presupuesto->id]);
-                
                 // Crear agregados
                 if (!empty($data['agregados'])) {
-                    \Log::info('Creando ' . count($data['agregados']) . ' agregados');
                     
                     foreach ($data['agregados'] as $index => $agregado) {
                         // Determinar si este producto tiene promoción
@@ -197,15 +182,12 @@ class PresupuestoService
                             'subtotal' => $subtotal,
                         ]);
                         
-                        \Log::info("Agregado {$index} creado:", $agregadoCreado->toArray());
                     }
                 }
                 
                 // Crear notificación
                 $this->notificationService->notificarPresupuestoCreado($presupuesto);
-                
-                \Log::info('=== CREATE PRESUPUESTO SERVICE - FINALIZADO CON ÉXITO ===');
-                
+
                 return $presupuesto;
                 
             } catch (\Exception $e) {
@@ -246,8 +228,7 @@ class PresupuestoService
 
     public function updatePresupuesto(Presupuesto $presupuesto, array $data)
 {
-    \Log::info('=== UPDATE PRESUPUESTO SERVICE - INICIO ===');
-    \Log::info('Data completa:', $data);
+
     
     return DB::transaction(function () use ($presupuesto, $data) {
         try {
@@ -329,7 +310,6 @@ class PresupuestoService
                 }
             }
             
-            \Log::info('=== UPDATE PRESUPUESTO SERVICE - FINALIZADO CON ÉXITO ===');
             
             return $presupuesto->fresh();
             

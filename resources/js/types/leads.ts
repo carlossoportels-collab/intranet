@@ -48,8 +48,8 @@ export interface Comercial {
     prefijo_id: number;
     nombre: string;
     email: string;
-    telefono?: string; // Podemos agregarlo directamente si viene del backend
-    personal?: Personal; // O podemos usar la relación
+    telefono?: string; 
+    personal?: Personal; 
     personal_id?: number;
 }
 

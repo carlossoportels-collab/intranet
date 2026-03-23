@@ -67,10 +67,6 @@ class ContratoLegacyController extends Controller
             if (!empty($files)) {
                 $filePath = $files[0]; // Tomar el primer archivo encontrado
                 $filename = basename($filePath);
-                Log::info("✅ PDF encontrado para contrato legacy {$id}", [
-                    'path' => $filePath,
-                    'filename' => $filename
-                ]);
                 break;
             }
         }

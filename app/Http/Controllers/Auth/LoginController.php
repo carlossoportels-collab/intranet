@@ -43,7 +43,6 @@ class LoginController extends Controller
         if (!$this->checkRateLimit($ip, 10, 15)) {
             $this->blockIp($ip, 60);
             
-            // NOTIFICACIÓN: IP bloqueada por rate limiting
             $this->securityNotification->notifyIpBlocked(
                 $ip,
                 'Excedió el límite de intentos (10 en 15 minutos)',
@@ -66,9 +65,8 @@ class LoginController extends Controller
         // Detectar intentos sospechosos
         if ($this->isSuspicious($acceso)) {
             $this->logLoginAttempt($acceso, false, ['suspicious' => true]);
-            $this->blockIp($ip, 120); // Bloquear por 2 horas
+            $this->blockIp($ip, 120);
             
-            // NOTIFICACIÓN: Actividad sospechosa detectada
             $this->securityNotification->notifySuspiciousActivity(
                 $acceso,
                 $ip,
@@ -96,19 +94,23 @@ class LoginController extends Controller
             $companiaData = $this->getCompaniaNombre($usuario);
             $nombreCompleto = $this->getNombreCompleto($usuario);
             
+            // Determinar redirección según el rol
+            $redirectTo = $this->getRedirectByRole($usuario->rol_id);
+            
             $request->session()->put('welcome_data', [
                 'compania' => $companiaData['nombre'],
                 'logo' => $companiaData['logo'],
                 'colores' => $companiaData['colores'],
                 'nombre' => $nombreCompleto,
                 'rol_id' => $usuario->rol_id,
+                'redirect_to' => $redirectTo,
             ]);
             
             return redirect()->route('welcome');
         }
         
         // Registrar intento fallido
-        $attempt = $this->logLoginAttempt($acceso, false);
+        $this->logLoginAttempt($acceso, false);
         
         // Verificar si hay múltiples intentos fallidos desde la misma IP
         $failedAttempts = DB::table('login_attempts')
@@ -118,7 +120,6 @@ class LoginController extends Controller
             ->count();
         
         if ($failedAttempts >= 5) {
-            // NOTIFICACIÓN: Múltiples intentos fallidos
             $this->securityNotification->notifyMultipleFailedAttempts(
                 $acceso,
                 $ip,
@@ -130,6 +131,25 @@ class LoginController extends Controller
             'acceso' => 'Credenciales incorrectas.'
         ]);
     }
+
+    /**
+     * Determinar la ruta de redirección según el rol del usuario
+     * @param int $rolId
+     * @return string
+     */
+private function getRedirectByRole(int $rolId): string
+{
+    $roleRedirects = [
+        1 => '/comercial/prospectos',  // root
+        2 => '/comercial/prospectos',  // admin
+        3 => '/comercial/prospectos',  // supervisor
+        4 => '/cuentas/certificados',  // soporte
+        5 => '/comercial/prospectos',  // Comercial
+        6 => '/rrhh/personal/licencias', // RRHH
+    ];
+    
+    return $roleRedirects[$rolId] ?? '/dashboard';
+}
 
     private function getCompaniaNombre($usuario)
     {
@@ -211,14 +231,12 @@ class LoginController extends Controller
         
         $request->session()->forget('welcome_data');
         
-        $redirectTo = route('comercial.prospectos');
-        
         return inertia('Auth/Welcome', [
             'compania' => $welcomeData['compania'],
             'logo' => $welcomeData['logo'],
             'colores' => $welcomeData['colores'],
             'nombre' => $welcomeData['nombre'],
-            'redirect_to' => $redirectTo,
+            'redirect_to' => $welcomeData['redirect_to'],
         ]);
     }
 
