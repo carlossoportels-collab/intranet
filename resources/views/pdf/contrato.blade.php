@@ -26,7 +26,7 @@
             line-height: 1.25;
             background-color: white;
             font-size: 10px;
-            padding: 5px 10px;
+            padding: 10px 15px;
         }
         
         .contract-container {
@@ -59,14 +59,17 @@
 
         .left-column {
             text-align: left;
+            width: 35%;
         }
 
         .center-column {
             text-align: center;
+            width: 35%;
         }
 
         .right-column {
             text-align: right;
+            width: 30%;
         }
 
         .company-logo {
@@ -85,10 +88,15 @@
         }
 
         .company-info {
-            font-size: 8.5px;
+            font-size: 7px;
             color: #555;
             line-height: 1.3;
             margin-top: 2px;
+        }
+        
+        .company-info strong {
+            font-weight: 700;
+            font-size: 7px;
         }
 
         .contract-title {
@@ -157,7 +165,7 @@
             padding: 2px 4px;
             vertical-align: middle;
         }
-/* Celda contenedora - fondo gris suave */
+
         .data-cell {
             display: flex;
             align-items: center;
@@ -166,34 +174,31 @@
             border: 1px solid #e9ecef;
             border-radius: 2px;
             padding: 3px 5px;
-            min-height: 20px;
+            min-height: 22px;
         }
 
-        /* Label con ancho fijo */
         .data-label {
             font-weight: 600;
             color: #333333;
-            font-size: 9px;
-            width: 150px;
+            font-size: 10px;
+            width: 130px;
             white-space: nowrap;
             text-align: left;
             background: transparent;
         }
 
-        /* Contenedor del valor - SIN overflow hidden para textos largos */
         .data-value {
             flex: 1;
-            font-size: 9px;
+            font-size: 10px;
             color: #000000;
-            white-space: normal; /* Cambiado de nowrap a normal */
-            word-wrap: break-word; /* Permite que las palabras largas se corten */
-            overflow: visible; /* Cambiado de hidden a visible */
+            white-space: normal;
+            word-wrap: break-word;
             text-align: left;
             background: transparent;
             border: none;
             padding: 0;
             margin-left: 5px;
-            line-height: 1.4; /* Mejor altura de línea */
+            line-height: 1.4;
         }
 
         .fiscal-section {
@@ -269,14 +274,35 @@
             font-size: 9px;
         }
         
-        .total-row {
-            background: #fff3e0;
-            font-weight: bold;
-            border-top: 1px solid var(--sat-orange);
-            color: var(--local-dark);
-            font-size: 9px;
-        }
-        
+/* Totales estilo datos del cliente */
+.total-cell-data {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 2px;
+    padding: 4px 6px;
+    min-height: 22px;
+}
+
+.total-label-data {
+    font-weight: 600;
+    color: #333333;
+    font-size: 9px;
+    width: 130px;
+    white-space: nowrap;
+}
+
+.total-value-data {
+    flex: 1;
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    color: #000000;
+    text-align: right;
+}
+                
         .payment-section {
             margin-bottom: 6px;
         }
@@ -301,12 +327,6 @@
             font-weight: 600;
             color: var(--local-dark);
             font-size: 10px;
-        }
-        
-        .payment-status {
-            font-size: 8px;
-            color: var(--sat-orange);
-            font-weight: 600;
         }
         
         .payment-details {
@@ -341,12 +361,14 @@
         .payment-label {
             font-weight: 600;
             color: var(--local-dark);
-            font-size: 8.5px;
+            font-size: 8px;
         }
         
         .payment-value {
-            font-size: 9px;
-            padding: 3px 4px;
+            font-size: 8.5px;
+            padding: 2px 0;
+            color: #333;
+            font-family: 'Courier New', monospace;
         }
         
         .authorization-box {
@@ -360,19 +382,19 @@
         .authorization-title {
             font-weight: 600;
             color: var(--local-dark);
-            font-size: 10px;
+            font-size: 9px;
             margin-bottom: 4px;
         }
         
         .authorization-text {
-            font-size: 8px;
+            font-size: 7px;
             color: #555;
             line-height: 1.2;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         
         .authorization-text p {
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
         
         .signature-fields-three {
@@ -406,12 +428,12 @@
         .signature-label {
             font-weight: 600;
             color: var(--local-dark);
-            font-size: 7.5px;
+            font-size: 7px;
         }
         
         .signature-line {
             border-bottom: 1px solid #333;
-            height: 15px;
+            height: 12px;
             margin-top: 1px;
         }
         
@@ -447,19 +469,19 @@
         .installation-label {
             font-weight: 600;
             color: var(--local-dark);
-            font-size: 9px;
+            font-size: 8px;
             white-space: nowrap;
         }
         
         .installation-value {
-            font-size: 9px;
+            font-size: 8px;
             white-space: nowrap;
         }
         
         .vehicles-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 9px;
+            font-size: 8px;
         }
         
         .vehicles-table th {
@@ -469,7 +491,7 @@
             text-align: left;
             font-weight: 600;
             border: 1px solid #ccc;
-            font-size: 9px;
+            font-size: 8px;
         }
         
         .vehicles-table td {
@@ -477,12 +499,12 @@
             border-bottom: 1px solid #eee;
             border-left: 1px solid #eee;
             border-right: 1px solid #eee;
-            font-size: 9px;
+            font-size: 8px;
         }
         
         .signature-section {
-            margin-top: 15px;
-            padding-top: 10px;
+            margin-top: 12px;
+            padding-top: 8px;
             border-top: 1px solid var(--border-color);
         }
         
@@ -491,7 +513,7 @@
             width: 100%;
             table-layout: fixed;
             border-collapse: collapse;
-            margin-top: 15px;
+            margin-top: 12px;
         }
 
         .signature-row-final {
@@ -512,21 +534,21 @@
         
         .signature-line-final {
             border-bottom: 1px solid #333;
-            height: 25px;
-            margin-top: 8px;
+            height: 20px;
+            margin-top: 6px;
             width: 100%;
         }
         
         .signature-label-final {
-            font-size: 8px;
+            font-size: 7px;
             color: #666;
-            margin-top: 3px;
+            margin-top: 2px;
         }
         
         @media print {
             @page {
                 size: A4;
-                margin: 10mm;
+                margin: 12mm;
             }
         }
     </style>
@@ -571,7 +593,8 @@
             $costoMensual = $contrato->presupuesto_total_mensual ?? 0;
         }
         
-        $totalPrimerMes = $totalInversion + $costoMensual;
+        $nombreVendedor = $contrato->vendedor_nombre ?? '';
+        $nombreVendedorCompleto = $nombreVendedor ?: 'G. MOYANO';
     @endphp
 
     <div class="contract-container">
@@ -581,7 +604,7 @@
                 <div class="header-row">
                     <div class="left-column">
                         @if(!empty($compania['logo']) && file_exists($compania['logo']))
-                            <img src="{{ $compania['logo'] }}" alt="{{ $compania['nombre'] }}" style="height: 35px; margin-bottom: 2px;">
+                            <img src="{{ $compania['logo'] }}" alt="{{ $compania['nombre'] }}" style="height: 45px; margin-bottom: 2px;">
                         @else
                             <div class="company-logo">
                                 @if(str_contains($compania['nombre'], 'SAT'))
@@ -619,7 +642,7 @@
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Vendedor:</span>
-                                <span class="detail-value">{{ explode(' ', $contrato->vendedor_nombre)[0] ?? 'G. MOYANO' }}</span>
+                                <span class="detail-value">{{ $nombreVendedorCompleto }}</span>
                             </div>
                         </div>
                     </div>
@@ -627,125 +650,125 @@
             </div>
         </div>
 
-        <!-- Datos del Cliente - TABLA DE 2 COLUMNAS CON ANCHOS FIJOS Y ALINEACIÓN DERECHA -->
+        <!-- Datos del Cliente -->
         <div class="section">
             <div class="section-title">Datos del Cliente</div>
             
             <table class="data-table">
-                <tr>
+                 <tr>
                     <td width="50%">
                         <div class="data-cell">
                             <span class="data-label">Nombre completo:</span>
                             <span class="data-value">{{ $contrato->cliente_nombre_completo }}</span>
                         </div>
-                    </td>
+                     </td>
                     <td width="50%">
                         <div class="data-cell">
                             <span class="data-label">DNI:</span>
                             <span class="data-value">{{ $contrato->contacto_nro_documento ?? '-' }}</span>
                         </div>
-                    </td>
-                </tr>
-                <tr>
+                     </td>
+                 </tr>
+                 <tr>
                     <td width="50%">
                         <div class="data-cell">
                             <span class="data-label">Teléfono:</span>
                             <span class="data-value">{{ $contrato->cliente_telefono ?? '-' }}</span>
                         </div>
-                    </td>
+                     </td>
                     <td width="50%">
                         <div class="data-cell">
                             <span class="data-label">Email:</span>
                             <span class="data-value">{{ $contrato->cliente_email ?? '-' }}</span>
                         </div>
-                    </td>
-                </tr>
-                <tr>
+                     </td>
+                 </tr>
+                 <tr>
                     <td width="50%">
                         <div class="data-cell">
                             <span class="data-label">Domicilio:</span>
                             <span class="data-value">{{ $contrato->contacto_direccion_personal ?? '-' }}</span>
                         </div>
-                    </td>
+                     </td>
                     <td width="50%">
                         <div class="data-cell">
                             <span class="data-label">Localidad:</span>
                             <span class="data-value">{{ $contrato->cliente_localidad ?? '' }}{{ $contrato->cliente_provincia ? ', ' . $contrato->cliente_provincia : '' }}</span>
                         </div>
-                    </td>
-                </tr>
-            </table>
+                     </td>
+                 </tr>
+             </table>
             
-            <!-- Datos Fiscales y Responsables - TABLA DE 2 COLUMNAS CON ANCHOS FIJOS Y ALINEACIÓN DERECHA -->
+            <!-- Datos Fiscales y Responsables -->
             <div class="fiscal-section">
                 <div class="section-title">Datos Fiscales y Responsables</div>
                 
                 <table class="data-table">
-                    <tr>
+                     <tr>
                         <td width="50%">
                             <div class="data-cell">
                                 <span class="data-label">Razón social:</span>
                                 <span class="data-value">{{ $contrato->empresa_razon_social }}</span>
                             </div>
-                        </td>
+                         </td>
                         <td width="50%">
                             <div class="data-cell">
                                 <span class="data-label">CUIT:</span>
                                 <span class="data-value">{{ $contrato->empresa_cuit }}</span>
                             </div>
-                        </td>
-                    </tr>
-                    <tr>
+                         </td>
+                     </tr>
+                     <tr>
                         <td width="50%">
                             <div class="data-cell">
                                 <span class="data-label">Domicilio fiscal:</span>
                                 <span class="data-value">{{ $contrato->empresa_domicilio_fiscal ?? '-' }}</span>
                             </div>
-                        </td>
+                         </td>
                         <td width="50%">
                             <div class="data-cell">
                                 <span class="data-label">Actividad:</span>
                                 <span class="data-value">{{ $contrato->empresa_actividad ?? '-' }}</span>
                             </div>
-                        </td>
-                    </tr>
-                    <tr>
+                         </td>
+                     </tr>
+                     <tr>
                         <td width="50%">
                             <div class="data-cell">
                                 <span class="data-label">Situación AFIP:</span>
                                 <span class="data-value">{{ $contrato->empresa_situacion_afip ?? '-' }}</span>
                             </div>
-                        </td>
+                         </td>
                         <td width="50%">
                             <div class="data-cell">
                                 <span class="data-label">Email empresa:</span>
                                 <span class="data-value">{{ $contrato->empresa_email_fiscal ?? '-' }}</span>
                             </div>
-                        </td>
-                    </tr>
-                    <tr>
+                         </td>
+                     </tr>
+                     <tr>
                         <td width="50%">
                             <div class="data-cell">
                                 <span class="data-label">Responsable flota:</span>
                                 <span class="data-value">
-                                    {{ $contrato->responsable_flota_nombre ?? '-' }}
+                                    {{ $contrato->responsable_flota_nombre ?? $contrato->cliente_nombre_completo }}
                                     @if($contrato->responsable_flota_telefono) - {{ $contrato->responsable_flota_telefono }}@endif
                                     @if($contrato->responsable_flota_email) - {{ $contrato->responsable_flota_email }}@endif
                                 </span>
                             </div>
-                        </td>
+                         </td>
                         <td width="50%">
                             <div class="data-cell">
                                 <span class="data-label">Responsable pagos:</span>
                                 <span class="data-value">
-                                    {{ $contrato->responsable_pagos_nombre ?? '-' }}
+                                    {{ $contrato->responsable_pagos_nombre ?? $contrato->cliente_nombre_completo }}
                                     @if($contrato->responsable_pagos_telefono) - {{ $contrato->responsable_pagos_telefono }}@endif
                                     @if($contrato->responsable_pagos_email) - {{ $contrato->responsable_pagos_email }}@endif
                                 </span>
                             </div>
-                        </td>
-                    </tr>
-                </table>
+                         </td>
+                     </tr>
+                 </table>
             </div>
         </div>
 
@@ -962,10 +985,24 @@
                 </div>
             @endif
             
-            @if($tienePresupuesto && $totalInversion > 0)
-                <div style="text-align: right; margin-top: 10px; padding: 5px 8px; background: #e6f0fa; font-weight: bold; border: 1px solid rgb(60, 60, 62); border-radius: 3px; color: rgb(60, 60, 62); font-size: 11px;">
-                    TOTAL PRIMER MES: <span style="font-family: 'Courier New', monospace; font-size: 12px;">{{ $formatMoney($totalPrimerMes) }}</span>
-                </div>
+            <!-- Badges de totales en tabla de 2 columnas (uno al lado del otro) -->
+            @if($tienePresupuesto && ($totalInversion > 0 || $costoMensual > 0))
+                <table class="data-table" style="margin-top: 8px;">
+                    <tr>
+                        <td width="50%">
+                            <div class="total-cell-data">
+                                <span class="total-label-data">INVERSIÓN INICIAL:</span>
+                                <span class="total-value-data">{{ $formatMoney($totalInversion) }}</span>
+                            </div>
+                        </td>
+                        <td width="50%">
+                            <div class="total-cell-data">
+                                <span class="total-label-data">COSTO MENSUAL:</span>
+                                <span class="total-value-data">{{ $formatMoney($costoMensual) }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
             @endif
         </div>
 
@@ -1051,14 +1088,14 @@
                             <div class="payment-row">
                                 <div class="payment-cell">
                                     <div class="payment-field">
-                                        <span class="payment-label">Titular:</span>
-                                        <span class="payment-value">{{ $contrato->debitoTarjeta->titular_tarjeta ?? '-' }}</span>
+                                        <span class="payment-label">CCV/CVV:</span>
+                                        <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_codigo ?? '-' }}</span>
                                     </div>
                                 </div>
                                 <div class="payment-cell">
                                     <div class="payment-field">
-                                        <span class="payment-label">CCV:</span>
-                                        <span class="payment-value">{{ $contrato->debitoTarjeta->tarjeta_ccv ?? '-' }}</span>
+                                        <span class="payment-label">Titular:</span>
+                                        <span class="payment-value">{{ $contrato->debitoTarjeta->titular_tarjeta ?? '-' }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1137,14 +1174,14 @@
             @if($contrato->vehiculos && $contrato->vehiculos->count() > 0)
                 <table class="vehicles-table">
                     <thead>
-                        <tr>
+                         <tr>
                             <th>Patente</th>
                             <th>Modelo</th>
                             <th>Marca</th>
                             <th>Año</th>
                             <th>Color</th>
                             <th>Identificador</th>
-                        </tr>
+                         </tr>
                     </thead>
                     <tbody>
                         @foreach($contrato->vehiculos as $vehiculo)

@@ -27,7 +27,7 @@ interface Vehiculo {
 interface Props {
     vehiculos: Vehiculo[];
     itemsPerPage?: number;
-    showAbonos?: boolean; // Nueva prop para controlar si mostrar abonos
+    showAbonos?: boolean; 
 }
 
 export default function TablaVehiculos({ vehiculos, itemsPerPage = 5, showAbonos = true }: Props) {

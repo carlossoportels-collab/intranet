@@ -180,4 +180,21 @@ class Lead extends Model
         return $this->empresaContacto?->empresa;
     }
 
+    /**
+ * Notificaciones de recordatorio no leídas para este lead
+ */
+public function recordatoriosNoLeidos()
+{
+    return $this->hasMany(\App\Models\Notificacion::class, 'entidad_id', 'id')
+        ->where('entidad_tipo', 'lead')
+        ->whereIn('tipo', [
+            'comentario_recordatorio',
+            'lead_posible_recontacto',
+            'recontacto_recordatorio',
+            'lead_sin_contactar'
+        ])
+        ->where('leida', false)
+        ->whereNull('deleted_at');
+}
+
 }

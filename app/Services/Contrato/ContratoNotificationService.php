@@ -11,32 +11,8 @@ use Illuminate\Support\Facades\Log;
 class ContratoNotificationService
 {
     /**
-     * Notificar cuando se crea un contrato (activo)
+     * NOTA: Se eliminó notificarContratoCreado() porque no es necesario
      */
-    public function notificarContratoCreado(Contrato $contrato): void
-    {
-        $usuarioId = $contrato->created_by;
-        $numeroContrato = str_pad($contrato->id, 6, '0', STR_PAD_LEFT);
-        
-        Notificacion::create([
-            'usuario_id' => $usuarioId,
-            'titulo' => '📄 Nuevo contrato generado',
-            'mensaje' => "Se ha generado el contrato N° {$numeroContrato} para {$contrato->cliente_nombre_completo}. El contrato está activo.",
-            'tipo' => 'contrato_activo',
-            'entidad_tipo' => 'contrato',
-            'entidad_id' => $contrato->id,
-            'leida' => false,
-            'fecha_notificacion' => now(),
-            'prioridad' => 'normal',
-            'created' => now()
-        ]);
-
-        Log::info('Notificación de contrato creado', [
-            'contrato_id' => $contrato->id,
-            'usuario_id' => $usuarioId,
-            'numero' => $numeroContrato
-        ]);
-    }
 
     /**
      * Notificar cuando un contrato pasa a pendiente (1 mes sin instalar)

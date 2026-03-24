@@ -390,7 +390,7 @@ class ProspectosController extends Controller
         $cantidadPrefijos = 0;
         
         if (!$usuario->ve_todas_cuentas) {
-            // 🔥 CAMBIO: Usar permisoService en lugar de prefijoService
+            
             $prefijosAsignados = $this->permisoService->getPrefijosPermitidos($usuario->id) ?? [];
             $cantidadPrefijos = count($prefijosAsignados);
         }

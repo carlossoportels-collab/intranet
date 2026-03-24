@@ -13,21 +13,21 @@ use App\Services\LeadPerdido\LeadPerdidoStatsService;
 use App\Services\LeadPerdido\LeadPerdidoSeguimientoService;
 use App\Http\Requests\ProcesarSeguimientoRequest;
 use App\DTOs\SeguimientoPerdidoData;
-use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
+use App\Traits\Authorizable; 
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 
 class LeadsPerdidosController extends Controller
 {
-    use Authorizable; // 🔥 AGREGAR TRAIT
+    use Authorizable;
 
     public function __construct(
         protected LeadPerdidoQueryService $queryService,
         protected LeadPerdidoStatsService $statsService,
         protected LeadPerdidoSeguimientoService $seguimientoService
     ) {
-        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+        $this->initializeAuthorization(); // INICIALIZAR
     }
 
     /**
@@ -35,7 +35,7 @@ class LeadsPerdidosController extends Controller
      */
     public function index(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO
+        // VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.VER_LEADS_PERDIDOS'));
         
         $usuario = auth()->user();
@@ -101,7 +101,7 @@ class LeadsPerdidosController extends Controller
     {
         $lead = Lead::findOrFail($id);
         
-        // 🔥 VERIFICAR ACCESO AL LEAD
+        // VERIFICAR ACCESO AL LEAD
         $this->authorizeLeadAccess($lead, config('permisos.GESTIONAR_LEADS_PERDIDOS'));
         
         $seguimiento = $lead->seguimientoPerdida()
@@ -145,7 +145,7 @@ class LeadsPerdidosController extends Controller
     {
         $lead = Lead::findOrFail($id);
         
-        // 🔥 VERIFICAR ACCESO AL LEAD Y PERMISO
+        // VERIFICAR ACCESO AL LEAD Y PERMISO
         $this->authorizeLeadAccess($lead, config('permisos.GESTIONAR_LEADS_PERDIDOS'));
         
         $data = SeguimientoPerdidoData::fromRequest(

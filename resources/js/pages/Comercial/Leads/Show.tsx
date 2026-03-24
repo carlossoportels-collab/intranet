@@ -65,6 +65,9 @@ interface PageProps {
   origenes: Origen[]; 
   estadosLead?: EstadoLead[];
   tiposComentario?: TipoComentario[];
+  tiposComentarioGenerales?: TipoComentario[];
+  tiposComentarioSeguimiento?: TipoComentario[];
+  estadosLeadSeguimiento?: EstadoLead[]; 
   rubros: Rubro[];  
   provincias: Provincia[];
   comerciales?: Comercial[];
@@ -84,6 +87,9 @@ export default function Show({
   origenes = [],
   estadosLead = [],
   tiposComentario = [],
+  tiposComentarioGenerales = [], 
+  tiposComentarioSeguimiento = [],
+  estadosLeadSeguimiento = [],
   rubros = [],
   provincias = [],
   comerciales = []
@@ -245,6 +251,12 @@ export default function Show({
             lead={lead}
             onEditar={() => abrirModal('editar', lead)}
             onNuevoComentario={() => abrirModal('nuevoComentario', lead)}
+            tiposComentario={tiposComentario}
+            estadosLead={estadosLead}
+            comentariosExistentes={comentarios.length}
+            seguimientoPerdida={lead.seguimientoPerdida}
+            tiposComentarioSeguimiento={tiposComentarioSeguimiento || []}
+            estadosLeadSeguimiento={estadosLead}
           />
         </div>
 
@@ -274,18 +286,6 @@ export default function Show({
         </div>
       </div>
 
-      <NuevoComentarioModal
-        isOpen={modals.nuevoComentario}
-        onClose={cerrarModales}
-        lead={lead}
-        tiposComentario={tiposComentario}
-        estadosLead={estadosLead}
-        comentariosExistentes={comentarios.length}
-        onSuccess={() => {
-          router.reload({ only: ['lead', 'comentarios', 'estadisticas'] });
-        }}
-      />
-      
       <EditarLeadModal
         isOpen={modals.editar}
         onClose={cerrarModales}

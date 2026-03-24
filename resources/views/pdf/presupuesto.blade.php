@@ -385,6 +385,21 @@
                 </tr>
             @endif
 
+                        @if(count($accesorios_clasificados ?? []) > 0)
+                <tr class="category-row">
+                    <td colspan="5">ACCESORIOS</td>
+                </tr>
+                @foreach($accesorios_clasificados as $item)
+                    <tr>
+                        <td>{{ $item->productoServicio->nombre ?? 'Producto #' . $item->prd_servicio_id }}</td>
+                        <td class="text-right">{{ $item->cantidad }}</td>
+                        <td class="text-right">{{ $formatMoney($item->valor) }}</td>
+                        <td class="text-right">{{ $getTextoDescuento($item->prd_servicio_id, $item->bonificacion ?? 0) }}</td>
+                        <td class="text-right">{{ $formatMoney($item->subtotal) }}</td>
+                    </tr>
+                @endforeach
+            @endif
+
             @if($presupuesto->abono)
                 <tr class="category-row">
                     <td colspan="5">ABONO MENSUAL</td>
@@ -413,20 +428,7 @@
                 @endforeach
             @endif
 
-            @if(count($accesorios_clasificados ?? []) > 0)
-                <tr class="category-row">
-                    <td colspan="5">ACCESORIOS</td>
-                </tr>
-                @foreach($accesorios_clasificados as $item)
-                    <tr>
-                        <td>{{ $item->productoServicio->nombre ?? 'Producto #' . $item->prd_servicio_id }}</td>
-                        <td class="text-right">{{ $item->cantidad }}</td>
-                        <td class="text-right">{{ $formatMoney($item->valor) }}</td>
-                        <td class="text-right">{{ $getTextoDescuento($item->prd_servicio_id, $item->bonificacion ?? 0) }}</td>
-                        <td class="text-right">{{ $formatMoney($item->subtotal) }}</td>
-                    </tr>
-                @endforeach
-            @endif
+
         </tbody>
     </table>
 

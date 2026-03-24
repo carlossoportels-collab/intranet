@@ -47,13 +47,14 @@ export default function PresupuestosCreate({
         subtotales,
         esComercial,
         cantidadMinimaPromo,
-        productosPromocionIds,
         accesoriosConPromocion,
         serviciosConPromocion,
         accesoriosNormales,
         serviciosNormales,
         tasaPromocion,
         abonoPromocion,
+        tasaNombre,
+        abonoNombre,
         updateField,
         aplicarPromocion,
         isFieldDisabled,
@@ -70,66 +71,68 @@ export default function PresupuestosCreate({
         convenios,
         metodosPago,
         leadId: lead.id,
-        promociones
+        promociones,
+        accesorios,      // ← PASAR ACCESORIOS
+        servicios        // ← PASAR SERVICIOS
     });
 
     // Definir los tabs (sin resumen)
     const tabItems = [
-{
-    id: 'tasa',
-    label: 'Tasa Instalación',
-    icon: <Truck className="h-4 w-4" />,
-    content: (
-        <div className="space-y-4">
-            <TasaSelector
-                value={state.tasaId}
-                onChange={(tasaId) => updateField('tasaId', tasaId)}
-                error={getError('tasa_id')}
-                disabled={isFieldDisabled('tasaId')}
-                tasas={tasas}
-            />
-            
-            <ResponsiveGrid cols={{ default: 1, md: 2 }} gap={4}>
-                <FormField label="Bonificación (%)">
-                    <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={state.tasaBonificacion}
-                        onChange={(e) => updateField('tasaBonificacion', Number(e.target.value))}
-                        disabled={isFieldDisabled('tasaBonificacion')}
-                        className="block w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-local focus:ring-2 focus:ring-local/20 text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+        {
+            id: 'tasa',
+            label: 'Tasa Instalación',
+            icon: <Truck className="h-4 w-4" />,
+            content: (
+                <div className="space-y-4">
+                    <TasaSelector
+                        value={state.tasaId}
+                        onChange={(tasaId) => updateField('tasaId', tasaId)}
+                        error={getError('tasa_id')}
+                        disabled={isFieldDisabled('tasaId')}
+                        tasas={tasas}
                     />
-                </FormField>
+                    
+                    <ResponsiveGrid cols={{ default: 1, md: 2 }} gap={4}>
+                        <FormField label="Bonificación (%)">
+                            <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={state.tasaBonificacion}
+                                onChange={(e) => updateField('tasaBonificacion', Number(e.target.value))}
+                                disabled={isFieldDisabled('tasaBonificacion')}
+                                className="block w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-local focus:ring-2 focus:ring-local/20 text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+                            />
+                        </FormField>
 
-                <FormField label="Método de Pago">
-                    <Select
-                        value={state.tasaMetodoPagoId.toString()}
-                        onValueChange={(value) => updateField('tasaMetodoPagoId', Number(value))}
-                    >
-                        <SelectTrigger className="bg-white border-2 border-gray-200 hover:border-local focus:border-local focus:ring-2 focus:ring-local/20 h-11">
-                            <SelectValue placeholder="Seleccionar método" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white max-h-60">
-                            {metodosPago.length === 0 ? (
-                                <SelectItem value="0" disabled>
-                                    No hay métodos de pago
-                                </SelectItem>
-                            ) : (
-                                metodosPago.map(metodo => (
-                                    <SelectItem key={metodo.id} value={metodo.id.toString()}>
-                                        {metodo.nombre}
-                                    </SelectItem>
-                                ))
-                            )}
-                        </SelectContent>
-                    </Select>
-                </FormField>
-            </ResponsiveGrid>
-        </div>
-    )
-},
+                        <FormField label="Método de Pago">
+                            <Select
+                                value={state.tasaMetodoPagoId.toString()}
+                                onValueChange={(value) => updateField('tasaMetodoPagoId', Number(value))}
+                            >
+                                <SelectTrigger className="bg-white border-2 border-gray-200 hover:border-local focus:border-local focus:ring-2 focus:ring-local/20 h-11">
+                                    <SelectValue placeholder="Seleccionar método" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white max-h-60">
+                                    {metodosPago.length === 0 ? (
+                                        <SelectItem value="0" disabled>
+                                            No hay métodos de pago
+                                        </SelectItem>
+                                    ) : (
+                                        metodosPago.map(metodo => (
+                                            <SelectItem key={metodo.id} value={metodo.id.toString()}>
+                                                {metodo.nombre}
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </FormField>
+                    </ResponsiveGrid>
+                </div>
+            )
+        },
         {
             id: 'abono',
             label: 'Abono Mensual',
@@ -156,7 +159,7 @@ export default function PresupuestosCreate({
                                     updateField('abonoBonificacion', Number(e.target.value));
                                 }}
                                 disabled={isFieldDisabled('abonoBonificacion')}
-                                 className="block w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-local focus:ring-2 focus:ring-local/20 text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+                                className="block w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-local focus:ring-2 focus:ring-local/20 text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
                             />
                         </FormField>
 
@@ -165,7 +168,7 @@ export default function PresupuestosCreate({
                                 value={state.abonoMetodoPagoId.toString()}
                                 onValueChange={(value) => updateField('abonoMetodoPagoId', Number(value))}
                             >
-                                <SelectTrigger className="bg-white">
+                                <SelectTrigger className="bg-white border-2 border-gray-200 hover:border-local focus:border-local focus:ring-2 focus:ring-local/20 h-11">
                                     <SelectValue placeholder="Seleccionar método" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-white max-h-60">
@@ -280,7 +283,7 @@ export default function PresupuestosCreate({
                                                 value={state.prefijoId.toString()}
                                                 onValueChange={(value) => updateField('prefijoId', Number(value))}
                                             >
-                                                <SelectTrigger id="prefijo_id" className="bg-white w-full">
+                                                <SelectTrigger id="prefijo_id" className="bg-white w-full border-2 border-gray-200 hover:border-local focus:border-local focus:ring-2 focus:ring-local/20 h-11">
                                                     <SelectValue placeholder="Seleccionar comercial" />
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-white max-h-60">
@@ -347,7 +350,7 @@ export default function PresupuestosCreate({
                                                 min={cantidadMinimaPromo}
                                                 value={state.cantidadVehiculos}
                                                 onChange={(e) => updateField('cantidadVehiculos', Number(e.target.value))}
-                                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white"
+                                                className="block w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-local focus:ring-2 focus:ring-local/20 text-sm bg-white transition-all"
                                             />
                                             {state.promocionId && (
                                                 <p className="text-xs text-blue-600 mt-1">
@@ -365,7 +368,7 @@ export default function PresupuestosCreate({
                                                 min="1"
                                                 value={state.diasValidez}
                                                 onChange={(e) => updateField('diasValidez', e.target.value)}
-                                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white"
+                                                className="block w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-local focus:ring-2 focus:ring-local/20 text-sm bg-white transition-all"
                                             />
                                         </FormField>
                                     </ResponsiveGrid>
@@ -399,6 +402,8 @@ export default function PresupuestosCreate({
                                         serviciosConPromocion={serviciosConPromocion}
                                         accesoriosNormales={accesoriosNormales}
                                         serviciosNormales={serviciosNormales}
+                                        tasaNombre={tasaNombre}      // ← NUEVO
+                                        abonoNombre={abonoNombre}    // ← NUEVO
                                     />
                                 </ResponsiveCard>
                             </div>
@@ -409,18 +414,18 @@ export default function PresupuestosCreate({
                     <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
                         <Link
                             href={`/comercial/leads/${lead.id}`}
-                            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 text-center w-full sm:w-auto"
+                            className="px-6 py-2.5 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all text-center w-full sm:w-auto"
                         >
                             Cancelar
                         </Link>
                         <button
                             type="submit"
                             disabled={state.loading}
-                            className="px-4 py-2 bg-local text-white text-sm rounded hover:bg-local-600 transition-colors disabled:opacity-50 w-full sm:w-auto"
+                            className="px-6 py-2.5 bg-local text-white text-sm font-medium rounded-lg hover:bg-local-600 transition-colors disabled:opacity-50 w-full sm:w-auto shadow-sm hover:shadow"
                         >
                             {state.loading ? (
                                 <span className="flex items-center justify-center gap-2">
-                                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
                                     Guardando...
                                 </span>
                             ) : 'Crear Presupuesto'}

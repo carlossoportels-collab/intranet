@@ -16,134 +16,171 @@ class EmailController extends Controller
     /**
      * Enviar contrato por email
      */
-    public function enviarContrato(Request $request)
-    {
-        try {
-            $request->validate([
-                'to' => 'required|json',
-                'cc' => 'nullable|json',
-                'bcc' => 'nullable|json',
-                'subject' => 'required|string|max:255',
-                'body' => 'required|string',
-                'contratoId' => 'required|integer',
-                'numeroContrato' => 'required|string',
-                'tipo' => 'nullable|string|in:administracion,cliente',
-                'pdf' => 'nullable|file|mimes:pdf|max:10240'
-            ]);
+/**
+ * Enviar contrato por email
+ */
+public function enviarContrato(Request $request)
+{
+    try {
+        $request->validate([
+            'to' => 'required|json',
+            'cc' => 'nullable|json',
+            'bcc' => 'nullable|json',
+            'subject' => 'required|string|max:255',
+            'body' => 'required|string',
+            'contratoId' => 'required|integer',
+            'numeroContrato' => 'required|string',
+            'tipo' => 'nullable|string|in:administracion,cliente',
+            'pdf' => 'nullable|file|mimes:pdf|max:10240'
+        ]);
 
-            // Decodificar JSON
-            $to = json_decode($request->to, true);
-            $cc = $request->cc ? json_decode($request->cc, true) : [];
-            $bcc = $request->bcc ? json_decode($request->bcc, true) : [];
+        // Decodificar JSON con manejo de errores
+        $to = json_decode($request->to, true);
+        $cc = $request->cc ? json_decode($request->cc, true) : [];
+        $bcc = $request->bcc ? json_decode($request->bcc, true) : [];
 
-            // 🔥 OBTENER DATOS DE LA COMPAÑÍA DEL CONTRATO (igual que en PresupuestosController)
-            $contrato = \App\Models\Contrato::with([
-                'presupuesto.prefijo.comercial.compania',
-                'presupuesto.prefijo.comercial.personal'
-            ])->find($request->contratoId);
+        // Verificar si el JSON se decodificó correctamente
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Error al decodificar JSON: ' . json_last_error_msg());
+        }
+
+        // Asegurar que $to sea un array
+        if (!is_array($to)) {
+            // Si es un string (ej: "correo@ejemplo.com"), convertirlo a array
+            if (is_string($to) && filter_var($to, FILTER_VALIDATE_EMAIL)) {
+                $to = [$to];
+            } else {
+                throw new \Exception('El formato de destinatarios no es válido');
+            }
+        }
+
+        // Asegurar que $cc y $bcc sean arrays
+        if (!is_array($cc)) {
+            $cc = is_string($cc) && filter_var($cc, FILTER_VALIDATE_EMAIL) ? [$cc] : [];
+        }
+        
+        if (!is_array($bcc)) {
+            $bcc = is_string($bcc) && filter_var($bcc, FILTER_VALIDATE_EMAIL) ? [$bcc] : [];
+        }
+
+        // Validar que haya al menos un destinatario
+        if (empty($to)) {
+            throw new \Exception('Debe especificar al menos un destinatario');
+        }
+
+        // 🔥 OBTENER DATOS DE LA COMPAÑÍA DEL CONTRATO (igual que en PresupuestosController)
+        $contrato = \App\Models\Contrato::with([
+            'presupuesto.prefijo.comercial.compania',
+            'presupuesto.prefijo.comercial.personal'
+        ])->find($request->contratoId);
+        
+        $compania = $this->getCompaniaDataFromContrato($contrato);
+
+        $data = [
+            'subject' => $request->subject,
+            'body' => $request->body,
+            'cc' => $cc,
+            'bcc' => $bcc,
+            'filename' => "Contrato_{$request->numeroContrato}.pdf",
+            'tipo' => $request->tipo ?? 'cliente',
+            'compania' => $compania,
+        ];
+
+        $pdfPath = null;
+        $attachments = [];
+
+        // Guardar PDF temporal
+        if ($request->hasFile('pdf')) {
+            $pdfFile = $request->file('pdf');
+            $pdfPath = storage_path("app/temp/contrato_{$request->contratoId}_" . time() . ".pdf");
             
-            $compania = $this->getCompaniaDataFromContrato($contrato);
-
-            $data = [
-                'subject' => $request->subject,
-                'body' => $request->body,
-                'cc' => $cc,
-                'bcc' => $bcc,
-                'filename' => "Contrato_{$request->numeroContrato}.pdf",
-                'tipo' => $request->tipo ?? 'cliente',
-                'compania' => $compania,
-            ];
-
-            $pdfPath = null;
-            $attachments = [];
-
-            // Guardar PDF temporal
-            if ($request->hasFile('pdf')) {
-                $pdfFile = $request->file('pdf');
-                $pdfPath = storage_path("app/temp/contrato_{$request->contratoId}_" . time() . ".pdf");
-                
-                $tempDir = storage_path('app/temp');
-                if (!file_exists($tempDir)) {
-                    mkdir($tempDir, 0755, true);
-                }
-                
-                file_put_contents($pdfPath, file_get_contents($pdfFile->getRealPath()));
+            $tempDir = storage_path('app/temp');
+            if (!file_exists($tempDir)) {
+                mkdir($tempDir, 0755, true);
             }
+            
+            file_put_contents($pdfPath, file_get_contents($pdfFile->getRealPath()));
+        }
 
-            // Procesar documentos adicionales
-            if ($request->has('documento_local_0') || $request->has('documento_plataforma_0')) {
-                foreach ($request->allFiles() as $key => $file) {
-                    if (str_starts_with($key, 'documento_local_') || str_starts_with($key, 'documento_plataforma_')) {
-                        $tempPath = storage_path("app/temp/attachment_{$request->contratoId}_" . time() . "_" . uniqid() . ".pdf");
-                        file_put_contents($tempPath, file_get_contents($file->getRealPath()));
-                        $attachments[] = [
-                            'path' => $tempPath,
-                            'name' => $file->getClientOriginalName(),
-                            'mime' => $file->getMimeType()
-                        ];
-                    }
+        // Procesar documentos adicionales
+        if ($request->has('documento_local_0') || $request->has('documento_plataforma_0')) {
+            foreach ($request->allFiles() as $key => $file) {
+                if (str_starts_with($key, 'documento_local_') || str_starts_with($key, 'documento_plataforma_')) {
+                    $tempPath = storage_path("app/temp/attachment_{$request->contratoId}_" . time() . "_" . uniqid() . ".pdf");
+                    file_put_contents($tempPath, file_get_contents($file->getRealPath()));
+                    $attachments[] = [
+                        'path' => $tempPath,
+                        'name' => $file->getClientOriginalName(),
+                        'mime' => $file->getMimeType()
+                    ];
                 }
             }
+        }
 
-            $data['attachments'] = $attachments;
+        $data['attachments'] = $attachments;
 
-            // Obtener datos del usuario para el remitente
-            $usuario = auth()->user();
-            $fromEmail = $usuario->personal->email ?? env('MAIL_FROM_ADDRESS', 'noreply@localsat.com.ar');
-            $fromName = $usuario->personal->nombre_completo ?? $usuario->name ?? 'LocalSat';
+        // Obtener datos del usuario para el remitente
+        $usuario = auth()->user();
+        $fromEmail = $usuario->personal->email ?? env('MAIL_FROM_ADDRESS', 'noreply@localsat.com.ar');
+        $fromName = $usuario->personal->nombre_completo ?? $usuario->name ?? 'LocalSat';
 
-            // Enviar email a cada destinatario
-            foreach ($to as $destinatario) {
+        // Enviar email a cada destinatario
+        foreach ($to as $destinatario) {
+            // Validar que sea un email válido
+            if (filter_var($destinatario, FILTER_VALIDATE_EMAIL)) {
                 Mail::to($destinatario)
                     ->send(new ContratoEnviado($data, $pdfPath, $fromEmail, $fromName, $compania));
+            } else {
+                Log::warning('Email inválido ignorado:', ['email' => $destinatario]);
             }
-
-            // Limpiar archivos temporales
-            if ($pdfPath && file_exists($pdfPath)) {
-                unlink($pdfPath);
-            }
-            
-            foreach ($attachments as $attachment) {
-                if (file_exists($attachment['path'])) {
-                    unlink($attachment['path']);
-                }
-            }
-
-            Log::info('Contrato enviado por email', [
-                'contrato_id' => $request->contratoId,
-                'destinatarios' => $to,
-                'tipo' => $request->tipo ?? 'cliente',
-                'usuario_id' => auth()->id(),
-                'from_email' => $fromEmail,
-                'compania' => $compania['nombre'] ?? 'LocalSat'
-            ]);
-
-            // DEVOLVER RESPUESTA PARA INERTIA
-            if ($request->header('X-Inertia')) {
-                return redirect()->back()->with('success', 'Email enviado correctamente');
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Email enviado correctamente'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error enviando contrato por email:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            if ($request->header('X-Inertia')) {
-                return redirect()->back()->with('error', 'Error al enviar el email: ' . $e->getMessage());
-            }
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Error al enviar el email: ' . $e->getMessage()
-            ], 500);
         }
+
+        // Limpiar archivos temporales
+        if ($pdfPath && file_exists($pdfPath)) {
+            unlink($pdfPath);
+        }
+        
+        foreach ($attachments as $attachment) {
+            if (file_exists($attachment['path'])) {
+                unlink($attachment['path']);
+            }
+        }
+
+        Log::info('Contrato enviado por email', [
+            'contrato_id' => $request->contratoId,
+            'destinatarios' => $to,
+            'tipo' => $request->tipo ?? 'cliente',
+            'usuario_id' => auth()->id(),
+            'from_email' => $fromEmail,
+            'compania' => $compania['nombre'] ?? 'LocalSat'
+        ]);
+
+        // DEVOLVER RESPUESTA PARA INERTIA
+        if ($request->header('X-Inertia')) {
+            return redirect()->back()->with('success', 'Email enviado correctamente');
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email enviado correctamente'
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Error enviando contrato por email:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        if ($request->header('X-Inertia')) {
+            return redirect()->back()->with('error', 'Error al enviar el email: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => false,
+            'error' => 'Error al enviar el email: ' . $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * Enviar presupuesto por email

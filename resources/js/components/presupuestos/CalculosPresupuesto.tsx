@@ -16,6 +16,9 @@ interface Props {
     serviciosConPromocion?: ProductoResumenItem[];
     accesoriosNormales?: ProductoResumenItem[];
     serviciosNormales?: ProductoResumenItem[];
+    // Props adicionales para los nombres de tasa y abono
+    tasaNombre?: string;
+    abonoNombre?: string;
 }
 
 export default function CalculosPresupuesto({
@@ -29,7 +32,9 @@ export default function CalculosPresupuesto({
     accesoriosConPromocion = [],
     serviciosConPromocion = [],
     accesoriosNormales = [],
-    serviciosNormales = []
+    serviciosNormales = [],
+    tasaNombre = 'Instalación',
+    abonoNombre = 'Abono Mensual'
 }: Props) {
     
     const calcularSubtotalPack = (valor: number, cantidad: number, tipo: '2x1' | '3x2'): number => {
@@ -119,209 +124,226 @@ export default function CalculosPresupuesto({
     const todosLosAccesorios = [...accesoriosConPromocion, ...accesoriosNormales];
     const todosLosServicios = [...serviciosConPromocion, ...serviciosNormales];
 
+    const inversionInicial = subtotalTasa + totalAccesorios;
+    const costoMensual = subtotalAbono + totalServicios;
+    const totalPrimerMes = inversionInicial + costoMensual;
+
     return (
         <div className="space-y-4">
-            {/* INSTALACIÓN */}
-            <div className="border-b border-gray-200 pb-3">
-                <h4 className="font-semibold text-gray-800 mb-2">Instalación</h4>
-                <div className="space-y-1">
-                    <div className="flex justify-between text-gray-600">
-                        <span>Precio base:</span>
-                        <span>{formatMoney(subtotalTasaOriginal)}</span>
+            {/* INVERSIÓN INICIAL - PAGO ÚNICO */}
+            <div className="bg-blue-50 rounded-lg border border-blue-200 overflow-hidden">
+                <div className="bg-blue-100 px-3 py-2 border-b border-blue-200">
+                    <div className="flex items-center gap-2">
+                        <span className="text-blue-700 text-sm font-semibold">💰 Inversión Inicial (Pago Único)</span>
                     </div>
-                    
-                    {tasaPromocion && (
-                        <>
-                            <div className="flex justify-between text-green-600 text-xs font-medium">
-                                <span>Promoción {tasaPromocion}:</span>
-                                <span>{getExplicacionPromocion(tasaPromocion, cantidadVehiculos)}</span>
-                            </div>
-                            <div className="flex justify-between text-green-600 text-xs font-medium">
-                                <span>Descuento:</span>
+                </div>
+                <div className="p-3 space-y-3">
+                    {/* INSTALACIÓN */}
+                    <div className="border-b border-blue-200 pb-2">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="font-medium text-gray-700">{tasaNombre}:</span>
+                            <span className="text-gray-600">{formatMoney(subtotalTasaOriginal)}</span>
+                        </div>
+                        
+                        {tasaPromocion && (
+                            <>
+                                <div className="flex justify-between text-green-600 text-xs mt-1 ml-2">
+                                    <span>🎉 Promoción {tasaPromocion}:</span>
+                                    <span>{getExplicacionPromocion(tasaPromocion, cantidadVehiculos)}</span>
+                                </div>
+                                <div className="flex justify-between text-green-600 text-xs ml-2">
+                                    <span>Descuento:</span>
+                                    <span>- {formatMoney(subtotalTasaOriginal - subtotalTasa)}</span>
+                                </div>
+                            </>
+                        )}
+                        
+                        {!tasaPromocion && tasaBonificacion > 0 && (
+                            <div className="flex justify-between text-green-600 text-xs mt-1 ml-2">
+                                <span>💰 Descuento {Math.round(tasaBonificacion)}%:</span>
                                 <span>- {formatMoney(subtotalTasaOriginal - subtotalTasa)}</span>
                             </div>
-                        </>
-                    )}
-                    
-                    {!tasaPromocion && tasaBonificacion > 0 && (
-                        <div className="flex justify-between text-green-600 text-xs font-medium">
-                            <span>Descuento {Math.round(tasaBonificacion)}%:</span>
-                            <span>- {formatMoney(subtotalTasaOriginal - subtotalTasa)}</span>
+                        )}
+                        
+                        <div className="flex justify-between font-semibold text-blue-700 mt-1 ml-2">
+                            <span>Total instalación:</span>
+                            <span>{formatMoney(subtotalTasa)}</span>
+                        </div>
+                    </div>
+
+                    {/* ACCESORIOS */}
+                    {todosLosAccesorios.length > 0 && (
+                        <div className="border-b border-blue-200 pb-2">
+                            <div className="flex items-center gap-1 mb-2">
+                                <span className="text-xs font-medium text-gray-700">Accesorios:</span>
+                            </div>
+                            
+                            <div className="space-y-2 ml-2">
+                            {todosLosAccesorios.map((item, index) => {
+                                const subtotalBase = item.valor * item.cantidad;
+                                const subtotalFinal = calcularSubtotalProducto(item);
+                                const nombrePromo = getNombrePromocion(item.tipoPromocion);
+                                
+                                return (
+                                    <div key={`accesorio-${item.id}-${index}`} className="text-xs">  {/* ← KEY ÚNICO */}
+                                        <div className="flex justify-between text-gray-600">
+                                            <span>• {item.nombre} x{item.cantidad}</span>
+                                            <span>{formatMoney(subtotalBase)}</span>
+                                        </div>
+                                        
+                                        {nombrePromo && (
+                                            <div className="flex justify-between text-green-600 mt-0.5">
+                                                <span>🎉 Promoción {nombrePromo}:</span>
+                                                <span>{getExplicacionPromocion(item.tipoPromocion as '2x1' | '3x2', item.cantidad)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        {item.bonificacion && item.bonificacion > 0 && !nombrePromo && (
+                                            <div className="flex justify-between text-green-600 mt-0.5">
+                                                <span>💰 Descuento {Math.round(item.bonificacion)}%:</span>
+                                                <span>- {formatMoney(subtotalBase - subtotalFinal)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="flex justify-between font-medium text-gray-800 mt-0.5">
+                                            <span>Subtotal:</span>
+                                            <span>{formatMoney(subtotalFinal)}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            </div>
+                            
+                            <div className="flex justify-between font-semibold text-blue-700 mt-2 pt-1 border-t border-blue-200">
+                                <span>TOTAL ACCESORIOS:</span>
+                                <span>{formatMoney(totalAccesorios)}</span>
+                            </div>
                         </div>
                     )}
-                    
-                    {!tasaPromocion && tasaBonificacion === 0 && (
-                        <div className="flex justify-between text-gray-500 text-xs">
-                            <span>Descuento:</span>
-                            <span>$ 0,00</span>
+
+                    {/* TOTAL INVERSIÓN INICIAL */}
+                    <div className="bg-blue-100 rounded-lg p-2 mt-1">
+                        <div className="flex justify-between items-center">
+                            <span className="font-bold text-blue-900 text-sm">💰 TOTAL INVERSIÓN INICIAL:</span>
+                            <span className="text-lg font-bold text-blue-900">{formatMoney(inversionInicial)}</span>
                         </div>
-                    )}
-                    
-                    <div className="flex justify-between font-bold pt-1 mt-1 border-t border-gray-200">
-                        <span>Total instalación:</span>
-                        <span className="text-local">{formatMoney(subtotalTasa)}</span>
                     </div>
                 </div>
             </div>
 
-            {/* ABONO MENSUAL */}
-            <div className="border-b border-gray-200 pb-3">
-                <h4 className="font-semibold text-gray-800 mb-2">Abono Mensual</h4>
-                <div className="space-y-1">
-                    <div className="flex justify-between text-gray-600">
-                        <span>Precio base:</span>
-                        <span>{formatMoney(subtotalAbonoOriginal)}</span>
+            {/* COSTO RECURRENTE - MENSUAL */}
+            <div className="bg-green-50 rounded-lg border border-green-200 overflow-hidden">
+                <div className="bg-green-100 px-3 py-2 border-b border-green-200">
+                    <div className="flex items-center gap-2">
+                        <span className="text-green-700 text-sm font-semibold">📅 Costo Recurrente (Mensual)</span>
                     </div>
-                    
-                    {abonoPromocion && (
-                        <>
-                            <div className="flex justify-between text-green-600 text-xs font-medium">
-                                <span>Promoción {abonoPromocion}:</span>
-                                <span>{getExplicacionPromocion(abonoPromocion, cantidadVehiculos)}</span>
-                            </div>
-                            <div className="flex justify-between text-green-600 text-xs font-medium">
-                                <span>Descuento:</span>
+                </div>
+                <div className="p-3 space-y-3">
+                    {/* ABONO MENSUAL */}
+                    <div className="border-b border-green-200 pb-2">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="font-medium text-gray-700">{abonoNombre}:</span>
+                            <span className="text-gray-600">{formatMoney(subtotalAbonoOriginal)}</span>
+                        </div>
+                        
+                        {abonoPromocion && (
+                            <>
+                                <div className="flex justify-between text-green-600 text-xs mt-1 ml-2">
+                                    <span>🎉 Promoción {abonoPromocion}:</span>
+                                    <span>{getExplicacionPromocion(abonoPromocion, cantidadVehiculos)}</span>
+                                </div>
+                                <div className="flex justify-between text-green-600 text-xs ml-2">
+                                    <span>Descuento:</span>
+                                    <span>- {formatMoney(subtotalAbonoOriginal - subtotalAbono)}</span>
+                                </div>
+                            </>
+                        )}
+                        
+                        {!abonoPromocion && abonoBonificacion > 0 && (
+                            <div className="flex justify-between text-green-600 text-xs mt-1 ml-2">
+                                <span>💰 Descuento {Math.round(abonoBonificacion)}%:</span>
                                 <span>- {formatMoney(subtotalAbonoOriginal - subtotalAbono)}</span>
                             </div>
-                        </>
-                    )}
-                    
-                    {!abonoPromocion && abonoBonificacion > 0 && (
-                        <div className="flex justify-between text-green-600 text-xs font-medium">
-                            <span>Descuento {Math.round(abonoBonificacion)}%:</span>
-                            <span>- {formatMoney(subtotalAbonoOriginal - subtotalAbono)}</span>
+                        )}
+                        
+                        <div className="flex justify-between font-semibold text-green-700 mt-1 ml-2">
+                            <span>Total abono mensual:</span>
+                            <span>{formatMoney(subtotalAbono)}</span>
+                        </div>
+                    </div>
+
+                    {/* SERVICIOS */}
+                    {todosLosServicios.length > 0 && (
+                        <div className="border-b border-green-200 pb-2">
+                            <div className="flex items-center gap-1 mb-2">
+                                <span className="text-xs font-medium text-gray-700">Servicios:</span>
+                            </div>
+                            
+                            <div className="space-y-2 ml-2">
+                            {todosLosServicios.map((item, index) => {
+                                const subtotalBase = item.valor * item.cantidad;
+                                const subtotalFinal = calcularSubtotalProducto(item);
+                                const nombrePromo = getNombrePromocion(item.tipoPromocion);
+                                
+                                return (
+                                    <div key={`servicio-${item.id}-${index}`} className="text-xs">  {/* ← KEY ÚNICO */}
+                                        <div className="flex justify-between text-gray-600">
+                                            <span>• {item.nombre} x{item.cantidad}</span>
+                                            <span>{formatMoney(subtotalBase)}</span>
+                                        </div>
+                                        
+                                        {nombrePromo && (
+                                            <div className="flex justify-between text-green-600 mt-0.5">
+                                                <span>🎉 Promoción {nombrePromo}:</span>
+                                                <span>{getExplicacionPromocion(item.tipoPromocion as '2x1' | '3x2', item.cantidad)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        {item.bonificacion && item.bonificacion > 0 && !nombrePromo && (
+                                            <div className="flex justify-between text-green-600 mt-0.5">
+                                                <span>💰 Descuento {Math.round(item.bonificacion)}%:</span>
+                                                <span>- {formatMoney(subtotalBase - subtotalFinal)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="flex justify-between font-medium text-gray-800 mt-0.5">
+                                            <span>Subtotal:</span>
+                                            <span>{formatMoney(subtotalFinal)}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            </div>
+                            
+                            <div className="flex justify-between font-semibold text-green-700 mt-2 pt-1 border-t border-green-200">
+                                <span>TOTAL SERVICIOS:</span>
+                                <span>{formatMoney(totalServicios)}</span>
+                            </div>
                         </div>
                     )}
-                    
-                    {!abonoPromocion && abonoBonificacion === 0 && (
-                        <div className="flex justify-between text-gray-500 text-xs">
-                            <span>Descuento:</span>
-                            <span>$ 0,00</span>
+
+                    {/* TOTAL COSTO MENSUAL */}
+                    <div className="bg-green-100 rounded-lg p-2 mt-1">
+                        <div className="flex justify-between items-center">
+                            <span className="font-bold text-green-900 text-sm">📅 TOTAL COSTO MENSUAL:</span>
+                            <span className="text-lg font-bold text-green-900">{formatMoney(costoMensual)}</span>
                         </div>
-                    )}
-                    
-                    <div className="flex justify-between font-bold pt-1 mt-1 border-t border-gray-200">
-                        <span>Total abono mensual:</span>
-                        <span className="text-local">{formatMoney(subtotalAbono)}</span>
                     </div>
                 </div>
             </div>
 
-            {/* ACCESORIOS */}
-            {todosLosAccesorios.length > 0 && (
-                <div className="border-b border-gray-200 pb-3">
-                    <h4 className="font-semibold text-gray-800 mb-2">Accesorios</h4>
-                    <div className="space-y-3">
-                        {todosLosAccesorios.map((item, index) => {
-                            const subtotalBase = item.valor * item.cantidad;
-                            const subtotalFinal = calcularSubtotalProducto(item);
-                            const nombrePromo = getNombrePromocion(item.tipoPromocion);
-                            
-                            return (
-                                <div key={`acc-${index}`} className="pl-2">
-                                    <div className="flex justify-between text-xs text-gray-600">
-                                        <span>{item.nombre} x{item.cantidad}:</span>
-                                        <span>{formatMoney(subtotalBase)}</span>
-                                    </div>
-                                    
-                                    {nombrePromo && (
-                                        <div className="flex justify-between text-green-600 text-xs font-medium">
-                                            <span>Promoción {nombrePromo}:</span>
-                                            <span>{getExplicacionPromocion(item.tipoPromocion as '2x1' | '3x2', item.cantidad)}</span>
-                                        </div>
-                                    )}
-                                    
-                                    {item.bonificacion && item.bonificacion > 0 ? (
-                                        <div className="flex justify-between text-green-600 text-xs font-medium">
-                                            <span>Descuento {Math.round(item.bonificacion)}%:</span>
-                                            <span>- {formatMoney(subtotalBase - subtotalFinal)}</span>
-                                        </div>
-                                    ) : !nombrePromo ? (
-                                        <div className="flex justify-between text-gray-500 text-xs">
-                                            <span>Descuento:</span>
-                                            <span>$ 0,00</span>
-                                        </div>
-                                    ) : null}
-                                    
-                                    <div className="flex justify-between text-xs font-bold mt-1">
-                                        <span>Subtotal:</span>
-                                        <span>{formatMoney(subtotalFinal)}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        
-                        <div className="flex justify-between font-bold pt-2 mt-1 border-t border-gray-200">
-                            <span>TOTAL ACCESORIOS:</span>
-                            <span className="text-local">{formatMoney(totalAccesorios)}</span>
-                        </div>
+            {/* TOTAL PRIMER MES - DESTACADO */}
+            <div className="bg-gradient-to-r from-local-500 to-local-600 rounded-lg p-3 text-white shadow-lg">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <p className="text-xs opacity-90">Total a pagar</p>
+                        <p className="text-[10px] opacity-75">Primer mes (instalación + 1er mes)</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xl font-bold">{formatMoney(totalPrimerMes)}</p>
+                        <p className="text-[10px] opacity-75">* Desde el 2° mes: {formatMoney(costoMensual)}/mes</p>
                     </div>
                 </div>
-            )}
-
-            {/* SERVICIOS */}
-            {todosLosServicios.length > 0 && (
-                <div className="border-b border-gray-200 pb-3">
-                    <h4 className="font-semibold text-gray-800 mb-2">Servicios</h4>
-                    <div className="space-y-3">
-                        {todosLosServicios.map((item, index) => {
-                            const subtotalBase = item.valor * item.cantidad;
-                            const subtotalFinal = calcularSubtotalProducto(item);
-                            const nombrePromo = getNombrePromocion(item.tipoPromocion);
-                            
-                            return (
-                                <div key={`serv-${index}`} className="pl-2">
-                                    <div className="flex justify-between text-xs text-gray-600">
-                                        <span>{item.nombre} x{item.cantidad}:</span>
-                                        <span>{formatMoney(subtotalBase)}</span>
-                                    </div>
-                                    
-                                    {nombrePromo && (
-                                        <div className="flex justify-between text-green-600 text-xs font-medium">
-                                            <span>Promoción {nombrePromo}:</span>
-                                            <span>{getExplicacionPromocion(item.tipoPromocion as '2x1' | '3x2', item.cantidad)}</span>
-                                        </div>
-                                    )}
-                                    
-                                    {item.bonificacion && item.bonificacion > 0 ? (
-                                        <div className="flex justify-between text-green-600 text-xs font-medium">
-                                            <span>Descuento {Math.round(item.bonificacion)}%:</span>
-                                            <span>- {formatMoney(subtotalBase - subtotalFinal)}</span>
-                                        </div>
-                                    ) : !nombrePromo ? (
-                                        <div className="flex justify-between text-gray-500 text-xs">
-                                            <span>Descuento:</span>
-                                            <span>$ 0,00</span>
-                                        </div>
-                                    ) : null}
-                                    
-                                    <div className="flex justify-between text-xs font-bold mt-1">
-                                        <span>Subtotal:</span>
-                                        <span>{formatMoney(subtotalFinal)}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        
-                        <div className="flex justify-between font-bold pt-2 mt-1 border-t border-gray-200">
-                            <span>TOTAL SERVICIOS:</span>
-                            <span className="text-local">{formatMoney(totalServicios)}</span>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* TOTAL GENERAL */}
-            <div className="pt-2">
-                <div className="flex justify-between font-bold text-base">
-                    <span>TOTAL GENERAL:</span>
-                    <span className="text-local text-lg">
-                        {formatMoney(subtotalTasa + subtotalAbono + totalAccesorios + totalServicios)}
-                    </span>
-                </div>
-                <p className="text-xs text-gray-500 text-right mt-2">
-                    * Costo mensual desde el 2° mes: {formatMoney(subtotalAbono + totalServicios)}
-                </p>
             </div>
         </div>
     );

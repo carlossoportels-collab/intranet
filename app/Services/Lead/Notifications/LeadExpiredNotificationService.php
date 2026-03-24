@@ -14,6 +14,7 @@ class LeadExpiredNotificationService
 {
     private ?array $estadosExcluirIds = null;
     private bool $estadosCargados = false;
+    private int $diasInactividadVencimiento = 45; // 45 días sin actividad
     
     /**
      * Constructor - SIN CONSULTAS A DB
@@ -84,8 +85,13 @@ class LeadExpiredNotificationService
     }
 
     /**
-     * Verifica leads que llevan 30 días sin cambiar de estado
+     * Verifica leads que llevan 45 días sin cambiar de estado
      * Los marca como vencidos (estado_lead_id = 9) y crea notificaciones
+     * 
+     * Lógica:
+     * - Se marcan leads con más de 45 días sin actividad
+     * - Se EXCLUYEN leads que tienen recordatorios NO LEÍDOS
+     *   (Si el comercial tiene un recordatorio pendiente, no se marca como vencido)
      */
     public function verificarLeadsVencidos(): array
     {
@@ -94,26 +100,26 @@ class LeadExpiredNotificationService
         $estadoVencido = 9; // ID del estado "Vencido"
 
         try {
-            // Obtener estados excluir (ahora seguro, carga lazy)
+            // Obtener estados excluir
             $estadosExcluirBase = $this->getEstadosExcluirIds();
-            
-            // Agregar el estado vencido a la lista de exclusión temporal para la consulta
             $estadosExcluir = array_merge($estadosExcluirBase, [$estadoVencido]);
             
-            // Buscar leads activos que no sean clientes y tengan más de 30 días sin cambio
+            $fechaLimite = Carbon::now()->subDays($this->diasInactividadVencimiento);
+            
+            // Buscar leads que cumplan las condiciones
             $leadsVencidos = Lead::where('es_cliente', 0)
                 ->where('es_activo', 1)
-                ->whereNotIn('estado_lead_id', $estadosExcluir) // Excluir estados finales y vencidos
-                ->where(function($query) {
-                    // Si tiene modified, usar esa fecha; si no, usar created
-                    $query->where(function($q) {
-                        $q->whereNotNull('modified')
-                          ->where('modified', '<=', Carbon::now()->subDays(30));
-                    })->orWhere(function($q) {
-                        $q->whereNull('modified')
-                          ->where('created', '<=', Carbon::now()->subDays(30));
-                    });
+                ->whereNotIn('estado_lead_id', $estadosExcluir)
+                ->where(function($query) use ($fechaLimite) {
+                    $query->whereNotNull('modified')
+                          ->where('modified', '<=', $fechaLimite)
+                          ->orWhere(function($q) use ($fechaLimite) {
+                              $q->whereNull('modified')
+                                ->where('created', '<=', $fechaLimite);
+                          });
                 })
+                // Excluir leads que tienen recordatorios NO LEÍDOS
+                ->whereDoesntHave('recordatoriosNoLeidos')
                 ->get();
 
             foreach ($leadsVencidos as $lead) {
@@ -124,6 +130,10 @@ class LeadExpiredNotificationService
                     $estadoAnterior = $lead->estado_lead_id;
                     $estadoAnteriorObj = EstadoLead::find($estadoAnterior);
                     
+                    // Calcular días ANTES de modificar el lead
+                    $fechaOriginal = $lead->getOriginal('modified') ?? $lead->getOriginal('created');
+                    $diasSinCambio = Carbon::parse($fechaOriginal)->diffInDays(now());
+                    
                     // Cambiar estado a vencido
                     $lead->estado_lead_id = $estadoVencido;
                     $lead->modified = now();
@@ -133,9 +143,14 @@ class LeadExpiredNotificationService
                     $comercialUsuarioId = $this->getComercialUsuarioId($lead->prefijo_id);
                     
                     if ($comercialUsuarioId) {
-                        // Crear notificación
-                        $this->crearNotificacionVencido($comercialUsuarioId, $lead, $estadoAnteriorObj);
+                        // Crear notificación con los días calculados
+                        $this->crearNotificacionVencido($comercialUsuarioId, $lead, $estadoAnteriorObj, $diasSinCambio);
                         $notificaciones++;
+                    } else {
+                        Log::warning('No se encontró comercial asignado para lead vencido', [
+                            'lead_id' => $lead->id,
+                            'prefijo_id' => $lead->prefijo_id
+                        ]);
                     }
                     
                     DB::commit();
@@ -145,7 +160,8 @@ class LeadExpiredNotificationService
                         'lead_id' => $lead->id,
                         'nombre' => $lead->nombre_completo,
                         'estado_anterior' => $estadoAnteriorObj?->nombre,
-                        'dias_sin_cambio' => Carbon::parse($lead->modified ?? $lead->created)->diffInDays(now())
+                        'dias_sin_cambio' => $diasSinCambio,
+                        'prefijo_id' => $lead->prefijo_id
                     ]);
                     
                 } catch (\Exception $e) {
@@ -180,7 +196,6 @@ class LeadExpiredNotificationService
      */
     private function getComercialUsuarioId(int $prefijoId): ?int
     {
-        // Esta consulta está bien aquí porque se ejecuta bajo demanda
         return DB::table('comercial as c')
             ->join('personal as p', 'c.personal_id', '=', 'p.id')
             ->join('usuarios as u', 'p.id', '=', 'u.personal_id')
@@ -192,9 +207,8 @@ class LeadExpiredNotificationService
     /**
      * Crear notificación de lead vencido
      */
-    private function crearNotificacionVencido(int $usuarioId, Lead $lead, ?EstadoLead $estadoAnterior): void
+    private function crearNotificacionVencido(int $usuarioId, Lead $lead, ?EstadoLead $estadoAnterior, int $dias): void
     {
-        $dias = Carbon::parse($lead->modified ?? $lead->created)->diffInDays(now());
         $nombreEstadoAnterior = $estadoAnterior?->nombre ?? 'desconocido';
         
         DB::table('notificaciones')->insert([
@@ -212,7 +226,8 @@ class LeadExpiredNotificationService
         
         Log::info('Notificación de lead vencido creada', [
             'usuario_id' => $usuarioId,
-            'lead_id' => $lead->id
+            'lead_id' => $lead->id,
+            'dias' => $dias
         ]);
     }
 
@@ -222,5 +237,13 @@ class LeadExpiredNotificationService
     public function obtenerEstadosExcluir(): array
     {
         return $this->getEstadosExcluirIds();
+    }
+    
+    /**
+     * Método público para obtener días de inactividad para vencimiento
+     */
+    public function getDiasInactividadVencimiento(): int
+    {
+        return $this->diasInactividadVencimiento;
     }
 }

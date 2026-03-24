@@ -9,21 +9,21 @@ use App\Models\Comentario;
 use App\Models\TipoComentario;
 use App\Models\EstadoLead;
 use App\Services\Lead\Notifications\LeadCommentNotificationService;
-use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
+use App\Traits\Authorizable; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class LeadContactController extends Controller
 {
-    use Authorizable; // 🔥 AGREGAR TRAIT
+    use Authorizable; 
 
     private LeadCommentNotificationService $notificationService;
 
     public function __construct(LeadCommentNotificationService $notificationService)
     {
         $this->notificationService = $notificationService;
-        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+        $this->initializeAuthorization(); 
     }
 
     public function contactarWhatsApp(Request $request, $leadId)

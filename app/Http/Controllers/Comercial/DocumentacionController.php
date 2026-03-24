@@ -4,7 +4,7 @@
 namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
-use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
+use App\Traits\Authorizable; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -12,16 +12,16 @@ use Inertia\Inertia;
 
 class DocumentacionController extends Controller
 {
-    use Authorizable; // 🔥 AGREGAR TRAIT
+    use Authorizable; 
 
     public function __construct()
     {
-        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+        $this->initializeAuthorization(); 
     }
 
     public function index()
     {
-        // 🔥 VERIFICAR PERMISO
+        // VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.VER_DOCUMENTACION'));
         
         $user = Auth::user();
@@ -51,7 +51,7 @@ class DocumentacionController extends Controller
 
     public function browse(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO
+        
         $this->authorizePermiso(config('permisos.VER_DOCUMENTACION'));
         
         $user = Auth::user();
@@ -123,7 +123,7 @@ class DocumentacionController extends Controller
 
     public function download(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO
+    
         $this->authorizePermiso(config('permisos.VER_DOCUMENTACION'));
         
         $user = Auth::user();

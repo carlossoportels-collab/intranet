@@ -13,7 +13,9 @@ use App\DTOs\LeadData;
 use App\Models\Lead;
 use App\Models\Empresa;
 use App\Models\EmpresaContacto;
-use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
+use App\Models\TipoComentario;
+use App\Models\EstadoLead;
+use App\Traits\Authorizable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -21,7 +23,7 @@ use Inertia\Response;
 
 class LeadController extends Controller
 {
-    use Authorizable; // 🔥 AGREGAR TRAIT
+    use Authorizable;
 
     public function __construct(
         private LeadCreationService $leadService,
@@ -29,7 +31,7 @@ class LeadController extends Controller
         private LeadFormService $formService,
         private LeadFilterService $filterService 
     ) {
-        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+        $this->initializeAuthorization();
     }
 
     /**
@@ -38,7 +40,15 @@ class LeadController extends Controller
     public function show($id): Response
     {
         // Verificar acceso al lead
-        $lead = Lead::findOrFail($id);
+        $lead = Lead::with([
+            'estadoLead',
+            'seguimientoPerdida.motivo',
+            'prefijo',
+            'rubro',
+            'origen',
+            'localidad.provincia'
+        ])->findOrFail($id);
+        
         $this->authorizeLeadAccess($lead, config('permisos.VER_PROSPECTOS'));
         
         $dashboardData = $this->detailsService->getLeadDashboardData($id, auth()->id());
@@ -52,12 +62,62 @@ class LeadController extends Controller
         $datosFiltros = app(LeadFilterService::class)->getDatosFiltros();
         $comerciales = $this->filterService->getComercialesActivos(auth()->user());
 
+        // Obtener el tipo de estado del lead para determinar qué tipos de comentario cargar
+        $estadoTipo = $lead->estadoLead->tipo ?? null;
+        
+        $tiposComentario = [];
+        $tiposComentarioSeguimiento = [];
+        $estadosLeadSeguimiento = [];
+        
+        // Para leads con tipo 'recontacto' - usar modal de seguimiento de leads perdidos
+        if ($estadoTipo === 'final_negativo' || $estadoTipo === 'recontacto') {
+            // Tipos de comentario para leads perdidos/seguimiento
+            $tiposComentarioSeguimiento = TipoComentario::where('aplica_a', 'lead_perdido')
+                ->where('es_activo', 1)
+                ->orderBy('nombre')
+                ->get();
+            
+            // Para el modal de seguimiento también necesitamos los tipos generales por si acaso
+            $tiposComentario = TipoComentario::where('aplica_a', 'lead')
+                ->where('es_activo', 1)
+                ->orderBy('nombre')
+                ->get();
+                
+            $estadosLeadSeguimiento = EstadoLead::where('activo', 1)
+                ->orderBy('nombre')
+                ->get();
+                
+        } elseif ($estadoTipo === 'final_positivo') {
+            // Tipos de comentario para clientes
+            $tiposComentario = TipoComentario::where('aplica_a', 'cliente')
+                ->where('es_activo', 1)
+                ->orderBy('nombre')
+                ->get();
+                
+        } else {
+            // Tipos de comentario para leads nuevos/activos (por defecto)
+            $tiposComentario = TipoComentario::where('aplica_a', 'lead')
+                ->where('es_activo', 1)
+                ->orderBy('nombre')
+                ->get();
+        }
+
+        // Tipos de comentario generales como respaldo
+        $tiposComentarioGenerales = TipoComentario::where('es_activo', 1)
+            ->orderBy('nombre')
+            ->get();
+
         return Inertia::render('Comercial/Leads/Show', array_merge(
             $dashboardData, 
             $formData,
             $datosFiltros,
             [
                 'comerciales' => $comerciales,
+                'tiposComentario' => $tiposComentario,
+                'tiposComentarioGenerales' => $tiposComentarioGenerales,
+                'tiposComentarioSeguimiento' => $tiposComentarioSeguimiento,
+                'estadosLeadSeguimiento' => $estadosLeadSeguimiento,
+                'lead' => $lead,
             ]
         ));
     }
@@ -67,7 +127,7 @@ class LeadController extends Controller
      */
     public function store(StoreLeadRequest $request)
     {
-        // 🔥 VERIFICAR PERMISO PARA GESTIONAR LEADS
+        //  VERIFICAR PERMISO PARA GESTIONAR LEADS
         $this->authorizePermiso(config('permisos.GESTIONAR_LEADS'));
         
         try {
@@ -114,7 +174,7 @@ class LeadController extends Controller
                 'estadoLead'
             ])->findOrFail($id);
             
-            // 🔥 VERIFICAR ACCESO AL LEAD
+            //  VERIFICAR ACCESO AL LEAD
             $this->authorizeLeadAccess($lead, config('permisos.VER_PROSPECTOS'));
 
             // Buscar el contacto a través de empresa_contactos

@@ -1,24 +1,44 @@
 // resources/js/components/leads/LeadHeader.tsx
+
 import { router, Link } from '@inertiajs/react';
 import { ArrowLeft, User, UserCheck, Hash, Briefcase, Target, Calendar, Award, Edit, MessageSquare, FileText } from 'lucide-react';
-import React from 'react';
+import React, { useState } from 'react';
 
+import LeadCommentModalSelector from './LeadCommentModalSelector';
 import { Lead } from '@/types/leads';
 
 interface LeadHeaderProps {
   lead: Lead;
   onEditar: () => void;
   onNuevoComentario: () => void;
+  tiposComentario?: any[];
+  estadosLead?: any[];
+  comentariosExistentes?: number;
+  seguimientoPerdida?: any;
+  tiposComentarioSeguimiento?: any[];
+  estadosLeadSeguimiento?: any[];
 }
 
 const LeadHeader: React.FC<LeadHeaderProps> = ({
   lead,
   onEditar,
-  onNuevoComentario
+  onNuevoComentario,
+  tiposComentario = [],
+  estadosLead = [],
+  comentariosExistentes = 0,
+  seguimientoPerdida = null,
+  tiposComentarioSeguimiento = [],
+  estadosLeadSeguimiento = []
 }) => {
+  const [modalSelectorOpen, setModalSelectorOpen] = useState(false);
+
   const handleVolver = () => {
-    // Volver a la página anterior en el historial
     window.history.back();
+  };
+
+  // Manejar apertura del modal - NO llamar a onNuevoComentario
+  const handleAbrirModalComentario = () => {
+    setModalSelectorOpen(true);
   };
 
   const getBadgeEstado = () => {
@@ -68,96 +88,114 @@ const LeadHeader: React.FC<LeadHeaderProps> = ({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-2">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            Lead #{lead.id}
-          </h1>
-          {getBadgeEstado()}
-          {lead.es_cliente && (
-            <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full flex items-center gap-1">
-              <Award className="h-3 w-3" />
-              Cliente
-            </span>
-          )}
-        </div>
-        
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center gap-2">
-            {getIconoGenero()}
-            {lead.nombre_completo}
-          </h2>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <UserCheck className="h-4 w-4" />
-            <div>
-              <span>Asignado a: {(lead as any).asignado_nombre || 'Sin asignar'}</span>
-              {lead.prefijo?.codigo && (
-                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  <Hash className="h-3 w-3 inline mr-1" />
-                  {lead.prefijo.codigo}
-                </span>
-              )}
+    <>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+              Lead #{lead.id}
+            </h1>
+            {getBadgeEstado()}
+            {lead.es_cliente && (
+              <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full flex items-center gap-1">
+                <Award className="h-3 w-3" />
+                Cliente
+              </span>
+            )}
+          </div>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center gap-2">
+              {getIconoGenero()}
+              {lead.nombre_completo}
+            </h2>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <UserCheck className="h-4 w-4" />
+              <div>
+                <span>Asignado a: {(lead as any).asignado_nombre || 'Sin asignar'}</span>
+                {lead.prefijo?.codigo && (
+                  <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                    <Hash className="h-3 w-3 inline mr-1" />
+                    {lead.prefijo.codigo}
+                  </span>
+                )}
+              </div>
             </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-gray-600">
+            {lead.rubro?.nombre && (
+              <span className="flex items-center gap-1">
+                <Briefcase className="h-4 w-4" />
+                {lead.rubro.nombre}
+              </span>
+            )}
+            {lead.origen?.nombre && (
+              <span className="flex items-center gap-1">
+                <Target className="h-4 w-4" />
+                Origen: {lead.origen.nombre}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Calendar className="h-4 w-4" />
+              Creado: {formatFecha(lead.created)}
+            </span>
           </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-gray-600">
-          {lead.rubro?.nombre && (
-            <span className="flex items-center gap-1">
-              <Briefcase className="h-4 w-4" />
-              {lead.rubro.nombre}
-            </span>
-          )}
-          {lead.origen?.nombre && (
-            <span className="flex items-center gap-1">
-              <Target className="h-4 w-4" />
-              Origen: {lead.origen.nombre}
-            </span>
-          )}
-          <span className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            Creado: {formatFecha(lead.created)}
-          </span>
+        {/* Acciones */}
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/comercial/presupuestos/create?lead_id=${lead.id}`}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+          >
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">Presupuesto</span>
+          </Link>
+
+          <button
+            onClick={onEditar}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+          >
+            <Edit className="h-4 w-4" />
+            <span className="hidden sm:inline">Editar</span>
+          </button>
+          
+          <button
+            onClick={handleAbrirModalComentario}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+          >
+            <MessageSquare className="h-4 w-4" />
+            <span className="hidden sm:inline">Seguimiento</span>
+          </button>
+          
+          <button
+            onClick={handleVolver}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Volver</span>
+          </button>
         </div>
       </div>
-      
-      {/* Acciones */}
-      <div className="flex items-center gap-2">
-        {/* Botón de Presupuesto */}
-        <Link
-          href={`/comercial/presupuestos/create?lead_id=${lead.id}`}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
-        >
-          <FileText className="h-4 w-4" />
-          <span className="hidden sm:inline">Presupuesto</span>
-        </Link>
 
-        <button
-          onClick={onEditar}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-        >
-          <Edit className="h-4 w-4" />
-          <span className="hidden sm:inline">Editar</span>
-        </button>
-        
-        <button
-          onClick={onNuevoComentario}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
-        >
-          <MessageSquare className="h-4 w-4" />
-          <span className="hidden sm:inline">Seguimiento</span>
-        </button>
-        
-        <button
-          onClick={handleVolver}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Volver</span>
-        </button>
-      </div>
-    </div>
+      {/* Modal Selector */}
+      <LeadCommentModalSelector
+        isOpen={modalSelectorOpen}
+        onClose={() => setModalSelectorOpen(false)}
+        lead={lead}
+        tiposComentario={tiposComentario}
+        estadosLead={estadosLead}
+        comentariosExistentes={comentariosExistentes}
+        onSuccess={() => {
+          router.reload({ only: ['lead', 'comentarios', 'estadisticas'] });
+          setModalSelectorOpen(false);
+        }}
+        seguimiento={seguimientoPerdida}
+        tiposComentarioSeguimiento={tiposComentarioSeguimiento}
+        estadosLeadSeguimiento={estadosLeadSeguimiento}
+      />
+    </>
   );
 };
 

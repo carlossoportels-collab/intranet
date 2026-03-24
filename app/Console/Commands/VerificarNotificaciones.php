@@ -53,7 +53,7 @@ class VerificarNotificaciones extends Command
             $this->info("✓ Notificaciones de cumpleaños: {$resultadoCumpleanios['notificaciones']}");
             
             // ===== LEADS VENCIDOS =====
-            $this->info('Verificando leads vencidos (30 días)...');
+            $this->info('Verificando leads vencidos (45 días)...');
             $resultadoVencidos = $this->expiredNotificationService->verificarLeadsVencidos();
             $this->info("✓ Leads vencidos procesados: {$resultadoVencidos['procesados']}");
             $this->info("✓ Notificaciones de vencimiento: {$resultadoVencidos['notificaciones']}");

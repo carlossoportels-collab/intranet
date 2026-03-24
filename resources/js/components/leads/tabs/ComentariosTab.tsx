@@ -83,14 +83,6 @@ const ComentariosTab: React.FC<ComentariosTabProps> = ({
         <h3 className="text-lg font-semibold text-gray-900">
           Comentarios y Seguimientos ({total})
         </h3>
-        <button
-          onClick={onNuevoComentario}
-          className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-        >
-          <MessageSquare className="h-4 w-4" />
-          <span className="hidden sm:inline">Nuevo comentario</span>
-          <span className="sm:hidden">Nuevo</span>
-        </button>
       </div>
 
       {/* Lista de comentarios paginada */}

@@ -98,6 +98,7 @@ export interface Lead {
         descripcion?: string;
     };
     notas?: NotaLead[]; 
+    seguimientoPerdida?: SeguimientoPerdida;
 }
 
 // Añade esta interfaz para las notas
@@ -166,4 +167,17 @@ export interface ComentarioLegacy {
     lead_id: number;
     comentario: string;
     created: string;
+}
+
+export interface SeguimientoPerdida {
+    id: number;
+    lead_id: number;
+    motivo_id: number;
+    posibilidades_futuras: string;
+    fecha_posible_recontacto?: string;
+    created: string;
+    motivo?: {
+        id: number;
+        nombre: string;
+    };
 }

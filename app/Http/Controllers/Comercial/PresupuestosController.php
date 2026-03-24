@@ -4,7 +4,7 @@
 namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
-use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
+use App\Traits\Authorizable; //IMPORTAR TRAIT
 use App\Models\Presupuesto;
 use App\Models\Lead;
 use App\Models\MedioPago;
@@ -19,7 +19,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class PresupuestosController extends Controller
 {
-    use Authorizable; // 🔥 AGREGAR TRAIT
+    use Authorizable; //AGREGAR TRAIT
 
     protected $productoService;
     protected $presupuestoService;
@@ -34,12 +34,12 @@ class PresupuestosController extends Controller
         $this->presupuestoService = $presupuestoService;
         $this->promocionService = $promocionService;
         
-        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+        $this->initializeAuthorization(); //INICIALIZAR
     }
 
     public function index(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO
+        //VERIFICAR PERMISO
         $this->authorizePermiso(config('permisos.VER_PRESUPUESTOS'));
         
         $usuario = auth()->user();
@@ -73,7 +73,7 @@ class PresupuestosController extends Controller
             $query->whereDate('created', '<=', $request->fecha_fin);
         }
         
-        // 🔥 APLICAR FILTRO DE PREFIJOS usando el trait
+        //APLICAR FILTRO DE PREFIJOS usando el trait
         $this->applyPrefijoFilter($query, $usuario);
         
         $presupuestos = $query->orderBy('created', 'desc')->paginate(5);
@@ -84,7 +84,7 @@ class PresupuestosController extends Controller
             return $presupuesto;
         });
 
-        // 🔥 ESTADÍSTICAS con filtro de prefijos
+        //ESTADÍSTICAS con filtro de prefijos
         $estadisticasQuery = Presupuesto::query();
         $this->applyPrefijoFilter($estadisticasQuery, $usuario);
         
@@ -96,7 +96,7 @@ class PresupuestosController extends Controller
             'rechazados' => (clone $estadisticasQuery)->where('estado_id', 4)->count(),
         ];
 
-        // 🔥 OBTENER PREFIJOS PERMITIDOS usando el trait
+        //OBTENER PREFIJOS PERMITIDOS usando el trait
         $prefijosPermitidos = $this->getPrefijosPermitidos();
         
         // Obtener prefijo del usuario si es comercial
@@ -167,7 +167,7 @@ class PresupuestosController extends Controller
 
     public function create(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO DE GESTIÓN
+        //VERIFICAR PERMISO DE GESTIÓN
         $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
         
         $usuario = auth()->user();
@@ -185,7 +185,7 @@ class PresupuestosController extends Controller
                 ->with('error', 'El lead seleccionado no existe');
         }
         
-        // 🔥 VERIFICAR ACCESO AL LEAD
+        //VERIFICAR ACCESO AL LEAD
         $this->authorizeLeadAccess($lead);
         
         $comerciales = \App\Models\Comercial::with('personal')
@@ -200,7 +200,7 @@ class PresupuestosController extends Controller
                 ];
             });
         
-        // 🔥 OBTENER PREFIJOS PERMITIDOS
+        //OBTENER PREFIJOS PERMITIDOS
         $prefijos = $this->getPrefijosPermitidos();
         
         $promociones = $this->promocionService->getPromocionesVigentes();
@@ -256,7 +256,6 @@ class PresupuestosController extends Controller
 
     public function store(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO DE GESTIÓN
         $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
         
         try {
@@ -269,14 +268,19 @@ class PresupuestosController extends Controller
                 'promocion_id' => 'nullable|exists:promociones,id',
                 'cantidad_vehiculos' => 'required|integer|min:1',
                 'validez' => 'required|integer|min:1',
-                'tasa_id' => 'required|exists:productos_servicios,id',
-                'valor_tasa' => 'required|numeric|min:0',
+                
+                // TASA - ahora opcional
+                'tasa_id' => 'nullable|exists:productos_servicios,id',
+                'valor_tasa' => 'nullable|numeric|min:0',
                 'tasa_bonificacion' => 'nullable|numeric|min:0|max:100',
-                'tasa_metodo_pago_id' => 'required|exists:metodos_pago,id',
-                'abono_id' => 'required|exists:productos_servicios,id',
-                'valor_abono' => 'required|numeric|min:0',
+                'tasa_metodo_pago_id' => 'nullable|exists:metodos_pago,id',
+                
+                // ABONO - ahora opcional
+                'abono_id' => 'nullable|exists:productos_servicios,id',
+                'valor_abono' => 'nullable|numeric|min:0',
                 'abono_bonificacion' => 'nullable|numeric|min:0|max:100',
-                'abono_metodo_pago_id' => 'required|exists:metodos_pago,id',
+                'abono_metodo_pago_id' => 'nullable|exists:metodos_pago,id',
+                
                 'agregados' => 'nullable|array',
                 'agregados.*.prd_servicio_id' => 'required|exists:productos_servicios,id',
                 'agregados.*.cantidad' => 'required|integer|min:1',
@@ -284,14 +288,31 @@ class PresupuestosController extends Controller
                 'agregados.*.valor' => 'required|numeric|min:0',
                 'agregados.*.bonificacion' => 'nullable|numeric|min:0|max:100',
             ]);
-
-
+            
+            // Validación adicional: al menos debe haber tasa o abono
+            if (empty($validated['tasa_id']) && empty($validated['abono_id'])) {
+                return back()->withErrors([
+                    'error' => 'Debe seleccionar al menos una Tasa de Instalación o un Abono Mensual.'
+                ])->withInput();
+            }
+            
+            // Si no hay tasa, establecer valores por defecto
+            if (empty($validated['tasa_id'])) {
+                $validated['valor_tasa'] = 0;
+                $validated['tasa_bonificacion'] = 0;
+                $validated['tasa_metodo_pago_id'] = null;
+            }
+            
+            // Si no hay abono, establecer valores por defecto
+            if (empty($validated['abono_id'])) {
+                $validated['valor_abono'] = 0;
+                $validated['abono_bonificacion'] = 0;
+                $validated['abono_metodo_pago_id'] = null;
+            }
 
             $validated['validez'] = $fechaValidez;
 
             $presupuesto = $this->presupuestoService->createPresupuesto($validated);
-            
-
             
             $lead = Lead::find($request->lead_id);
             if ($lead && !$lead->es_cliente) {
@@ -316,16 +337,16 @@ class PresupuestosController extends Controller
             ])->withInput();
         }
     }
-
     public function show(Presupuesto $presupuesto)
     {
-        // 🔥 VERIFICAR ACCESO AL PRESUPUESTO (por prefijo)
+        //VERIFICAR ACCESO AL PRESUPUESTO (por prefijo)
         $this->authorizeLeadAccess($presupuesto); // Reutilizamos la misma lógica
         
         // Cargar todas las relaciones necesarias
         $presupuesto->load([
             'lead', 
             'prefijo.comercial.personal',
+            'prefijo.comercial.compania', 
             'tasa', 
             'abono',
             'promocion.productos',
@@ -363,7 +384,10 @@ class PresupuestosController extends Controller
         $presupuesto->compania_nombre = $companiaNombre;
         $presupuesto->compania_id = $companiaId;
         $presupuesto->nombre_comercial = $presupuesto->nombre_comercial;
-        
+         $presupuesto->compania = (object) [
+        'id' => $companiaId,
+        'nombre' => $companiaNombre
+    ];
         return Inertia::render('Comercial/Presupuestos/Show', [
             'presupuesto' => $presupuesto
         ]);
@@ -371,7 +395,7 @@ class PresupuestosController extends Controller
 
     public function edit(Presupuesto $presupuesto)
     {
-        // 🔥 VERIFICAR ACCESO Y PERMISO DE GESTIÓN
+        //VERIFICAR ACCESO Y PERMISO DE GESTIÓN
         $this->authorizeLeadAccess($presupuesto);
         $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
         
@@ -421,7 +445,6 @@ class PresupuestosController extends Controller
 
     public function update(Request $request, Presupuesto $presupuesto)
     {
-        // 🔥 VERIFICAR ACCESO Y PERMISO DE GESTIÓN
         $this->authorizeLeadAccess($presupuesto);
         $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
         
@@ -434,14 +457,19 @@ class PresupuestosController extends Controller
                 'promocion_id' => 'nullable|exists:promociones,id',
                 'cantidad_vehiculos' => 'required|integer|min:1',
                 'validez' => 'required|integer|min:1',
-                'tasa_id' => 'required|exists:productos_servicios,id',
-                'valor_tasa' => 'required|numeric|min:0',
+                
+                // TASA - ahora opcional
+                'tasa_id' => 'nullable|exists:productos_servicios,id',
+                'valor_tasa' => 'nullable|numeric|min:0',
                 'tasa_bonificacion' => 'nullable|numeric|min:0|max:100',
-                'tasa_metodo_pago_id' => 'required|exists:metodos_pago,id',
-                'abono_id' => 'required|exists:productos_servicios,id',
-                'valor_abono' => 'required|numeric|min:0',
+                'tasa_metodo_pago_id' => 'nullable|exists:metodos_pago,id',
+                
+                // ABONO - ahora opcional
+                'abono_id' => 'nullable|exists:productos_servicios,id',
+                'valor_abono' => 'nullable|numeric|min:0',
                 'abono_bonificacion' => 'nullable|numeric|min:0|max:100',
-                'abono_metodo_pago_id' => 'required|exists:metodos_pago,id',
+                'abono_metodo_pago_id' => 'nullable|exists:metodos_pago,id',
+                
                 'agregados' => 'nullable|array',
                 'agregados.*.prd_servicio_id' => 'required|exists:productos_servicios,id',
                 'agregados.*.cantidad' => 'required|integer|min:1',
@@ -449,13 +477,32 @@ class PresupuestosController extends Controller
                 'agregados.*.valor' => 'required|numeric|min:0',
                 'agregados.*.bonificacion' => 'nullable|numeric|min:0|max:100',
             ]);
-
+            
+            // Validación adicional: al menos debe haber tasa o abono
+            if (empty($validated['tasa_id']) && empty($validated['abono_id'])) {
+                return back()->withErrors([
+                    'error' => 'Debe seleccionar al menos una Tasa de Instalación o un Abono Mensual.'
+                ])->withInput();
+            }
+            
+            // Si no hay tasa, establecer valores por defecto
+            if (empty($validated['tasa_id'])) {
+                $validated['valor_tasa'] = 0;
+                $validated['tasa_bonificacion'] = 0;
+                $validated['tasa_metodo_pago_id'] = null;
+            }
+            
+            // Si no hay abono, establecer valores por defecto
+            if (empty($validated['abono_id'])) {
+                $validated['valor_abono'] = 0;
+                $validated['abono_bonificacion'] = 0;
+                $validated['abono_metodo_pago_id'] = null;
+            }
 
             $validated['validez'] = $fechaValidez;
 
             $presupuestoActualizado = $this->presupuestoService->updatePresupuesto($presupuesto, $validated);
             
-        
             return redirect()->route('comercial.presupuestos.show', $presupuestoActualizado->id)
                 ->with('success', 'Presupuesto actualizado correctamente');
             
@@ -474,7 +521,7 @@ class PresupuestosController extends Controller
 
     public function destroy(Presupuesto $presupuesto)
     {
-        // 🔥 VERIFICAR ACCESO Y PERMISO DE GESTIÓN
+        //VERIFICAR ACCESO Y PERMISO DE GESTIÓN
         $this->authorizeLeadAccess($presupuesto);
         $this->authorizePermiso(config('permisos.GESTIONAR_PRESUPUESTOS'));
         
@@ -484,7 +531,7 @@ class PresupuestosController extends Controller
 
     public function generarPdf(Request $request, Presupuesto $presupuesto)
     {
-        // 🔥 VERIFICAR ACCESO AL PRESUPUESTO
+        //VERIFICAR ACCESO AL PRESUPUESTO
         $this->authorizeLeadAccess($presupuesto);
         
         // Recargar el presupuesto con todas las relaciones necesarias
@@ -564,7 +611,7 @@ class PresupuestosController extends Controller
     
     public function generarPdfTemp(Request $request, Presupuesto $presupuesto)
     {
-        // 🔥 VERIFICAR ACCESO AL PRESUPUESTO
+        //VERIFICAR ACCESO AL PRESUPUESTO
         $this->authorizeLeadAccess($presupuesto);
         
         

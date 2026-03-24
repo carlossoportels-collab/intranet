@@ -6,40 +6,13 @@ namespace App\Services\Presupuesto;
 use App\Models\Presupuesto;
 use App\Models\Notificacion;
 use App\Models\Comercial;
+use App\Models\Lead;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class PresupuestoNotificationService
 {
-    /**
-     * Crear notificación cuando se crea un presupuesto
-     */
-    public function notificarPresupuestoCreado(Presupuesto $presupuesto): void
-    {
-        $usuarioId = $presupuesto->created_by;
-        $referencia = $this->getReferencia($presupuesto);
-        $diasValidez = $this->calcularDiasValidez($presupuesto);
-        
-        Notificacion::create([
-            'usuario_id' => $usuarioId,
-            'titulo' => '📋 Nuevo presupuesto creado',
-            'mensaje' => "Se ha creado el presupuesto {$referencia} para {$presupuesto->lead->nombre_completo}. Vence en {$diasValidez} días.",
-            'tipo' => 'presupuesto_por_vencer',
-            'entidad_tipo' => 'presupuesto',
-            'entidad_id' => $presupuesto->id,
-            'leida' => false,
-            'fecha_notificacion' => now(),
-            'prioridad' => 'normal',
-            'created' => now()
-        ]);
-
-        Log::info('Notificación de presupuesto creado', [
-            'presupuesto_id' => $presupuesto->id,
-            'usuario_id' => $usuarioId,
-            'referencia' => $referencia
-        ]);
-    }
-
+    
     /**
      * Crear notificación para presupuesto que vence mañana
      */
@@ -79,7 +52,7 @@ class PresupuestoNotificationService
     }
 
     /**
-     * Crear notificación para presupuesto vencido
+     * Crear notificación para presupuesto vencido (genérico)
      */
     public function notificarVencido(Presupuesto $presupuesto): void
     {
@@ -117,7 +90,49 @@ class PresupuestoNotificationService
     }
 
     /**
-     * Verificar presupuestos (simplificado: solo mañana y vencidos)
+     * NUEVO: Crear notificación para presupuesto vencido hace más de 30 días
+     * con lead en estado activo
+     */
+    public function notificarPresupuestoVencidoLargo(Presupuesto $presupuesto, int $diasVencido): void
+    {
+        // Verificar si ya existe una notificación similar no leída para este presupuesto
+        $existe = Notificacion::where('usuario_id', $presupuesto->created_by)
+            ->where('entidad_tipo', 'presupuesto')
+            ->where('entidad_id', $presupuesto->id)
+            ->where('tipo', 'presupuesto_vencido_largo')
+            ->where('leida', false)
+            ->exists();
+
+        if ($existe) {
+            return;
+        }
+
+        $referencia = $this->getReferencia($presupuesto);
+        $lead = $presupuesto->lead;
+        
+        Notificacion::create([
+            'usuario_id' => $presupuesto->created_by,
+            'titulo' => '⚠️ Presupuesto vencido hace más de 30 días',
+            'mensaje' => "El presupuesto {$referencia} para {$lead->nombre_completo} lleva {$diasVencido} días vencido. El lead aún está activo, considera generar un nuevo presupuesto.",
+            'tipo' => 'presupuesto_vencido_largo',
+            'entidad_tipo' => 'presupuesto',
+            'entidad_id' => $presupuesto->id,
+            'leida' => false,
+            'fecha_notificacion' => now(),
+            'prioridad' => 'urgente',
+            'created' => now()
+        ]);
+
+        Log::info('Notificación de presupuesto vencido largo plazo', [
+            'presupuesto_id' => $presupuesto->id,
+            'referencia' => $referencia,
+            'lead_id' => $lead->id,
+            'dias_vencido' => $diasVencido
+        ]);
+    }
+
+    /**
+     * Verificar presupuestos
      */
     public function verificarPresupuestos(): array
     {
@@ -149,15 +164,47 @@ class PresupuestoNotificationService
             $presupuesto->estado_id = 2; // Vencido
             $presupuesto->save();
             
-            // Crear notificación
+            // Crear notificación de vencimiento normal
             $this->notificarVencido($presupuesto);
             $notificacionesCreadas++;
             $presupuestosProcesados++;
         }
 
+        // 3. NUEVO: Presupuestos vencidos hace más de 30 días con lead activo
+        $fechaLimite = $hoy->copy()->subDays(30);
+        
+        $presupuestosVencidosLargo = Presupuesto::where('validez', '<', $fechaLimite)
+            ->where('estado_id', 2) // Estado vencido
+            ->whereNull('deleted_at')
+            ->whereHas('lead', function($query) {
+                // Lead con estado_lead.tipo = 'activo'
+                $query->whereHas('estadoLead', function($q) {
+                    $q->where('tipo', 'activo');
+                })->where('es_activo', 1);
+            })
+            ->get();
+
+        foreach ($presupuestosVencidosLargo as $presupuesto) {
+            $fechaVencimiento = Carbon::parse($presupuesto->validez);
+            $diasVencido = $fechaVencimiento->diffInDays($hoy);
+            
+            // Verificar que no tenga ya una notificación de este tipo
+            $yaNotificado = Notificacion::where('entidad_tipo', 'presupuesto')
+                ->where('entidad_id', $presupuesto->id)
+                ->where('tipo', 'presupuesto_vencido_largo')
+                ->exists();
+                
+            if (!$yaNotificado) {
+                $this->notificarPresupuestoVencidoLargo($presupuesto, $diasVencido);
+                $notificacionesCreadas++;
+                $presupuestosProcesados++;
+            }
+        }
+
         Log::info('Verificación de presupuestos completada', [
             'procesados' => $presupuestosProcesados,
-            'notificaciones' => $notificacionesCreadas
+            'notificaciones' => $notificacionesCreadas,
+            'vencidos_largo_plazo' => $presupuestosVencidosLargo->count()
         ]);
 
         return [

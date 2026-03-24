@@ -62,6 +62,8 @@ export default function PresupuestosEdit({
         serviciosNormales,
         tasaPromocion,
         abonoPromocion,
+        tasaNombre,
+        abonoNombre,
         updateField,
         aplicarPromocion,
         isFieldDisabled,
@@ -75,7 +77,9 @@ export default function PresupuestosEdit({
         abonos,
         convenios,
         metodosPago,
-        promociones
+        promociones,
+        accesorios,      // ← PASAR ACCESORIOS
+        servicios        // ← PASAR SERVICIOS
     });
 
     // Definir los tabs (sin resumen)
@@ -386,6 +390,8 @@ export default function PresupuestosEdit({
                                         serviciosConPromocion={serviciosConPromocion}
                                         accesoriosNormales={accesoriosNormales}
                                         serviciosNormales={serviciosNormales}
+                                        tasaNombre={tasaNombre}      // ← NUEVO
+                                        abonoNombre={abonoNombre}    // ← NUEVO
                                     />
                                 </ResponsiveCard>
                             </div>

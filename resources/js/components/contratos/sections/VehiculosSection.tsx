@@ -31,14 +31,13 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
             // Sobran vehículos (por si cambia la cantidad), recortamos
             setVehiculos(vehiculos.slice(0, cantidadMaxima));
         }
-    }, [cantidadMaxima]); // Solo se ejecuta si cambia cantidadMaxima
+    }, [cantidadMaxima]);
 
     const todosCompletados = vehiculos.every(v => v.patente && v.patente.trim() !== '');
     
     const eliminarVehiculo = (index: number) => {
         // Evitar eliminar si estamos en el mínimo requerido
         if (vehiculos.length <= cantidadMaxima) {
-            // Mostramos un mensaje o simplemente no dejamos eliminar
             return;
         }
         setVehiculos(vehiculos.filter((_, i) => i !== index));
@@ -95,9 +94,10 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                 )}
                             </div>
                             
-                            {/* Grid de campos */}
-                            <div className="grid grid-cols-4 gap-2">
-                                <div className="col-span-1">
+                            {/* Grid de campos - Actualizado para incluir IDENTIFICADOR */}
+                            <div className="grid grid-cols-12 gap-2">
+                                {/* Patente - 3 columnas */}
+                                <div className="col-span-3">
                                     <input
                                         type="text"
                                         value={vehiculo.patente}
@@ -109,7 +109,21 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                         required
                                     />
                                 </div>
-                                <div className="col-span-1">
+                            
+                                                                {/* IDENTIFICADOR - 2 columnas */}
+                                <div className="col-span-2">
+                                    <input
+                                        type="text"
+                                        value={vehiculo.identificador}
+                                        onChange={(e) => updateVehiculo(index, 'identificador', e.target.value)}
+                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Identificador"
+                                    />
+                                </div>
+
+                                
+                                {/* Marca - 2 columnas */}
+                                <div className="col-span-2">
                                     <input
                                         type="text"
                                         value={vehiculo.marca}
@@ -118,7 +132,9 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                         placeholder="Marca"
                                     />
                                 </div>
-                                <div className="col-span-1">
+                                
+                                {/* Modelo - 2 columnas */}
+                                <div className="col-span-2">
                                     <input
                                         type="text"
                                         value={vehiculo.modelo}
@@ -127,7 +143,9 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                         placeholder="Modelo"
                                     />
                                 </div>
-                                <div className="col-span-1 flex gap-1">
+                                
+                                {/* Año - 1 columna */}
+                                <div className="col-span-1">
                                     <input
                                         type="text"
                                         value={vehiculo.anio}
@@ -135,6 +153,10 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                         className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Año"
                                     />
+                                </div>
+                                
+                                {/* Color - 2 columnas */}
+                                <div className="col-span-2">
                                     <input
                                         type="text"
                                         value={vehiculo.color}
@@ -143,6 +165,7 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                         placeholder="Color"
                                     />
                                 </div>
+                                
                             </div>
                         </div>
                     ))}

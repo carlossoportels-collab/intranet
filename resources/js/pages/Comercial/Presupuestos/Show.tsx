@@ -137,185 +137,236 @@ export default function PresupuestosShow({ presupuesto }: Props) {
                     </ResponsiveGrid>
                 </DataCard>
 
-                {/* DETALLE DE INVERSIÓN */}
-                <DataCard title="Detalle de Inversión">
-                    <div className="bg-gray-50 p-4 rounded-lg border">
-                        <div className="space-y-3 text-sm">
-                            {/* TASA */}
-                            {presupuesto.tasa && (
-                                <div className="border-b border-gray-200 pb-2">
-                                    <div className="flex justify-between font-medium text-gray-700 mb-1">
-                                        <span>{presupuesto.tasa.nombre}:</span>
-                                        <span>{formatMoney(toNumber(presupuesto.valor_tasa) * presupuesto.cantidad_vehiculos)}</span>
-                                    </div>
-                                    
-                                    {data.tienePromocion && data.tienePromocionProducto(presupuesto.tasa?.id) ? (
-                                        <div className="mt-1 pl-2">
-                                            <div className="flex justify-between text-green-700 text-xs font-medium">
-                                                <span>Descuento: {data.getTextoBonificacion(presupuesto.tasa?.id, presupuesto.tasa_bonificacion)}</span>
-                                                <span>- {formatMoney((toNumber(presupuesto.valor_tasa) * presupuesto.cantidad_vehiculos) - data.subtotalTasa)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm font-bold mt-1">
-                                                <span>Total instalación:</span>
-                                                <span className="text-local">{formatMoney(data.subtotalTasa)}</span>
-                                            </div>
-                                        </div>
-                                    ) : toNumber(presupuesto.tasa_bonificacion) > 0 ? (
-                                        <div className="mt-1 pl-2">
-                                            <div className="flex justify-between text-green-700 text-xs font-medium">
-                                                <span>Descuento: {formatPorcentaje(presupuesto.tasa_bonificacion)}</span>
-                                                <span>- {formatMoney((toNumber(presupuesto.valor_tasa) * presupuesto.cantidad_vehiculos) - data.subtotalTasa)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm font-bold mt-1">
-                                                <span>Total instalación:</span>
-                                                <span className="text-local">{formatMoney(data.subtotalTasa)}</span>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex justify-between text-sm font-bold mt-1 pl-2">
-                                            <span>Total instalación:</span>
-                                            <span className="text-local">{formatMoney(data.subtotalTasa)}</span>
-                                        </div>
-                                    )}
+{/* DETALLE DE INVERSIÓN */}
+<DataCard title="Detalle de Inversión">
+    <div className="space-y-6">
+        {/* Layout de dos columnas para Inversión Inicial y Costo Recurrente */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* INVERSIÓN INICIAL - PAGO ÚNICO */}
+            <div className="bg-blue-50 rounded-lg border border-blue-200 overflow-hidden h-fit">
+                <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                    <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-blue-700" />
+                        <h3 className="font-semibold text-blue-900">Inversión Inicial (Pago Único)</h3>
+                    </div>
+                </div>
+                <div className="p-4 space-y-3">
+                    {/* TASA */}
+                    {presupuesto.tasa && (
+                        <div className="border-b border-blue-200 pb-3 last:border-0">
+                            <div className="flex justify-between items-center mb-1">
+                                <div className="flex items-center gap-1">
+                                    <Wrench className="h-4 w-4 text-gray-500" />
+                                    <span className="font-medium text-gray-700">{presupuesto.tasa.nombre}:</span>
                                 </div>
-                            )}
-
-                            {/* ABONO */}
-                            {presupuesto.abono && (
-                                <div className="border-b border-gray-200 pb-2">
-                                    <div className="flex justify-between font-medium text-gray-700 mb-1">
-                                        <span>{presupuesto.abono.nombre}:</span>
-                                        <span>{formatMoney(toNumber(presupuesto.valor_abono) * presupuesto.cantidad_vehiculos)}</span>
-                                    </div>
-                                    
-                                    {data.tienePromocion && data.tienePromocionProducto(presupuesto.abono?.id) ? (
-                                        <div className="mt-1 pl-2">
-                                            <div className="flex justify-between text-green-700 text-xs font-medium">
-                                                <span>Descuento: {data.getTextoBonificacion(presupuesto.abono?.id, presupuesto.abono_bonificacion)}</span>
-                                                <span>- {formatMoney((toNumber(presupuesto.valor_abono) * presupuesto.cantidad_vehiculos) - data.subtotalAbono)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm font-bold mt-1">
-                                                <span>Total abono:</span>
-                                                <span className="text-local">{formatMoney(data.subtotalAbono)}</span>
-                                            </div>
-                                        </div>
-                                    ) : toNumber(presupuesto.abono_bonificacion) > 0 ? (
-                                        <div className="mt-1 pl-2">
-                                            <div className="flex justify-between text-green-700 text-xs font-medium">
-                                                <span>Descuento: {formatPorcentaje(presupuesto.abono_bonificacion)}</span>
-                                                <span>- {formatMoney((toNumber(presupuesto.valor_abono) * presupuesto.cantidad_vehiculos) - data.subtotalAbono)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm font-bold mt-1">
-                                                <span>Total abono:</span>
-                                                <span className="text-local">{formatMoney(data.subtotalAbono)}</span>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex justify-between text-sm font-bold mt-1 pl-2">
-                                            <span>Total abono:</span>
-                                            <span className="text-local">{formatMoney(data.subtotalAbono)}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* ACCESORIOS */}
-                            {data.tieneAccesorios && (
-                                <div className="border-b border-gray-200 pb-2">
-                                    <p className="font-medium text-gray-700 mb-2">Accesorios:</p>
-                                    
-                                    {data.accesoriosUnicos.map((item: any, index: number) => {
-                                        const subtotalBase = toNumber(item.valor) * item.cantidad;
-                                        const enPromocion = data.tienePromocion && data.tienePromocionProducto(item.prd_servicio_id);
-                                        
-                                        return (
-                                            <div key={index} className="mb-3 pl-2">
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-gray-600">{item.producto_servicio?.nombre} x{item.cantidad}:</span>
-                                                    <span className="font-medium">{formatMoney(subtotalBase)}</span>
-                                                </div>
-                                                {enPromocion ? (
-                                                    <div className="flex justify-between text-green-700 text-xs font-medium">
-                                                        <span>Descuento: {data.getTextoBonificacion(item.prd_servicio_id, item.bonificacion)}</span>
-                                                        <span>- {formatMoney(subtotalBase - toNumber(item.subtotal))}</span>
-                                                    </div>
-                                                ) : toNumber(item.bonificacion) > 0 ? (
-                                                    <div className="flex justify-between text-green-700 text-xs font-medium">
-                                                        <span>Descuento: {formatPorcentaje(item.bonificacion)}</span>
-                                                        <span>- {formatMoney(subtotalBase - toNumber(item.subtotal))}</span>
-                                                    </div>
-                                                ) : null}
-                                                <div className="flex justify-between text-xs font-bold mt-1">
-                                                    <span>Subtotal:</span>
-                                                    <span className="text-local">{formatMoney(item.subtotal)}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    
-                                    <div className="flex justify-between text-sm font-bold mt-2 pt-1 border-t border-gray-200">
-                                        <span>TOTAL ACCESORIOS:</span>
-                                        <span className="text-local">{formatMoney(data.totalAccesorios)}</span>
+                                <span className="text-gray-600">{formatMoney(toNumber(presupuesto.valor_tasa) * presupuesto.cantidad_vehiculos)}</span>
+                            </div>
+                            
+                            {data.tienePromocion && data.tienePromocionProducto(presupuesto.tasa?.id) ? (
+                                <div className="mt-1 pl-6">
+                                    <div className="flex justify-between text-green-700 text-xs">
+                                        <span>🎉 Descuento promoción: {data.getTextoBonificacion(presupuesto.tasa?.id, presupuesto.tasa_bonificacion)}</span>
+                                        <span>- {formatMoney((toNumber(presupuesto.valor_tasa) * presupuesto.cantidad_vehiculos) - data.subtotalTasa)}</span>
                                     </div>
                                 </div>
-                            )}
-
-                            {/* SERVICIOS */}
-                            {data.tieneServiciosMensuales && (
-                                <div className="border-b border-gray-200 pb-2">
-                                    <p className="font-medium text-gray-700 mb-2">Servicios:</p>
-                                    
-                                    {data.serviciosMensuales.map((item: any, index: number) => {
-                                        const subtotalBase = toNumber(item.valor) * item.cantidad;
-                                        const enPromocion = data.tienePromocion && data.tienePromocionProducto(item.prd_servicio_id);
-                                        
-                                        return (
-                                            <div key={index} className="mb-3 pl-2">
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-gray-600">{item.producto_servicio?.nombre} x{item.cantidad}:</span>
-                                                    <span className="font-medium">{formatMoney(subtotalBase)}</span>
-                                                </div>
-                                                {enPromocion ? (
-                                                    <div className="flex justify-between text-green-700 text-xs font-medium">
-                                                        <span>Descuento: {data.getTextoBonificacion(item.prd_servicio_id, item.bonificacion)}</span>
-                                                        <span>- {formatMoney(subtotalBase - toNumber(item.subtotal))}</span>
-                                                    </div>
-                                                ) : toNumber(item.bonificacion) > 0 ? (
-                                                    <div className="flex justify-between text-green-700 text-xs font-medium">
-                                                        <span>Descuento: {formatPorcentaje(item.bonificacion)}</span>
-                                                        <span>- {formatMoney(subtotalBase - toNumber(item.subtotal))}</span>
-                                                    </div>
-                                                ) : null}
-                                                <div className="flex justify-between text-xs font-bold mt-1">
-                                                    <span>Subtotal:</span>
-                                                    <span className="text-local">{formatMoney(item.subtotal)}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    
-                                    <div className="flex justify-between text-sm font-bold mt-2 pt-1 border-t border-gray-200">
-                                        <span>TOTAL SERVICIOS:</span>
-                                        <span className="text-local">{formatMoney(data.totalServiciosMensuales)}</span>
+                            ) : toNumber(presupuesto.tasa_bonificacion) > 0 ? (
+                                <div className="mt-1 pl-6">
+                                    <div className="flex justify-between text-green-600 text-xs">
+                                        <span>💰 Descuento: {formatPorcentaje(presupuesto.tasa_bonificacion)}</span>
+                                        <span>- {formatMoney((toNumber(presupuesto.valor_tasa) * presupuesto.cantidad_vehiculos) - data.subtotalTasa)}</span>
                                     </div>
                                 </div>
-                            )}
-
-                            {/* TOTAL GENERAL */}
-                            <div className="pt-2">
-                                <div className="flex justify-between font-bold text-base">
-                                    <span>TOTAL GENERAL:</span>
-                                    <span className="text-local text-lg">
-                                        {formatMoney(data.totalPrimerMes)}
-                                    </span>
-                                </div>
-                                <p className="text-xs text-gray-500 text-right mt-1">
-                                    * Costo mensual desde el 2° mes: <Amount value={data.costoMensualTotal} />
-                                </p>
+                            ) : null}
+                            
+                            <div className="flex justify-between mt-1 pl-6 font-semibold text-blue-700">
+                                <span>Total instalación:</span>
+                                <span>{formatMoney(data.subtotalTasa)}</span>
                             </div>
                         </div>
+                    )}
+
+                    {/* ACCESORIOS */}
+                    {data.tieneAccesorios && (
+                        <div className="border-b border-blue-200 pb-3 last:border-0">
+                            <div className="flex items-center gap-1 mb-2">
+                                <Package className="h-4 w-4 text-gray-500" />
+                                <span className="font-medium text-gray-700">Accesorios:</span>
+                            </div>
+                            
+                            <div className="space-y-3 pl-6">
+                                {data.accesoriosUnicos.map((item: any, index: number) => {
+                                    const subtotalBase = toNumber(item.valor) * item.cantidad;
+                                    const enPromocion = data.tienePromocion && data.tienePromocionProducto(item.prd_servicio_id);
+                                    
+                                    return (
+                                        <div key={index} className="text-sm">
+                                            <div className="flex justify-between text-gray-600">
+                                                <span>• {item.producto_servicio?.nombre} x{item.cantidad}</span>
+                                                <span>{formatMoney(subtotalBase)}</span>
+                                            </div>
+                                            {enPromocion ? (
+                                                <div className="flex justify-between text-green-700 text-xs mt-0.5">
+                                                    <span>Descuento promoción: {data.getTextoBonificacion(item.prd_servicio_id, item.bonificacion)}</span>
+                                                    <span>- {formatMoney(subtotalBase - toNumber(item.subtotal))}</span>
+                                                </div>
+                                            ) : toNumber(item.bonificacion) > 0 ? (
+                                                <div className="flex justify-between text-green-600 text-xs mt-0.5">
+                                                    <span>Descuento: {formatPorcentaje(item.bonificacion)}</span>
+                                                    <span>- {formatMoney(subtotalBase - toNumber(item.subtotal))}</span>
+                                                </div>
+                                            ) : null}
+                                            <div className="flex justify-between font-medium text-gray-800 mt-0.5">
+                                                <span>Subtotal:</span>
+                                                <span>{formatMoney(item.subtotal)}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            
+                            <div className="flex justify-between mt-3 pt-2 border-t border-blue-200 font-semibold text-blue-700">
+                                <span>TOTAL ACCESORIOS:</span>
+                                <span>{formatMoney(data.totalAccesorios)}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TOTAL INVERSIÓN INICIAL */}
+                    <div className="bg-blue-100 rounded-lg p-3 mt-2">
+                        <div className="flex justify-between items-center">
+                            <span className="font-bold text-blue-900">💰 TOTAL INVERSIÓN INICIAL:</span>
+                            <span className="text-xl font-bold text-blue-900">{formatMoney(data.inversionInicial)}</span>
+                        </div>
                     </div>
-                </DataCard>
+                </div>
+            </div>
+
+            {/* COSTO RECURRENTE - MENSUAL */}
+            <div className="bg-green-50 rounded-lg border border-green-200 overflow-hidden h-fit">
+                <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                    <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-green-700" />
+                        <h3 className="font-semibold text-green-900">Costo Recurrente (Mensual)</h3>
+                    </div>
+                </div>
+                <div className="p-4 space-y-3">
+                    {/* ABONO */}
+                    {presupuesto.abono && (
+                        <div className="border-b border-green-200 pb-3 last:border-0">
+                            <div className="flex justify-between items-center mb-1">
+                                <div className="flex items-center gap-1">
+                                    <CreditCard className="h-4 w-4 text-gray-500" />
+                                    <span className="font-medium text-gray-700">{presupuesto.abono.nombre}:</span>
+                                </div>
+                                <span className="text-gray-600">{formatMoney(toNumber(presupuesto.valor_abono) * presupuesto.cantidad_vehiculos)}</span>
+                            </div>
+                            
+                            {data.tienePromocion && data.tienePromocionProducto(presupuesto.abono?.id) ? (
+                                <div className="mt-1 pl-6">
+                                    <div className="flex justify-between text-green-700 text-xs">
+                                        <span>🎉 Descuento promoción: {data.getTextoBonificacion(presupuesto.abono?.id, presupuesto.abono_bonificacion)}</span>
+                                        <span>- {formatMoney((toNumber(presupuesto.valor_abono) * presupuesto.cantidad_vehiculos) - data.subtotalAbono)}</span>
+                                    </div>
+                                </div>
+                            ) : toNumber(presupuesto.abono_bonificacion) > 0 ? (
+                                <div className="mt-1 pl-6">
+                                    <div className="flex justify-between text-green-600 text-xs">
+                                        <span>💰 Descuento: {formatPorcentaje(presupuesto.abono_bonificacion)}</span>
+                                        <span>- {formatMoney((toNumber(presupuesto.valor_abono) * presupuesto.cantidad_vehiculos) - data.subtotalAbono)}</span>
+                                    </div>
+                                </div>
+                            ) : null}
+                            
+                            <div className="flex justify-between mt-1 pl-6 font-semibold text-green-700">
+                                <span>Total abono:</span>
+                                <span>{formatMoney(data.subtotalAbono)}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SERVICIOS */}
+                    {data.tieneServiciosMensuales && (
+                        <div className="border-b border-green-200 pb-3 last:border-0">
+                            <div className="flex items-center gap-1 mb-2">
+                                <Package className="h-4 w-4 text-gray-500" />
+                                <span className="font-medium text-gray-700">Servicios:</span>
+                            </div>
+                            
+                            <div className="space-y-3 pl-6">
+                                {data.serviciosMensuales.map((item: any, index: number) => {
+                                    const subtotalBase = toNumber(item.valor) * item.cantidad;
+                                    const enPromocion = data.tienePromocion && data.tienePromocionProducto(item.prd_servicio_id);
+                                    
+                                    return (
+                                        <div key={index} className="text-sm">
+                                            <div className="flex justify-between text-gray-600">
+                                                <span>• {item.producto_servicio?.nombre} x{item.cantidad}</span>
+                                                <span>{formatMoney(subtotalBase)}</span>
+                                            </div>
+                                            {enPromocion ? (
+                                                <div className="flex justify-between text-green-700 text-xs mt-0.5">
+                                                    <span>Descuento promoción: {data.getTextoBonificacion(item.prd_servicio_id, item.bonificacion)}</span>
+                                                    <span>- {formatMoney(subtotalBase - toNumber(item.subtotal))}</span>
+                                                </div>
+                                            ) : toNumber(item.bonificacion) > 0 ? (
+                                                <div className="flex justify-between text-green-600 text-xs mt-0.5">
+                                                    <span>Descuento: {formatPorcentaje(item.bonificacion)}</span>
+                                                    <span>- {formatMoney(subtotalBase - toNumber(item.subtotal))}</span>
+                                                </div>
+                                            ) : null}
+                                            <div className="flex justify-between font-medium text-gray-800 mt-0.5">
+                                                <span>Subtotal:</span>
+                                                <span>{formatMoney(item.subtotal)}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            
+                            <div className="flex justify-between mt-3 pt-2 border-t border-green-200 font-semibold text-green-700">
+                                <span>TOTAL SERVICIOS:</span>
+                                <span>{formatMoney(data.totalServiciosMensuales)}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TOTAL COSTO MENSUAL */}
+                    <div className="bg-green-100 rounded-lg p-3 mt-2">
+                        <div className="flex justify-between items-center">
+                            <span className="font-bold text-green-900">📅 TOTAL COSTO MENSUAL:</span>
+                            <span className="text-xl font-bold text-green-900">{formatMoney(data.costoMensualTotal)}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {/* RESUMEN TOTAL PRIMER MES */}
+        <div className="bg-gradient-to-r from-local-500 to-local-600 rounded-lg p-4 text-white shadow-lg">
+            <div className="flex justify-between items-center">
+                <div>
+                    <p className="text-sm opacity-90">Total a pagar</p>
+                    <p className="text-xs opacity-75">Primer mes (instalación + 1er mes)</p>
+                </div>
+                <div className="text-right">
+                    <p className="text-2xl font-bold">{formatMoney(data.totalPrimerMes)}</p>
+                    <p className="text-xs opacity-75">* Desde el 2° mes: {formatMoney(data.costoMensualTotal)}/mes</p>
+                </div>
+            </div>
+        </div>
+
+        {/* PROMOCIÓN DESTACADA */}
+        {data.tienePromocion && (
+            <div className="bg-purple-50 rounded-lg border border-purple-200 p-3">
+                <div className="flex items-center gap-2 text-purple-800">
+                    <Gift className="h-4 w-4" />
+                    <span className="font-medium">Promoción aplicada:</span>
+                    <span>{presupuesto.promocion?.nombre}</span>
+                </div>
+            </div>
+        )}
+    </div>
+</DataCard>
 
                 {/* Resumen Simplificado */}
                 <DataCard title="Resumen de Inversión">

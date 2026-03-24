@@ -7,7 +7,7 @@ import {
   RefreshCw, 
   TrendingUp, 
   TrendingDown, 
-  Clock, 
+  MessageSquare, 
   Calendar,
   ChevronRight,
   Users,
@@ -663,7 +663,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                               <Link
                                 href={`/comercial/leads/${lead.id}`}
-                                className="text-red-600 hover:text-red-900 flex items-center gap-1 text-xs sm:text-sm"
+                                className="text-blue-600 hover:text-blue-900 flex items-center gap-1 text-xs sm:text-sm"
                               >
                                 <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                                 Ver detalles
@@ -671,7 +671,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                               {['Perdido', 'Info Enviada', 'Recontactando', 'Reagendado'].includes(lead.estado_lead.nombre) && (
                                 <button
                                     onClick={() => abrirModalSeguimiento(lead.id)}
-                                    className="text-blue-600 hover:text-blue-900 flex items-center gap-1 text-xs sm:text-sm"
+                                    className="text-green-600 hover:text-green-900 flex items-center gap-1 text-xs sm:text-sm"
                                     disabled={cargandoModal}
                                 >
                                   {cargandoModal ? (
@@ -681,7 +681,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                                     </>
                                   ) : (
                                     <>
-                                      <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
+                                      <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4" />
                                       Seguimiento
                                     </>
                                   )}

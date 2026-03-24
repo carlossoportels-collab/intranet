@@ -5,22 +5,22 @@ namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmpresaResponsable;
-use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
+use App\Traits\Authorizable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class EmpresaResponsableController extends Controller
 {
-    use Authorizable; // 🔥 AGREGAR TRAIT
+    use Authorizable; 
 
     public function __construct()
     {
-        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+        $this->initializeAuthorization(); 
     }
 
     public function store(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO (asumiendo que existe)
+     
         $this->authorizePermiso(config('permisos.GESTIONAR_EMPRESAS', 'gestionar_empresas'));
         
         try {
@@ -61,7 +61,7 @@ class EmpresaResponsableController extends Controller
 
     public function destroy($id)
     {
-        // 🔥 VERIFICAR PERMISO (asumiendo que existe)
+       
         $this->authorizePermiso(config('permisos.GESTIONAR_EMPRESAS', 'gestionar_empresas'));
         
         try {

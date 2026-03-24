@@ -24,6 +24,8 @@ interface UsePresupuestoFormProps {
     metodosPago: MetodoPagoDTO[];
     leadId: number;
     promociones?: PromocionDTO[];
+    accesorios: ProductoServicioDTO[];
+    servicios: ProductoServicioDTO[];
 }
 
 export const usePresupuestoForm = ({
@@ -35,7 +37,9 @@ export const usePresupuestoForm = ({
     convenios,
     metodosPago,
     leadId,
-    promociones = []
+    promociones = [],
+    accesorios,
+    servicios
 }: UsePresupuestoFormProps) => {
     const { errors } = usePage().props;
     const toast = useToast();
@@ -74,6 +78,18 @@ export const usePresupuestoForm = ({
     const [promocionSeleccionada, setPromocionSeleccionada] = useState<PromocionDTO | null>(null);
     const [cantidadMinimaPromo, setCantidadMinimaPromo] = useState<number>(1);
     const [productosPromocionIds, setProductosPromocionIds] = useState<Set<number>>(new Set());
+
+    // Obtener nombres de tasa y abono
+    const tasaNombre = useMemo(() => {
+        const tasa = tasas.find(t => t.id === state.tasaId);
+        return tasa?.nombre || 'Instalación';
+    }, [state.tasaId, tasas]);
+
+    const abonoNombre = useMemo(() => {
+        const todosAbonos = [...abonos, ...convenios];
+        const abono = todosAbonos.find(a => a.id === state.abonoId);
+        return abono?.nombre || 'Abono Mensual';
+    }, [state.abonoId, abonos, convenios]);
 
     const getProductoValor = useCallback((id: number, lista: ProductoServicioDTO[]) => {
         const producto = lista.find(p => p.id === id);
@@ -181,7 +197,6 @@ export const usePresupuestoForm = ({
         field: K, 
         value: PresupuestoFormState[K]
     ) => {
-        // Solo validar cantidad de vehículos, no ajustar automáticamente
         if (field === 'cantidadVehiculos' && state.promocionId) {
             const numValue = value as number;
             if (numValue < cantidadMinimaPromo) {
@@ -197,8 +212,8 @@ export const usePresupuestoForm = ({
     const cargarProductosPromocion = useCallback((promocion: PromocionDTO) => {
         let minVehiculos = 1;
         
-        const nuevosAccesorios: PresupuestoAgregadoDTO[] = [];
-        const nuevosServicios: PresupuestoAgregadoDTO[] = [];
+        const nuevosAccesoriosMap = new Map<number, PresupuestoAgregadoDTO>();
+        const nuevosServiciosMap = new Map<number, PresupuestoAgregadoDTO>();
         
         promocion.productos.forEach(prod => {
             if (prod.cantidad_minima && prod.cantidad_minima > minVehiculos) {
@@ -220,37 +235,40 @@ export const usePresupuestoForm = ({
                     break;
                     
                 case 5: // ACCESORIOS
-                    nuevosAccesorios.push({
-                        prd_servicio_id: productoBase.id,
-                        cantidad: prod.cantidad_minima || 1,
-                        aplica_a_todos_vehiculos: false,
-                        valor: productoBase.precio,
-                        bonificacion: prod.bonificacion,
-                        subtotal: 0
-                    });
+                    if (!nuevosAccesoriosMap.has(productoBase.id)) {
+                        nuevosAccesoriosMap.set(productoBase.id, {
+                            prd_servicio_id: productoBase.id,
+                            cantidad: prod.cantidad_minima || 1,
+                            aplica_a_todos_vehiculos: false,
+                            valor: productoBase.precio,
+                            bonificacion: prod.bonificacion,
+                            subtotal: 0
+                        });
+                    }
                     break;
                     
                 case 3: // SERVICIOS
-                    nuevosServicios.push({
-                        prd_servicio_id: productoBase.id,
-                        cantidad: prod.cantidad_minima || 1,
-                        aplica_a_todos_vehiculos: false,
-                        valor: productoBase.precio,
-                        bonificacion: prod.bonificacion,
-                        subtotal: 0
-                    });
+                    if (!nuevosServiciosMap.has(productoBase.id)) {
+                        nuevosServiciosMap.set(productoBase.id, {
+                            prd_servicio_id: productoBase.id,
+                            cantidad: prod.cantidad_minima || 1,
+                            aplica_a_todos_vehiculos: false,
+                            valor: productoBase.precio,
+                            bonificacion: prod.bonificacion,
+                            subtotal: 0
+                        });
+                    }
                     break;
             }
         });
 
         setState(prev => ({
             ...prev,
-            accesoriosAgregados: nuevosAccesorios,
-            serviciosAgregados: nuevosServicios
+            accesoriosAgregados: Array.from(nuevosAccesoriosMap.values()),
+            serviciosAgregados: Array.from(nuevosServiciosMap.values())
         }));
 
         if (minVehiculos > 1) {
-            // Solo actualizar si es mayor, sin toast
             setState(prev => ({ ...prev, cantidadVehiculos: minVehiculos }));
         }
 
@@ -325,47 +343,59 @@ export const usePresupuestoForm = ({
     // Calcular productos normales (sin promoción)
     const accesoriosNormales = useMemo((): ProductoResumenItem[] => {
         if (!productosPromocionIds.size) {
-            return state.accesoriosAgregados.map(item => ({
-                id: item.prd_servicio_id,
-                nombre: 'Accesorio',
-                valor: item.valor,
-                cantidad: item.cantidad,
-                bonificacion: item.bonificacion
-            }));
+            return state.accesoriosAgregados.map(item => {
+                const producto = accesorios.find(a => a.id === item.prd_servicio_id);
+                return {
+                    id: item.prd_servicio_id,
+                    nombre: producto?.nombre || 'Accesorio',
+                    valor: item.valor,
+                    cantidad: item.cantidad,
+                    bonificacion: item.bonificacion
+                };
+            });
         }
         
         return state.accesoriosAgregados
             .filter(item => !productosPromocionIds.has(item.prd_servicio_id))
-            .map(item => ({
-                id: item.prd_servicio_id,
-                nombre: 'Accesorio',
-                valor: item.valor,
-                cantidad: item.cantidad,
-                bonificacion: item.bonificacion
-            }));
-    }, [state.accesoriosAgregados, productosPromocionIds]);
+            .map(item => {
+                const producto = accesorios.find(a => a.id === item.prd_servicio_id);
+                return {
+                    id: item.prd_servicio_id,
+                    nombre: producto?.nombre || 'Accesorio',
+                    valor: item.valor,
+                    cantidad: item.cantidad,
+                    bonificacion: item.bonificacion
+                };
+            });
+    }, [state.accesoriosAgregados, productosPromocionIds, accesorios]);
 
     const serviciosNormales = useMemo((): ProductoResumenItem[] => {
         if (!productosPromocionIds.size) {
-            return state.serviciosAgregados.map(item => ({
-                id: item.prd_servicio_id,
-                nombre: 'Servicio',
-                valor: item.valor,
-                cantidad: item.cantidad,
-                bonificacion: item.bonificacion
-            }));
+            return state.serviciosAgregados.map(item => {
+                const producto = servicios.find(s => s.id === item.prd_servicio_id);
+                return {
+                    id: item.prd_servicio_id,
+                    nombre: producto?.nombre || 'Servicio',
+                    valor: item.valor,
+                    cantidad: item.cantidad,
+                    bonificacion: item.bonificacion
+                };
+            });
         }
         
         return state.serviciosAgregados
             .filter(item => !productosPromocionIds.has(item.prd_servicio_id))
-            .map(item => ({
-                id: item.prd_servicio_id,
-                nombre: 'Servicio',
-                valor: item.valor,
-                cantidad: item.cantidad,
-                bonificacion: item.bonificacion
-            }));
-    }, [state.serviciosAgregados, productosPromocionIds]);
+            .map(item => {
+                const producto = servicios.find(s => s.id === item.prd_servicio_id);
+                return {
+                    id: item.prd_servicio_id,
+                    nombre: producto?.nombre || 'Servicio',
+                    valor: item.valor,
+                    cantidad: item.cantidad,
+                    bonificacion: item.bonificacion
+                };
+            });
+    }, [state.serviciosAgregados, productosPromocionIds, servicios]);
 
     // Determinar tipo de promoción para tasa y abono
     const tasaPromocion = useMemo(() => {
@@ -388,29 +418,39 @@ export const usePresupuestoForm = ({
             : null;
     }, [promocionSeleccionada]);
 
-    // Validación del formulario
+    /**
+     * VALIDACIÓN DEL FORMULARIO - ACTUALIZADA
+     * Permite presupuestos con solo tasa, solo abono, o ambos
+     */
     const validateForm = useCallback((): boolean => {
-        if (!state.prefijoId) {
+        // Validar comercial
+        if (!state.prefijoId || state.prefijoId === 0) {
             toast.error('Debe seleccionar un comercial');
             return false;
         }
-        if (!state.tasaId) {
-            toast.error('Debe seleccionar una tasa de instalación');
+        
+        // Validar que al menos tenga una tasa o un abono
+        const tieneTasa = state.tasaId && state.tasaId !== 0;
+        const tieneAbono = state.abonoId && state.abonoId !== 0;
+        
+        if (!tieneTasa && !tieneAbono) {
+            toast.error('Debe seleccionar al menos una Tasa de Instalación o un Abono Mensual');
             return false;
         }
-        if (!state.tasaMetodoPagoId) {
+        
+        // Validar método de pago de la tasa (solo si tiene tasa)
+        if (tieneTasa && (!state.tasaMetodoPagoId || state.tasaMetodoPagoId === 0)) {
             toast.error('Debe seleccionar un método de pago para la tasa');
             return false;
         }
-        if (!state.abonoId) {
-            toast.error('Debe seleccionar un abono mensual');
-            return false;
-        }
-        if (!state.abonoMetodoPagoId) {
+        
+        // Validar método de pago del abono (solo si tiene abono)
+        if (tieneAbono && (!state.abonoMetodoPagoId || state.abonoMetodoPagoId === 0)) {
             toast.error('Debe seleccionar un método de pago para el abono');
             return false;
         }
         
+        // Validar cantidad mínima para promoción
         if (state.promocionId && state.cantidadVehiculos < cantidadMinimaPromo) {
             toast.error(`Esta promoción requiere un mínimo de ${cantidadMinimaPromo} vehículos`);
             return false;
@@ -419,7 +459,10 @@ export const usePresupuestoForm = ({
         return true;
     }, [state, toast, cantidadMinimaPromo]);
 
-    // Submit del formulario - SOLO AQUÍ SE GUARDA
+    /**
+     * SUBMIT DEL FORMULARIO - ACTUALIZADO
+     * Solo envía los campos que están seleccionados
+     */
     const handleSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         
@@ -429,20 +472,26 @@ export const usePresupuestoForm = ({
         
         setState(prev => ({ ...prev, loading: true }));
 
+        const tieneTasa = state.tasaId && state.tasaId !== 0;
+        const tieneAbono = state.abonoId && state.abonoId !== 0;
+
         const data = {
             prefijo_id: state.prefijoId,
             lead_id: leadId,
             promocion_id: state.promocionId,
             cantidad_vehiculos: state.cantidadVehiculos,
             validez: state.diasValidez,
-            tasa_id: state.tasaId,
-            valor_tasa: valores.valorTasa,
-            tasa_bonificacion: state.tasaBonificacion,
-            tasa_metodo_pago_id: state.tasaMetodoPagoId,
-            abono_id: state.abonoId,
-            valor_abono: valores.valorAbono,
-            abono_bonificacion: state.abonoBonificacion,
-            abono_metodo_pago_id: state.abonoMetodoPagoId,
+            // Tasa - solo si está seleccionada
+            tasa_id: tieneTasa ? state.tasaId : null,
+            valor_tasa: tieneTasa ? valores.valorTasa : 0,
+            tasa_bonificacion: tieneTasa ? state.tasaBonificacion : 0,
+            tasa_metodo_pago_id: tieneTasa ? state.tasaMetodoPagoId : null,
+            // Abono - solo si está seleccionado
+            abono_id: tieneAbono ? state.abonoId : null,
+            valor_abono: tieneAbono ? valores.valorAbono : 0,
+            abono_bonificacion: tieneAbono ? state.abonoBonificacion : 0,
+            abono_metodo_pago_id: tieneAbono ? state.abonoMetodoPagoId : null,
+            // Agregados
             agregados: [
                 ...state.accesoriosAgregados.map(a => ({
                     prd_servicio_id: a.prd_servicio_id,
@@ -500,6 +549,8 @@ export const usePresupuestoForm = ({
         serviciosNormales,
         tasaPromocion,
         abonoPromocion,
+        tasaNombre,
+        abonoNombre,
         updateField,
         aplicarPromocion,
         isFieldDisabled,

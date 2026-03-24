@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
 use App\Services\Lead\LeadFilterService;
-use App\Traits\Authorizable; // 🔥 IMPORTAR TRAIT
+use App\Traits\Authorizable; 
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\EmpresaContacto;
@@ -13,19 +13,19 @@ use Illuminate\Support\Facades\DB;
 
 class ContactosController extends Controller
 {
-    use Authorizable; // 🔥 AGREGAR TRAIT
+    use Authorizable; 
 
     protected LeadFilterService $filterService;
 
     public function __construct(LeadFilterService $filterService)
     {
         $this->filterService = $filterService;
-        $this->initializeAuthorization(); // 🔥 INICIALIZAR
+        $this->initializeAuthorization(); 
     }
 
     public function index(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO
+       
         $this->authorizePermiso(config('permisos.VER_CONTACTOS'));
         
         $usuario = auth()->user();
@@ -35,7 +35,7 @@ class ContactosController extends Controller
             ->where('es_activo', 1)
             ->whereNull('deleted_at');
         
-        // 🔥 APLICAR FILTRO DE PREFIJOS usando el trait
+      
         // Para contactos, filtramos a través de las empresas
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
@@ -160,7 +160,7 @@ class ContactosController extends Controller
             ->whereNull('deleted_at')
             ->firstOrFail();
         
-        // 🔥 VERIFICAR ACCESO AL CONTACTO
+       
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
@@ -192,8 +192,8 @@ class ContactosController extends Controller
      */
     public function create()
     {
-        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
-        $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS')); // Necesitas definir este permiso
+        
+        $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
         
         $usuario = auth()->user();
         
@@ -229,7 +229,7 @@ class ContactosController extends Controller
      */
     public function store(Request $request)
     {
-        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
+        
         $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
         
         // Validar los datos del formulario
@@ -285,7 +285,6 @@ class ContactosController extends Controller
      */
     public function edit($id)
     {
-        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
         $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
         
         $usuario = auth()->user();
@@ -347,7 +346,7 @@ class ContactosController extends Controller
      */
     public function update(Request $request, $id)
     {
-        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
+       
         $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
         
         $contacto = EmpresaContacto::where('id', $id)
@@ -423,7 +422,7 @@ class ContactosController extends Controller
      */
     public function destroy($id)
     {
-        // 🔥 VERIFICAR PERMISO PARA GESTIONAR
+       
         $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
         
         $contacto = EmpresaContacto::where('id', $id)
