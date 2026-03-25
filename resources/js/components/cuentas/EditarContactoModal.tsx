@@ -56,7 +56,6 @@ export default function EditarContactoModal({
 
     useEffect(() => {
         if (contacto) {
-            console.log('Contacto a editar:', contacto);
             
             // Inicializar nombre de localidad si existe
             if (contacto.lead?.localidad) {

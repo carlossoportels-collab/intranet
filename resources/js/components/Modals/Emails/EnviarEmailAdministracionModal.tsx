@@ -350,7 +350,7 @@ export default function EnviarEmailAdministracionModal({
             mensajeGenericoRef.current = generarMensajeAdministracion();
             
             setFormData({
-                to: 'gfaure@localsat.com.ar',
+                to: 'gfaure@localsat.com.ar;pgomez@localsat.com.ar;informes@localsat.com.ar',
                 cc: comercialEmail,
                 bcc: '',
                 subject: `[ADMIN] Contrato ${contrato.numero_contrato || ''} - ${contrato.empresa_razon_social || ''}`,
@@ -537,20 +537,23 @@ export default function EnviarEmailAdministracionModal({
                         <form id="adminEmailForm" onSubmit={handleSubmit} className="space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div className="space-y-2">
-                                    <label htmlFor="to" className="block text-sm font-medium text-gray-700">
-                                        Para <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="email"
-                                        id="to"
-                                        name="to"
-                                        value={formData.to}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-purple-50"
-                                        readOnly
-                                    />
-                                </div>
+                                <label htmlFor="to" className="block text-sm font-medium text-gray-700">
+                                    Para <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="email"
+                                    id="to"
+                                    name="to"
+                                    value={formData.to}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full border border-gray-300 rounded-xl shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    placeholder="destinatario@email.com"
+                                />
+                                <p className="text-xs text-gray-500">
+                                    Puedes modificar el destinatario por defecto
+                                </p>
+                            </div>
 
                                 <div className="space-y-2">
                                     <label htmlFor="cc" className="block text-sm font-medium text-gray-700">

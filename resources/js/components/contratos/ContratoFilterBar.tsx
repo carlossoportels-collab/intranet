@@ -161,16 +161,9 @@ export const ContratoFilterBar: React.FC<Props> = ({
     const datePickerRef = useRef<HTMLDivElement>(null);
     const calendarDesdeRef = useRef<HTMLDivElement>(null);
     const calendarHastaRef = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-    console.log('🔍 DEBUG ContratoFilterBar:', {
-        usuarioEsComercial,
-        prefijoUsuario,
-        prefijoValue,
-        prefijosFiltro: prefijosFiltro.map(p => ({ id: p.id, display_text: p.display_text }))
-    });
-}, [usuarioEsComercial, prefijoUsuario, prefijoValue, prefijosFiltro]);
 
-    // 🔥 EFECTO CRÍTICO: Sincronizar el prefijoValue cuando el usuario es comercial
+
+    //  Sincronizar el prefijoValue cuando el usuario es comercial
     useEffect(() => {
         if (usuarioEsComercial && prefijoUsuario?.id) {
             // Si el usuario es comercial, forzar que el filtro use su prefijo

@@ -96,7 +96,6 @@ export default function DocumentoSelector({
             // IMPORTANTE: Para la API, enviamos la ruta relativa (sin la carpeta base)
             // Si relativePath está vacío, la API devolverá la raíz del usuario
             const url = `/comercial/documentacion/browse?path=${encodeURIComponent(relativePath)}`;
-            console.log('Cargando URL:', url); // Debug
             
             const response = await fetch(url, {
                 headers: {
@@ -110,7 +109,6 @@ export default function DocumentoSelector({
             }
             
             const data = await response.json();
-            console.log('Datos recibidos:', data); // Debug
             
             setFolderContents(prev => ({
                 ...prev,
@@ -118,7 +116,6 @@ export default function DocumentoSelector({
             }));
             
         } catch (error) {
-            console.error('Error cargando carpeta:', error);
             setError('Error al cargar el contenido de la carpeta');
         } finally {
             setLoading(false);
@@ -183,21 +180,23 @@ export default function DocumentoSelector({
     };
 
     const handleConfirm = () => {
-        const archivosSeleccionados = Object.keys(selected)
-            .filter(key => selected[key])
-            .map(path => {
-                // Buscar el archivo en todos los contenidos cargados
-                for (const content of Object.values(folderContents)) {
-                    const file = content.files.find(f => f.path === path);
-                    if (file) return file;
+    const archivosSeleccionados = Object.keys(selected)
+        .filter(key => selected[key])
+        .map(path => {
+            // Buscar el archivo en todos los contenidos cargados
+            for (const content of Object.values(folderContents)) {
+                const file = content.files.find(f => f.path === path);
+                if (file) {
+                    console.log('Archivo encontrado:', file);
+                    return file;
                 }
-                return null;
-            })
-            .filter(f => f !== null) as FileItem[];
-        
-        onSelect(archivosSeleccionados);
-        onClose();
-    };
+            }
+            return null;
+        })
+        .filter(f => f !== null) as FileItem[];
+    onSelect(archivosSeleccionados);
+    onClose();
+};
 
     // Obtener el contenido actual usando la ruta relativa como clave
     const cacheKey = currentRelativePath || 'root';

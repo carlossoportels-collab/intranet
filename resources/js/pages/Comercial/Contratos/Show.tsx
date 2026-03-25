@@ -34,9 +34,6 @@ export default function ContratoShow({ contrato }: Props) {
         vehiculos: false
     });
 
-    console.log('📦 Contrato completo:', contrato);
-    console.log('🔍 lead_es_cliente:', contrato.lead_es_cliente);
-
     const getEstadoColor = (estadoId?: number) => {
         switch(estadoId) {
             case 1: return 'green';

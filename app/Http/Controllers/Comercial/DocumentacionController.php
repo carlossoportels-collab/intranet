@@ -123,13 +123,13 @@ class DocumentacionController extends Controller
 
     public function download(Request $request)
     {
-    
         $this->authorizePermiso(config('permisos.VER_DOCUMENTACION'));
         
         $user = Auth::user();
         $isAdmin = !$user->comercial || $user->rol_id == 1;
         
         $filePath = $request->get('file');
+        $raw = $request->get('raw', false);
         
         if (!$filePath) {
             return response()->json(['error' => 'Archivo no especificado'], 400);
@@ -140,18 +140,24 @@ class DocumentacionController extends Controller
             return response()->json(['error' => 'Acceso no permitido'], 403);
         }
         
+        // Log para depuración
+        \Log::info('Descargando documento', [
+            'filePath' => $filePath,
+            'isAdmin' => $isAdmin,
+            'userId' => $user->id
+        ]);
+        
         // Para usuarios normales (con compañía)
         if (!$isAdmin) {
             $companiaId = $user->comercial?->compania_id;
             $userFolder = $this->getBasePathByCompany($companiaId);
             
-            // Construir la ruta completa dentro de la carpeta del usuario
-            $fullPath = $userFolder . '/' . $filePath;
-            
-            // Validar que la ruta esté dentro de la carpeta del usuario
-            if (!str_starts_with($fullPath, $userFolder)) {
+            // Verificar que la ruta comience con la carpeta del usuario
+            if (!str_starts_with($filePath, $userFolder)) {
                 return response()->json(['error' => 'Acceso no permitido'], 403);
             }
+            
+            $fullPath = $filePath;
         } 
         // Para admins
         else {
@@ -167,15 +173,29 @@ class DocumentacionController extends Controller
             $fullPath = $filePath;
         }
         
+        // Log de la ruta completa
+        \Log::info('Ruta completa para descarga', [
+            'fullPath' => $fullPath,
+            'exists' => Storage::disk('public')->exists($fullPath)
+        ]);
+        
         // Verificar que el archivo existe
         if (!Storage::disk('public')->exists($fullPath)) {
-            return response()->json(['error' => 'Archivo no encontrado'], 404);
+            return response()->json(['error' => 'Archivo no encontrado: ' . $fullPath], 404);
         }
         
-        // Obtener el nombre del archivo para la descarga
         $fileName = basename($fullPath);
         
-        // Descargar el archivo
+        // Si raw=1, devolver el archivo para leerlo
+        if ($raw == 1) {
+            $fileContent = Storage::disk('public')->get($fullPath);
+            $mimeType = Storage::disk('public')->mimeType($fullPath);
+            
+            return response($fileContent, 200)
+                ->header('Content-Type', $mimeType)
+                ->header('Content-Disposition', 'inline');
+        }
+        
         return Storage::disk('public')->download($fullPath, $fileName);
     }
 

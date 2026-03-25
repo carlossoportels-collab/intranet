@@ -462,6 +462,6 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     // API para envío de emails
         Route::post('/email/enviar-presupuesto', [App\Http\Controllers\Api\EmailController::class, 'enviarPresupuesto'])->name('email.enviar-presupuesto');
         Route::post('/email/enviar-contrato', [App\Http\Controllers\Api\EmailController::class, 'enviarContrato'])->name('email.enviar-contrato');
-
+       Route::post('/email/vista-previa-bienvenida', [App\Http\Controllers\Api\EmailController::class, 'vistaPreviaBienvenida'])->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 });
 

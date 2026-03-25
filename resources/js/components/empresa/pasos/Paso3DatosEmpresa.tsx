@@ -36,15 +36,12 @@ export default function Paso3DatosEmpresa({
 
     // Actualizar cuando cambian las props iniciales
     useEffect(() => {
-        console.log('Paso3DatosEmpresa - Props recibidas:', { localidadInicial, provinciaInicial });
         
         if (provinciaInicial) {
-            console.log('Seteando provinciaId a:', provinciaInicial);
             setProvinciaId(provinciaInicial);
         }
         
         if (localidadInicial) {
-            console.log('Seteando searchLocalidad a:', localidadInicial);
             setSearchLocalidad(localidadInicial);
         }
     }, [localidadInicial, provinciaInicial]);

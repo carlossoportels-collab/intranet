@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 
 import { useToast } from '@/contexts/ToastContext';
 import EnviarPresupuestoEmailModal from '@/components/Modals/Emails/EnviarPresupuestoEmailModal';
+import { sendWhatsApp, sendWhatsAppWithFile } from '@/utils/whatsapp.utils';
 
 interface Props {
     presupuestoId: number;
@@ -46,7 +47,29 @@ export const PresupuestoActions: React.FC<Props> = ({
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const toast = useToast();
 
-    // Función para generar PDF temporal
+    // Función para generar PDF temporal y obtener el blob
+    const generarPDFBlob = async (): Promise<Blob | null> => {
+        try {
+            const response = await fetch(`/comercial/presupuestos/${presupuestoId}/pdf?download=1`, {
+                method: 'GET',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'Accept': 'application/pdf'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error al generar PDF: ${response.status}`);
+            }
+            
+            return await response.blob();
+        } catch (error) {
+            console.error('Error generando PDF:', error);
+            return null;
+        }
+    };
+
+    // Función para generar PDF temporal (URL)
     const generarPDFTemporal = async (): Promise<string | null> => {
         return new Promise((resolve) => {
             router.post(`/comercial/presupuestos/${presupuestoId}/generar-pdf-temp`, {}, {
@@ -113,16 +136,23 @@ export const PresupuestoActions: React.FC<Props> = ({
         window.open(`/comercial/presupuestos/${presupuestoId}/pdf`, '_blank');
     };
 
-    const handleWhatsApp = async () => {
+    // WhatsApp solo texto - usando el servicio unificado
+    const handleWhatsApp = () => {
         if (!telefono || !mensajeWhatsApp) {
             toast.error('No se puede enviar el mensaje');
             return;
         }
 
-        window.open(`https://wa.me/${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensajeWhatsApp)}`, '_blank');
-        toast.success('Mensaje enviado');
+        try {
+            sendWhatsApp(telefono, mensajeWhatsApp);
+            toast.success('Abriendo WhatsApp...');
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('No se pudo abrir WhatsApp');
+        }
     };
 
+    // WhatsApp con PDF - usando el servicio unificado
     const handleWhatsAppConPDF = async () => {
         if (!telefono || !mensajeWhatsApp) {
             toast.error('No se puede enviar el mensaje');
@@ -133,40 +163,22 @@ export const PresupuestoActions: React.FC<Props> = ({
         toast.info('Preparando PDF...');
         
         try {
-            // Generar PDF temporal
-            const url = await generarPDFTemporal();
+            // Generar el PDF como blob
+            const pdfBlob = await generarPDFBlob();
             
-            if (!url) {
+            if (!pdfBlob) {
                 throw new Error('No se pudo generar el PDF');
             }
             
-            // Descargar el PDF generado
-            const pdfResponse = await fetch(url);
-            const pdfBlob = await pdfResponse.blob();
+            const filename = `Presupuesto_${referencia}.pdf`;
             
-            const file = new File([pdfBlob], `Presupuesto_${referencia}.pdf`, { type: 'application/pdf' });
+            // Usar el servicio unificado para enviar con archivo
+            const result = await sendWhatsAppWithFile(telefono, mensajeWhatsApp, pdfBlob, filename);
             
-            // Web Share API
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    title: `Presupuesto ${referencia}`,
-                    text: mensajeWhatsApp,
-                    files: [file]
-                });
-                toast.success('Archivo listo para compartir');
+            if (result.success) {
+                toast.success('PDF preparado y WhatsApp abierto');
             } else {
-                // Fallback: descargar y luego abrir WhatsApp
-                const downloadUrl = window.URL.createObjectURL(pdfBlob);
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = `Presupuesto_${referencia}.pdf`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(downloadUrl);
-                
-                window.open(`https://wa.me/${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensajeWhatsApp)}`, '_blank');
-                toast.success('PDF descargado y WhatsApp abierto');
+                toast.error(result.error || 'Error al procesar la solicitud');
             }
             
         } catch (error) {
@@ -182,7 +194,6 @@ export const PresupuestoActions: React.FC<Props> = ({
         toast.info('Preparando PDF para email...');
         
         try {
-            // Generar PDF temporal
             const url = await generarPDFTemporal();
             
             if (url) {
@@ -208,7 +219,7 @@ export const PresupuestoActions: React.FC<Props> = ({
                     <span className="hidden sm:inline">Editar</span>
                 </Link>
 
-                {/* Botón WhatsApp normal (solo texto) */}
+                {/* WhatsApp solo texto */}
                 {tieneTelefono && mensajeWhatsApp && telefono ? (
                     <button
                         onClick={handleWhatsApp}
@@ -239,7 +250,7 @@ export const PresupuestoActions: React.FC<Props> = ({
                     </button>
                 )}
 
-                {/* Botón WhatsApp con PDF (SIEMPRE VISIBLE si hay teléfono) */}
+                {/* WhatsApp con PDF */}
                 {tieneTelefono && mensajeWhatsApp && telefono && (
                     <button
                         onClick={handleWhatsAppConPDF}

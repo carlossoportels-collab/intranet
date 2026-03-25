@@ -25,7 +25,7 @@
         }
         .logo {
             max-height: 60px;
-            max-width: 200px;
+            max-width: 200px; 
         }
         .content {
             padding: 30px 20px;

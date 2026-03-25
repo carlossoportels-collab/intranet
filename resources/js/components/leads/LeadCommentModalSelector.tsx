@@ -53,17 +53,6 @@ export default function LeadCommentModalSelector({
     
     const modalType = getModalType();
     
-    // Para depuración
-    console.log('🔍 LeadCommentModalSelector:', {
-        modalType,
-        leadId: lead?.id,
-        leadNombre: lead?.nombre_completo,
-        estadoTipo: lead?.estado_lead?.tipo,
-        estadoNombre: lead?.estado_lead?.nombre,
-        tiposComentarioLength: tiposComentario.length,
-        tiposComentarioSeguimientoLength: tiposComentarioSeguimiento.length,
-        tieneSeguimiento: !!seguimiento
-    });
     
     // Modal para leads en recontacto o perdidos
     if (modalType === 'perdido') {
@@ -72,7 +61,6 @@ export default function LeadCommentModalSelector({
             ? tiposComentarioSeguimiento 
             : tiposComentario;
             
-        console.log('📋 Abriendo modal de seguimiento (perdido/recontacto) con tipos:', tiposParaModal.length);
         
         return (
             <SeguimientoLeadModal
@@ -89,7 +77,6 @@ export default function LeadCommentModalSelector({
     
     // Modal para clientes
     if (modalType === 'cliente') {
-        console.log('📋 Abriendo modal de cliente');
         return (
             <ClienteComentarioModal
                 isOpen={isOpen}

@@ -1,17 +1,12 @@
 // resources/js/components/Modals/Emails/EnviarContratoEmailModal.tsx
 
 import { router } from '@inertiajs/react';
-import { X, Send, Paperclip, Mail, FileText, CheckSquare, Eye, EyeOff, Files, Upload, Trash2, Gift, FileCheck } from 'lucide-react';
+import { X, Send, Mail, FileText, Files, Upload, Trash2, Gift, FileCheck, Eye } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 
 import { useToast } from '@/contexts/ToastContext';
 import DocumentoSelector from './DocumentoSelector';
 import VistaPreviaBienvenidaModal from './VistaPreviaBienvenidaModal';
-import { 
-    mensajeBienvenidaLocalsatAlpha, 
-    mensajeBienvenidaSmartSat, 
-    mensajeBienvenidaLocalsatDelta 
-} from './Mensajes/Bienvenida';
 
 interface FileItem {
     name: string;
@@ -73,7 +68,7 @@ export default function EnviarContratoEmailModal({
     // Guardar referencia al mensaje genérico para usarlo cuando se desmarca bienvenida
     const mensajeGenericoRef = useRef('');
 
-    // Generar mensaje genérico para cuando no hay bienvenida
+    // Generar mensaje genérico para cuando no hay bienvenida (texto plano)
     const generarMensajeGenerico = () => {
         const lineas: string[] = [];
         
@@ -94,53 +89,20 @@ export default function EnviarContratoEmailModal({
         return lineas.join('\n');
     };
 
-    // Determinar qué mensaje de bienvenida usar basado en compañía y plataforma
-    const generarMensajeBienvenida = () => {
-        if (companiaId === 2) {
-            return mensajeBienvenidaSmartSat(
-                contrato,
-                comercialNombre,
-                comercialEmail,
-                comercialTelefono || ''
-            );
-        }
-        
-        if (plataforma?.toUpperCase() === 'DELTA') {
-            return mensajeBienvenidaLocalsatDelta(
-                contrato,
-                comercialNombre,
-                comercialEmail,
-                comercialTelefono || ''
-            );
-        }
-        
-        return mensajeBienvenidaLocalsatAlpha(
-            contrato,
-            comercialNombre,
-            comercialEmail,
-            comercialTelefono || ''
-        );
-    };
-
     // Inicializar el formulario cuando se abre el modal
     useEffect(() => {
         if (isOpen && contrato) {
             const emailComercial = comercialEmail || contrato.vendedor_email || '';
             const nuevoIncluirBienvenida = !leadEsCliente;
             
-            // Guardar el mensaje genérico en la ref para usarlo después
             mensajeGenericoRef.current = generarMensajeGenerico();
-            
-            const mensajeInicial = nuevoIncluirBienvenida 
-                ? generarMensajeBienvenida() 
-                : mensajeGenericoRef.current;
             
             setFormData({
                 to: contrato.cliente_email || '',
                 cc: emailComercial,
                 bcc: '',
                 subject: `Contrato ${contrato.numero_contrato || ''} - ${companiaNombre}`,
-                body: mensajeInicial,
+                body: mensajeGenericoRef.current,
                 attachPDF: true,
                 incluirBienvenida: nuevoIncluirBienvenida
             });
@@ -151,26 +113,25 @@ export default function EnviarContratoEmailModal({
                 }
             }, 100);
         }
-    }, [isOpen, contrato, comercialEmail, companiaNombre, companiaId, plataforma, leadEsCliente]);
+    }, [isOpen, contrato, comercialEmail, companiaNombre, leadEsCliente]);
 
     // Efecto para cambiar el mensaje cuando se des/marca el checkbox
     useEffect(() => {
         if (isOpen) {
             if (!formData.incluirBienvenida) {
-                // Si se desmarcó bienvenida, poner el mensaje genérico SIEMPRE
                 setFormData(prev => ({
                     ...prev,
                     body: mensajeGenericoRef.current
                 }));
             } else {
-                // Si se marcó bienvenida, poner el mensaje de bienvenida
+                // Mensaje indicativo (el backend generará el HTML con la plantilla Blade)
                 setFormData(prev => ({
                     ...prev,
-                    body: generarMensajeBienvenida()
+                    body: `[Mensaje de bienvenida de ${companiaNombre} - ${plataforma}]\n\nEl mensaje se generará automáticamente en el servidor.`
                 }));
             }
         }
-    }, [formData.incluirBienvenida]);
+    }, [formData.incluirBienvenida, isOpen, companiaNombre, plataforma]);
 
     // Cargar el PDF
     useEffect(() => {
@@ -262,7 +223,17 @@ export default function EnviarContratoEmailModal({
                 numeroContrato: contrato.numero_contrato,
                 attachPDF: formData.attachPDF,
                 incluirBienvenida: formData.incluirBienvenida,
-                convertirACliente: !leadEsCliente && formData.incluirBienvenida
+                convertirACliente: !leadEsCliente && formData.incluirBienvenida,
+                // Datos para la bienvenida (el backend usará plantillas Blade)
+                bienvenidaData: formData.incluirBienvenida ? {
+                    companiaId: companiaId,
+                    plataforma: plataforma,
+                    nombreCliente: contrato.cliente_nombre_completo,
+                    nombreFlota: contrato.empresa_nombre_flota || contrato.cliente_nombre_completo,
+                    comercialNombre: comercialNombre,
+                    comercialEmail: comercialEmail,
+                    comercialTelefono: comercialTelefono
+                } : null
             };
 
             const formDataToSend = new FormData();
@@ -302,6 +273,10 @@ export default function EnviarContratoEmailModal({
             toast.error('Error al procesar la solicitud');
             setIsSubmitting(false);
         }
+    };
+
+    const handleVerVistaPrevia = async () => {
+        setShowVistaPrevia(true);
     };
 
     if (!isOpen || !contrato) return null;
@@ -490,7 +465,7 @@ export default function EnviarContratoEmailModal({
                                         {formData.incluirBienvenida && !leadEsCliente && (
                                             <button
                                                 type="button"
-                                                onClick={() => setShowVistaPrevia(true)}
+                                                onClick={handleVerVistaPrevia}
                                                 className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 rounded-lg text-sm text-green-700 hover:bg-green-50 transition-colors"
                                             >
                                                 <Eye className="h-4 w-4" />
@@ -647,8 +622,12 @@ export default function EnviarContratoEmailModal({
             <VistaPreviaBienvenidaModal
                 isOpen={showVistaPrevia}
                 onClose={() => setShowVistaPrevia(false)}
-                mensaje={formData.body}
+                contrato={contrato}
                 comercialNombre={comercialNombre}
+                comercialEmail={comercialEmail}
+                comercialTelefono={comercialTelefono}
+                companiaId={companiaId}
+                companiaNombre={companiaNombre}
                 plataforma={plataforma}
             />
         </>

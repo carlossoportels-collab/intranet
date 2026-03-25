@@ -82,7 +82,6 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
                     </div>
                 </aside>
 
-                {/* 🔥 MAIN CON ALTURA CALCULADA */}
                 <main 
                     className="flex-1 overflow-y-auto p-2"
                     style={{ height: `calc(100vh - ${headerHeight}px)` }}

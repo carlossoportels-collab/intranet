@@ -196,10 +196,6 @@ export default function CrearLeadModal({
         
     if (formData.prefijo_id) {
         const comercial = comerciales.find(c => c.prefijo_id.toString() === formData.prefijo_id);
-        // 🔥 AGREGAR ESTOS LOGS
-        console.log('🔍 [CrearLeadModal] Comercial encontrado:', comercial);
-        console.log('🔍 [CrearLeadModal] Teléfono del comercial:', comercial?.telefono);
-        console.log('🔍 [CrearLeadModal] Lista completa de comerciales:', comerciales);
         setComercialAsignado(comercial || null);
     }
         
