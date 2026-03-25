@@ -106,7 +106,43 @@ const handleOpenEmailOptions = async () => {
             [section]: !prev[section]
         }));
     };
+const getTipoOperacionBadge = () => {
+    const tipo = contrato?.tipo_operacion;
+    
+    switch(tipo) {
+        case 'venta_cliente':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
+        case 'alta_nueva':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
+        case 'cambio_titularidad':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
+        case 'cambio_razon_social':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
+        default:
+            return null;
+    }
+};
 
+// En el header, después del StatusBadge, agregar:
+<div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+        Contrato #{contrato.numero_contrato}
+    </h1>
+    <StatusBadge 
+        status={contrato.estado?.nombre || 'Sin estado'} 
+        color={getEstadoColor(contrato.estado_id)}
+    />
+    {getTipoOperacionBadge()}
+    {contrato.lead_es_cliente ? (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+            Cliente
+        </span>
+    ) : (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+            Lead
+        </span>
+    )}
+</div>
     return (
         <AppLayout title={`Contrato #${contrato.numero_contrato}`}>
             <Head title={`Contrato #${contrato.numero_contrato}`} />

@@ -65,13 +65,12 @@ export default function EnviarContratoEmailModal({
     const modalContentRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Guardar referencia al mensaje genérico para usarlo cuando se desmarca bienvenida
+    // Guardar referencia al mensaje genérico
     const mensajeGenericoRef = useRef('');
 
-    // Generar mensaje genérico para cuando no hay bienvenida (texto plano)
+    // Generar mensaje genérico
     const generarMensajeGenerico = () => {
         const lineas: string[] = [];
-        
         const nombreCliente = contrato?.cliente_nombre_completo || 'cliente';
         lineas.push(`Buenos días ${nombreCliente},`);
         lineas.push(``);
@@ -85,16 +84,14 @@ export default function EnviarContratoEmailModal({
         lineas.push(`${companiaNombre}`);
         lineas.push(`${comercialEmail}`);
         if (comercialTelefono) lineas.push(`Tel: ${comercialTelefono}`);
-        
         return lineas.join('\n');
     };
 
-    // Inicializar el formulario cuando se abre el modal
+    // Inicializar formulario
     useEffect(() => {
         if (isOpen && contrato) {
             const emailComercial = comercialEmail || contrato.vendedor_email || '';
             const nuevoIncluirBienvenida = !leadEsCliente;
-            
             mensajeGenericoRef.current = generarMensajeGenerico();
             
             setFormData({
@@ -115,25 +112,18 @@ export default function EnviarContratoEmailModal({
         }
     }, [isOpen, contrato, comercialEmail, companiaNombre, leadEsCliente]);
 
-    // Efecto para cambiar el mensaje cuando se des/marca el checkbox
+    // Cambiar mensaje según checkbox
     useEffect(() => {
         if (isOpen) {
             if (!formData.incluirBienvenida) {
-                setFormData(prev => ({
-                    ...prev,
-                    body: mensajeGenericoRef.current
-                }));
+                setFormData(prev => ({ ...prev, body: mensajeGenericoRef.current }));
             } else {
-                // Mensaje indicativo (el backend generará el HTML con la plantilla Blade)
-                setFormData(prev => ({
-                    ...prev,
-                    body: `[Mensaje de bienvenida de ${companiaNombre} - ${plataforma}]\n\nEl mensaje se generará automáticamente en el servidor.`
-                }));
+                setFormData(prev => ({ ...prev, body: `[Mensaje de bienvenida de ${companiaNombre} - ${plataforma}]\n\nEl mensaje se generará automáticamente en el servidor.` }));
             }
         }
     }, [formData.incluirBienvenida, isOpen, companiaNombre, plataforma]);
 
-    // Cargar el PDF
+    // Cargar PDF
     useEffect(() => {
         if (pdfUrl && !pdfLoaded && formData.attachPDF) {
             fetch(pdfUrl)
@@ -153,16 +143,11 @@ export default function EnviarContratoEmailModal({
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         const checked = (e.target as HTMLInputElement).checked;
-        
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }));
+        setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     };
 
     const handleDocumentosSeleccionados = async (archivos: FileItem[]) => {
         setDocumentosAdjuntos(prev => [...prev, ...archivos]);
-        
         const nuevosArchivos: File[] = [];
         for (const archivo of archivos) {
             try {
@@ -183,7 +168,6 @@ export default function EnviarContratoEmailModal({
         if (e.target.files) {
             const files = Array.from(e.target.files);
             setArchivosLocales(prev => [...prev, ...files]);
-            
             const nuevosItems: FileItem[] = files.map(file => ({
                 name: file.name,
                 path: file.name,
@@ -203,7 +187,6 @@ export default function EnviarContratoEmailModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
         if (!formData.to) {
             toast.error('El destinatario es requerido');
             return;
@@ -224,15 +207,14 @@ export default function EnviarContratoEmailModal({
                 attachPDF: formData.attachPDF,
                 incluirBienvenida: formData.incluirBienvenida,
                 convertirACliente: !leadEsCliente && formData.incluirBienvenida,
-                // Datos para la bienvenida (el backend usará plantillas Blade)
                 bienvenidaData: formData.incluirBienvenida ? {
-                    companiaId: companiaId,
-                    plataforma: plataforma,
+                    companiaId,
+                    plataforma,
                     nombreCliente: contrato.cliente_nombre_completo,
                     nombreFlota: contrato.empresa_nombre_flota || contrato.cliente_nombre_completo,
-                    comercialNombre: comercialNombre,
-                    comercialEmail: comercialEmail,
-                    comercialTelefono: comercialTelefono
+                    comercialNombre,
+                    comercialEmail,
+                    comercialTelefono
                 } : null
             };
 
@@ -260,13 +242,10 @@ export default function EnviarContratoEmailModal({
                     onClose();
                 },
                 onError: (errors: any) => {
-                    const errorMessage = errors?.error || 'Error al enviar el email';
-                    toast.error(errorMessage);
+                    toast.error(errors?.error || 'Error al enviar el email');
                     setIsSubmitting(false);
                 },
-                onFinish: () => {
-                    setIsSubmitting(false);
-                }
+                onFinish: () => setIsSubmitting(false)
             });
         } catch (error) {
             console.error('Error:', error);
@@ -275,9 +254,7 @@ export default function EnviarContratoEmailModal({
         }
     };
 
-    const handleVerVistaPrevia = async () => {
-        setShowVistaPrevia(true);
-    };
+    const handleVerVistaPrevia = () => setShowVistaPrevia(true);
 
     if (!isOpen || !contrato) return null;
 
@@ -285,32 +262,23 @@ export default function EnviarContratoEmailModal({
         <>
             <div className="fixed inset-0 bg-black/60 z-[99990]" onClick={onClose} />
             
-            <div className="fixed inset-0 flex items-center justify-center p-8 z-[99995] pointer-events-none">
+            <div className="fixed inset-0 flex items-center justify-center p-4 z-[99995] pointer-events-none">
                 <div 
-                    className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[85vh] pointer-events-auto border border-gray-100"
+                    className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] pointer-events-auto border border-gray-100"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="flex items-center justify-between p-8 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-gray-50 to-white rounded-t-2xl">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-blue-100 rounded-xl">
-                                <Mail className="h-6 w-6 text-blue-600" />
+                    {/* Header - Responsive */}
+                    <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-gray-50 to-white rounded-t-2xl">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                            <div className="p-2 sm:p-3 bg-blue-100 rounded-xl">
+                                <Mail className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-semibold text-gray-900">
+                                <h2 className="text-lg sm:text-2xl font-semibold text-gray-900">
                                     Enviar Contrato por Email
                                 </h2>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    Contrato #{contrato.numero_contrato} • {contrato.cliente_nombre_completo} • {companiaNombre} • {plataforma}
-                                    {!leadEsCliente && (
-                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                                            Lead
-                                        </span>
-                                    )}
-                                    {leadEsCliente && (
-                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                            Cliente
-                                        </span>
-                                    )}
+                                <p className="text-xs sm:text-sm text-gray-500 mt-1 line-clamp-1">
+                                    Contrato #{contrato.numero_contrato} • {contrato.cliente_nombre_completo?.split(' ')[0]}
                                 </p>
                             </div>
                         </div>
@@ -323,95 +291,84 @@ export default function EnviarContratoEmailModal({
                         </button>
                     </div>
 
-                    <div ref={modalContentRef} className="flex-1 overflow-y-auto p-8 space-y-6">
-                        <form id="contratoEmailForm" onSubmit={handleSubmit} className="space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Content - Scrollable con padding responsivo */}
+                    <div ref={modalContentRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+                        <form id="contratoEmailForm" onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                            {/* Campos principales - Stack en móvil, grid en desktop */}
+                            <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
                                 <div className="space-y-2">
-                                    <label htmlFor="to" className="block text-sm font-medium text-gray-700">
+                                    <label className="block text-sm font-medium text-gray-700">
                                         Para <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="email"
-                                        id="to"
                                         name="to"
                                         value={formData.to}
                                         onChange={handleChange}
                                         required
-                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-2.5 sm:py-3 px-3 sm:px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="cliente@email.com"
                                     />
                                 </div>
-
                                 <div className="space-y-2">
-                                    <label htmlFor="cc" className="block text-sm font-medium text-gray-700">
-                                        CC (copia)
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700">CC (copia)</label>
                                     <input
                                         type="text"
-                                        id="cc"
                                         name="cc"
                                         value={formData.cc}
                                         onChange={handleChange}
-                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-2.5 sm:py-3 px-3 sm:px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="comercial@empresa.com"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Múltiples emails separados por coma</p>
+                                    <p className="text-xs text-gray-500">Múltiples emails separados por coma</p>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
                                 <div className="space-y-2">
-                                    <label htmlFor="bcc" className="block text-sm font-medium text-gray-700">
-                                        CCO (copia oculta)
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700">CCO (copia oculta)</label>
                                     <input
                                         type="text"
-                                        id="bcc"
                                         name="bcc"
                                         value={formData.bcc}
                                         onChange={handleChange}
-                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-2.5 sm:py-3 px-3 sm:px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="otro@email.com"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Múltiples emails separados por coma</p>
+                                    <p className="text-xs text-gray-500">Múltiples emails separados por coma</p>
                                 </div>
-
                                 <div className="space-y-2">
-                                    <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
-                                        Asunto
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700">Asunto</label>
                                     <input
                                         type="text"
-                                        id="subject"
                                         name="subject"
                                         value={formData.subject}
                                         onChange={handleChange}
-                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-2.5 sm:py-3 px-3 sm:px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
                             </div>
 
-                            <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
+                            {/* Contrato a enviar */}
+                            <div className="bg-blue-50 p-4 sm:p-6 rounded-xl border border-blue-200">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
                                         <div className="p-2 bg-blue-100 rounded-lg">
-                                            <FileCheck className="h-6 w-6 text-blue-600" />
+                                            <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                                         </div>
                                         <div>
-                                            <h3 className="font-medium text-blue-900">Contrato a enviar</h3>
-                                            <p className="text-sm text-blue-700 mt-1">
-                                                Contrato #{contrato.numero_contrato} • {contrato.cliente_nombre_completo}
-                                            </p>
+                                            <h3 className="font-medium text-blue-900 text-sm sm:text-base">Contrato a enviar</h3>
+                                            <p className="text-xs sm:text-sm text-blue-700 mt-0.5">Contrato #{contrato.numero_contrato}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
                                         <input
                                             type="checkbox"
                                             id="attachPDF"
                                             name="attachPDF"
                                             checked={formData.attachPDF}
                                             onChange={handleChange}
-                                            className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                                         />
                                         <label htmlFor="attachPDF" className="text-sm font-medium text-gray-700">
                                             Adjuntar PDF
@@ -419,33 +376,32 @@ export default function EnviarContratoEmailModal({
                                     </div>
                                 </div>
                                 {formData.attachPDF && pdfFile && (
-                                    <div className="mt-4 pt-4 border-t border-blue-200 flex items-center gap-3 text-blue-800">
-                                        <FileText className="h-4 w-4" />
-                                        <span className="text-sm">
-                                            Contrato_{contrato.numero_contrato}.pdf ({(pdfFile.size / 1024).toFixed(2)} KB)
-                                        </span>
+                                    <div className="mt-3 pt-3 border-t border-blue-200 flex items-center gap-2 text-blue-800 text-xs sm:text-sm">
+                                        <FileText className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                        <span className="truncate">Contrato_{contrato.numero_contrato}.pdf ({(pdfFile.size / 1024).toFixed(2)} KB)</span>
                                     </div>
                                 )}
                             </div>
 
-                            <div className={`${!leadEsCliente ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'} p-6 rounded-xl border`}>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
+                            {/* Mensaje de bienvenida */}
+                            <div className={`${!leadEsCliente ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'} p-4 sm:p-6 rounded-xl border`}>
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
                                         <div className={`${!leadEsCliente ? 'bg-green-100' : 'bg-gray-200'} p-2 rounded-lg`}>
-                                            <Gift className={`h-6 w-6 ${!leadEsCliente ? 'text-green-600' : 'text-gray-500'}`} />
+                                            <Gift className={`h-5 w-5 ${!leadEsCliente ? 'text-green-600' : 'text-gray-500'}`} />
                                         </div>
                                         <div>
-                                            <h3 className={`font-medium ${!leadEsCliente ? 'text-green-900' : 'text-gray-600'}`}>
+                                            <h3 className={`font-medium text-sm sm:text-base ${!leadEsCliente ? 'text-green-900' : 'text-gray-600'}`}>
                                                 Mensaje de bienvenida
                                             </h3>
-                                            <p className={`text-sm ${!leadEsCliente ? 'text-green-700' : 'text-gray-500'} mt-1`}>
+                                            <p className="text-xs sm:text-sm mt-1 hidden sm:block">
                                                 {!leadEsCliente 
                                                     ? 'Recomendado para nuevos clientes. Incluye datos de acceso, guías y contacto del comercial'
                                                     : 'El cliente ya ha recibido el mensaje de bienvenida previamente'}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-3">
                                         <input
                                             type="checkbox"
                                             id="incluirBienvenida"
@@ -453,11 +409,7 @@ export default function EnviarContratoEmailModal({
                                             checked={formData.incluirBienvenida}
                                             onChange={handleChange}
                                             disabled={leadEsCliente}
-                                            className={`h-5 w-5 rounded border-gray-300 
-                                                ${!leadEsCliente 
-                                                    ? 'text-green-600 focus:ring-green-500' 
-                                                    : 'text-gray-400 cursor-not-allowed'
-                                                }`}
+                                            className={`h-4 w-4 rounded ${!leadEsCliente ? 'text-green-600 focus:ring-green-500' : 'text-gray-400 cursor-not-allowed'}`}
                                         />
                                         <label htmlFor="incluirBienvenida" className={`text-sm font-medium ${leadEsCliente ? 'text-gray-400' : 'text-gray-700'}`}>
                                             Incluir
@@ -466,76 +418,66 @@ export default function EnviarContratoEmailModal({
                                             <button
                                                 type="button"
                                                 onClick={handleVerVistaPrevia}
-                                                className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 rounded-lg text-sm text-green-700 hover:bg-green-50 transition-colors"
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-white border border-green-300 rounded-lg text-xs text-green-700 hover:bg-green-50"
                                             >
-                                                <Eye className="h-4 w-4" />
-                                                Vista previa
+                                                <Eye className="h-3 w-3" />
+                                                <span className="hidden sm:inline">Vista previa</span>
                                             </button>
                                         )}
                                     </div>
                                 </div>
-                                
-                                {leadEsCliente && !formData.incluirBienvenida && (
-                                    <p className="mt-3 text-xs text-gray-500 border-t border-gray-200 pt-3">
-                                        ℹ️ El mensaje de bienvenida solo está disponible para leads que aún no son clientes. 
-                                        Si necesitas reenviarlo, contacta a soporte.
-                                    </p>
-                                )}
+                                <p className="text-xs text-gray-500 mt-2 sm:hidden">
+                                    {!leadEsCliente 
+                                        ? 'Incluye datos de acceso, guías y contacto del comercial'
+                                        : 'El cliente ya ha recibido el mensaje de bienvenida'}
+                                </p>
                             </div>
 
-                            {/* Textarea editable SOLO cuando NO se incluye bienvenida */}
+                            {/* Textarea editable (solo cuando NO hay bienvenida) */}
                             {!formData.incluirBienvenida && (
                                 <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <label htmlFor="body" className="block text-sm font-medium text-gray-700">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                        <label className="text-sm font-medium text-gray-700">
                                             Mensaje para el cliente <span className="text-gray-400 text-xs">(puedes editarlo)</span>
                                         </label>
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    body: mensajeGenericoRef.current
-                                                }));
-                                            }}
-                                            className="text-xs text-blue-600 hover:text-blue-800"
+                                            onClick={() => setFormData(prev => ({ ...prev, body: mensajeGenericoRef.current }))}
+                                            className="text-xs text-blue-600 hover:text-blue-800 text-left sm:text-right"
                                         >
                                             Restaurar mensaje
                                         </button>
                                     </div>
                                     <textarea
-                                        id="body"
                                         name="body"
-                                        rows={10}
+                                        rows={8}
                                         value={formData.body}
                                         onChange={handleChange}
-                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                                        className="w-full border border-gray-300 rounded-xl shadow-sm py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                                         placeholder="Escribí tu mensaje aquí..."
                                     />
-                                    <p className="text-xs text-gray-500">
-                                        Este mensaje se enviará junto con el contrato adjunto.
-                                    </p>
                                 </div>
                             )}
 
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-4">
+                            {/* Documentación adicional */}
+                            <div className="space-y-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                                     <span className="text-sm font-medium text-gray-700">Documentación adicional:</span>
-                                    <div className="flex gap-3">
+                                    <div className="flex flex-wrap gap-2">
                                         <button
                                             type="button"
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs sm:text-sm text-gray-700 hover:bg-gray-50"
                                         >
-                                            <Upload className="h-4 w-4" />
+                                            <Upload className="h-3.5 w-3.5" />
                                             Subir archivos
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setShowDocumentSelector(true)}
-                                            className="flex items-center gap-2 px-4 py-2 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-700 hover:bg-purple-100 transition-colors"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs sm:text-sm text-purple-700 hover:bg-purple-100"
                                         >
-                                            <Files className="h-4 w-4" />
+                                            <Files className="h-3.5 w-3.5" />
                                             Buscar en biblioteca
                                         </button>
                                     </div>
@@ -549,27 +491,24 @@ export default function EnviarContratoEmailModal({
                                 </div>
 
                                 {documentosAdjuntos.length > 0 && (
-                                    <div className="bg-purple-50 p-5 rounded-xl border border-purple-200">
-                                        <p className="text-sm font-medium text-purple-800 mb-3">
+                                    <div className="bg-purple-50 p-3 sm:p-4 rounded-xl border border-purple-200">
+                                        <p className="text-xs sm:text-sm font-medium text-purple-800 mb-2">
                                             Archivos adjuntos ({documentosAdjuntos.length})
                                         </p>
-                                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        <div className="space-y-1.5 max-h-40 overflow-y-auto">
                                             {documentosAdjuntos.map((doc, index) => (
-                                                <div key={index} className="flex items-center justify-between gap-2 text-sm bg-white p-3 rounded-lg border border-purple-100 hover:border-purple-200 transition-colors">
-                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                        <FileText className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                                                <div key={index} className="flex items-center justify-between gap-2 text-xs sm:text-sm bg-white p-2 rounded-lg border border-purple-100">
+                                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                        <FileText className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
                                                         <span className="truncate text-purple-900">{doc.name}</span>
-                                                        {doc.size && (
-                                                            <span className="text-xs text-purple-500 flex-shrink-0">({doc.size})</span>
-                                                        )}
+                                                        {doc.size && <span className="text-xs text-purple-500 flex-shrink-0">({doc.size})</span>}
                                                     </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => removeAdjunto(index)}
-                                                        className="p-1.5 hover:bg-purple-100 rounded-lg text-purple-400 hover:text-purple-600 transition-colors"
-                                                        title="Eliminar"
+                                                        className="p-1 hover:bg-purple-100 rounded-lg text-purple-400 hover:text-purple-600"
                                                     >
-                                                        <Trash2 className="h-4 w-4" />
+                                                        <Trash2 className="h-3.5 w-3.5" />
                                                     </button>
                                                 </div>
                                             ))}
@@ -580,12 +519,13 @@ export default function EnviarContratoEmailModal({
                         </form>
                     </div>
 
-                    <div className="flex justify-end gap-3 p-8 border-t border-gray-200 flex-shrink-0 bg-gray-50 rounded-b-2xl">
+                    {/* Footer - Responsive */}
+                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 p-4 sm:p-6 border-t border-gray-200 flex-shrink-0 bg-gray-50 rounded-b-2xl">
                         <button
                             type="button"
                             onClick={onClose}
                             disabled={isSubmitting}
-                            className="px-6 py-3 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                            className="px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50 w-full sm:w-auto order-2 sm:order-1"
                         >
                             Cancelar
                         </button>
@@ -593,7 +533,7 @@ export default function EnviarContratoEmailModal({
                             type="submit"
                             form="contratoEmailForm"
                             disabled={isSubmitting}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto order-1 sm:order-2"
                         >
                             {isSubmitting ? (
                                 <>

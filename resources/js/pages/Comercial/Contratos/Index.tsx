@@ -1,6 +1,6 @@
 // resources/js/Pages/Comercial/Contratos/Index.tsx
 import { Link, router } from '@inertiajs/react';
-import { FileText, Calendar, User, Building, Truck, Eye, Download, Edit, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { FileText, Calendar, User, Building, Truck, Eye, Download, Edit, ChevronDown, ChevronUp, Filter, Tag } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { ContratoFilterBar } from '@/components/contratos/ContratoFilterBar';
@@ -19,6 +19,7 @@ interface Contrato {
     presupuesto_total_inversion: number;
     presupuesto_total_mensual: number;
     fecha_emision: string;
+    tipo_operacion?: string;
     estado?: {
         id: number;
         nombre: string;
@@ -71,7 +72,6 @@ export default function ContratosIndex({
     prefijoUsuario = null,
     estados = []
 }: Props) {
-    // 🔥 CAMBIADO: Usar la misma lógica que en Detalles.tsx
     const usuarioEsComercial = !usuario.ve_todas_cuentas;
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [expandedMobileCard, setExpandedMobileCard] = useState<number | null>(null);
@@ -84,11 +84,9 @@ export default function ContratosIndex({
             search: ''
         };
         
-        // Si el usuario es comercial, no mostrar filtro de prefijo
         if (!usuarioEsComercial) {
             initialFilters.prefijo_id = '';
         } else if (prefijoUsuario?.id) {
-            // Si es comercial, inicializar con su prefijo
             initialFilters.prefijo_id = prefijoUsuario.id;
         }
         
@@ -119,6 +117,22 @@ export default function ContratosIndex({
         }
     };
 
+    // Función para obtener el badge del tipo de operación
+    const getTipoOperacionBadge = (tipo?: string) => {
+        switch(tipo) {
+            case 'venta_cliente':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
+            case 'alta_nueva':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
+            case 'cambio_titularidad':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
+            case 'cambio_razon_social':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
+            default:
+                return null;
+        }
+    };
+
     const handlePageChange = (page: number) => {
         router.get('/comercial/contratos', { 
             page,
@@ -127,7 +141,6 @@ export default function ContratosIndex({
     };
 
     const handleFilterChange = (key: string, value: string) => {
-        // Si es comercial, no permitir cambiar el filtro de prefijo
         if (usuarioEsComercial && key === 'prefijo_id') return;
         
         const newFilters = { ...filters, [key]: value, page: 1 };
@@ -148,7 +161,6 @@ export default function ContratosIndex({
             search: ''
         };
         
-        // Si es comercial, mantener su prefijo
         if (usuarioEsComercial && prefijoUsuario?.id) {
             newFilters.prefijo_id = prefijoUsuario.id;
         } else if (!usuarioEsComercial) {
@@ -162,7 +174,6 @@ export default function ContratosIndex({
     const hayFiltrosActivos = () => {
         let hasFilters = filters.estado_id || filters.fecha_inicio || filters.fecha_fin || filters.search;
         
-        // Para no comerciales, verificar también prefijo_id
         if (!usuarioEsComercial && filters.prefijo_id) {
             hasFilters = true;
         }
@@ -201,7 +212,6 @@ export default function ContratosIndex({
                             </p>
                         </div>
                         
-                        {/* Mobile filter toggle */}
                         <button
                             type="button"
                             onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -303,7 +313,7 @@ export default function ContratosIndex({
                                             Total
                                         </th>
                                         <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Estado
+                                            Tipo
                                         </th>
                                         <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Acciones
@@ -332,10 +342,9 @@ export default function ContratosIndex({
                                                 <Amount value={totalPrimerMes(contrato)} />
                                             </td>
                                             <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
-                                                <StatusBadge 
-                                                    status={getEstadoNombre(contrato.estado?.id)} 
-                                                    color={getEstadoColor(contrato.estado?.id)}
-                                                />
+                                                {getTipoOperacionBadge(contrato.tipo_operacion) || (
+                                                    <span className="text-xs text-gray-400">No especificado</span>
+                                                )}
                                             </td>
                                             <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-gray-500">
                                                 <div className="flex items-center gap-2">
@@ -375,15 +384,11 @@ export default function ContratosIndex({
                                     {/* Cabecera de la tarjeta */}
                                     <div className="flex items-start justify-between mb-2">
                                         <div>
-                                            <div className="flex items-center gap-2 mb-1">
+                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                 <span className="text-sm font-medium text-gray-900">
                                                     #{contrato.numero_contrato}
                                                 </span>
-                                                <StatusBadge 
-                                                    status={getEstadoNombre(contrato.estado?.id)} 
-                                                    color={getEstadoColor(contrato.estado?.id)}
-                                                    size="sm"
-                                                />
+                                                {getTipoOperacionBadge(contrato.tipo_operacion)}
                                             </div>
                                             <p className="text-sm text-gray-600 font-medium">
                                                 {contrato.cliente_nombre_completo}
@@ -469,6 +474,7 @@ export default function ContratosIndex({
                                     lastPage={contratos.last_page}
                                     total={contratos.total}
                                     perPage={contratos.per_page}
+                                    onPageChange={handlePageChange}
                                 />
                             </div>
                         )}

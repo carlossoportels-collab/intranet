@@ -115,7 +115,6 @@ export default function AltaEmpresaModal({
             document.body.style.overflow = 'hidden';
             cargarDatosIniciales();
             
-            // Si hay paso inicial, configurar los pasos completados
             if (pasoInicial > 1) {
                 setPaso1Completado(true);
             }
@@ -140,7 +139,6 @@ export default function AltaEmpresaModal({
     // Cargar datos del lead cuando se abre el modal
     useEffect(() => {
         if (isOpen && lead) {
-            // Cargar datos del lead
             setFormData(prev => ({
                 ...prev,
                 lead: {
@@ -154,7 +152,6 @@ export default function AltaEmpresaModal({
                 }
             }));
 
-            // Si el lead tiene empresa, cargar datos de empresa y contacto
             if ((lead as any).empresa_contacto) {
                 const empresaContacto = (lead as any).empresa_contacto;
                 const empresa = empresaContacto?.empresa;
@@ -239,7 +236,6 @@ export default function AltaEmpresaModal({
         setErrores({});
     };
 
-    // Cargar datos iniciales
     const cargarDatosIniciales = async () => {
         setCargandoDatos(true);
         
@@ -266,53 +262,166 @@ export default function AltaEmpresaModal({
         }
     };
 
-    // Validar paso actual
+    /**
+     * VALIDACIÓN MEJORADA DE CADA PASO
+     */
     const validarPaso = (paso: number): boolean => {
         const nuevosErrores: Record<string, string> = {};
 
         if (paso === 1) {
             const { lead } = formData;
-            if (!lead.nombre_completo) nuevosErrores['lead.nombre_completo'] = 'El nombre es requerido';
-            if (!lead.telefono) nuevosErrores['lead.telefono'] = 'El teléfono es requerido';
-            if (!lead.email) nuevosErrores['lead.email'] = 'El email es requerido';
-            if (lead.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email)) {
-                nuevosErrores['lead.email'] = 'Email inválido';
+            
+            if (!lead.nombre_completo || lead.nombre_completo.trim() === '') {
+                nuevosErrores['lead.nombre_completo'] = 'El nombre es requerido';
+            } else if (lead.nombre_completo.trim().length < 3) {
+                nuevosErrores['lead.nombre_completo'] = 'El nombre debe tener al menos 3 caracteres';
             }
-            if (!lead.genero) nuevosErrores['lead.genero'] = 'El género es requerido';
-            if (!lead.localidad_id) nuevosErrores['lead.localidad_id'] = 'La localidad es requerida';
-            if (!lead.rubro_id) nuevosErrores['lead.rubro_id'] = 'El rubro es requerido';
-            if (!lead.origen_id) nuevosErrores['lead.origen_id'] = 'El origen es requerido';
+            
+            if (!lead.telefono || lead.telefono.trim() === '') {
+                nuevosErrores['lead.telefono'] = 'El teléfono es requerido';
+            } else {
+                const telefonoLimpio = lead.telefono.replace(/\D/g, '');
+                if (telefonoLimpio.length < 8) {
+                    nuevosErrores['lead.telefono'] = 'El teléfono debe tener al menos 8 dígitos';
+                }
+            }
+            
+            if (!lead.email || lead.email.trim() === '') {
+                nuevosErrores['lead.email'] = 'El email es requerido';
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email)) {
+                nuevosErrores['lead.email'] = 'Email inválido (ej: nombre@dominio.com)';
+            }
+            
+            if (!lead.genero) {
+                nuevosErrores['lead.genero'] = 'El género es requerido';
+            }
+            
+            if (!lead.localidad_id ) {
+                nuevosErrores['lead.localidad_id'] = 'La localidad es requerida (seleccione una de la lista)';
+            }
+            
+            if (!lead.rubro_id ) {
+                nuevosErrores['lead.rubro_id'] = 'El rubro es requerido';
+            }
+            
+            if (!lead.origen_id ) {
+                nuevosErrores['lead.origen_id'] = 'El origen de contacto es requerido';
+            }
         }
 
         if (paso === 2) {
             const { contacto } = formData;
-            if (!contacto.tipo_responsabilidad_id) nuevosErrores['contacto.tipo_responsabilidad_id'] = 'Seleccione tipo de responsabilidad';
-            if (!contacto.tipo_documento_id) nuevosErrores['contacto.tipo_documento_id'] = 'Seleccione tipo de documento';
-            if (!contacto.nro_documento) nuevosErrores['contacto.nro_documento'] = 'Ingrese número de documento';
-            if (!contacto.nacionalidad_id) nuevosErrores['contacto.nacionalidad_id'] = 'Seleccione nacionalidad';
-            if (!contacto.fecha_nacimiento) nuevosErrores['contacto.fecha_nacimiento'] = 'Ingrese fecha de nacimiento';
-            if (!contacto.direccion_personal) nuevosErrores['contacto.direccion_personal'] = 'Ingrese dirección personal';
-            if (!contacto.codigo_postal_personal) nuevosErrores['contacto.codigo_postal_personal'] = 'Ingrese código postal';
+            
+            if (!contacto.tipo_responsabilidad_id) {
+                nuevosErrores['contacto.tipo_responsabilidad_id'] = 'Seleccione tipo de responsabilidad';
+            }
+            
+            if (!contacto.tipo_documento_id) {
+                nuevosErrores['contacto.tipo_documento_id'] = 'Seleccione tipo de documento';
+            }
+            
+            if (!contacto.nro_documento || contacto.nro_documento.trim() === '') {
+                nuevosErrores['contacto.nro_documento'] = 'Ingrese número de documento';
+            } else if (contacto.nro_documento.trim().length < 7) {
+                nuevosErrores['contacto.nro_documento'] = 'El número de documento debe tener al menos 7 caracteres';
+            }
+            
+            if (!contacto.nacionalidad_id) {
+                nuevosErrores['contacto.nacionalidad_id'] = 'Seleccione nacionalidad';
+            }
+            
+            if (!contacto.fecha_nacimiento) {
+                nuevosErrores['contacto.fecha_nacimiento'] = 'Ingrese fecha de nacimiento';
+            } else {
+                const fechaNacimiento = new Date(contacto.fecha_nacimiento);
+                const hoy = new Date();
+                let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+                const mesDiff = hoy.getMonth() - fechaNacimiento.getMonth();
+                
+                if (isNaN(fechaNacimiento.getTime())) {
+                    nuevosErrores['contacto.fecha_nacimiento'] = 'Fecha inválida';
+                } else if (edad < 18 || (edad === 18 && mesDiff < 0)) {
+                    nuevosErrores['contacto.fecha_nacimiento'] = 'Debe ser mayor de 18 años';
+                }
+            }
+            
+            if (!contacto.direccion_personal || contacto.direccion_personal.trim() === '') {
+                nuevosErrores['contacto.direccion_personal'] = 'Ingrese dirección personal';
+            }
+            
+            if (!contacto.codigo_postal_personal || contacto.codigo_postal_personal.trim() === '') {
+                nuevosErrores['contacto.codigo_postal_personal'] = 'Ingrese código postal';
+            }
         }
 
         if (paso === 3) {
             const { empresa } = formData;
-            if (!empresa.nombre_fantasia) nuevosErrores['empresa.nombre_fantasia'] = 'Ingrese nombre de fantasía';
-            if (!empresa.razon_social) nuevosErrores['empresa.razon_social'] = 'Ingrese razón social';
-            if (!empresa.cuit) nuevosErrores['empresa.cuit'] = 'Ingrese CUIT';
-            if (!empresa.direccion_fiscal) nuevosErrores['empresa.direccion_fiscal'] = 'Ingrese dirección fiscal';
-            if (!empresa.codigo_postal_fiscal) nuevosErrores['empresa.codigo_postal_fiscal'] = 'Ingrese código postal fiscal';
-            if (!empresa.localidad_fiscal_id) nuevosErrores['empresa.localidad_fiscal_id'] = 'Seleccione localidad fiscal';
-            if (!empresa.telefono_fiscal) nuevosErrores['empresa.telefono_fiscal'] = 'Ingrese teléfono fiscal';
-            if (!empresa.email_fiscal) nuevosErrores['empresa.email_fiscal'] = 'Ingrese email fiscal';
-            if (!empresa.rubro_id) nuevosErrores['empresa.rubro_id'] = 'Seleccione rubro';
-            if (!empresa.cat_fiscal_id) nuevosErrores['empresa.cat_fiscal_id'] = 'Seleccione categoría fiscal';
-            if (!empresa.plataforma_id) nuevosErrores['empresa.plataforma_id'] = 'Seleccione plataforma';
-            if (!empresa.nombre_flota) nuevosErrores['empresa.nombre_flota'] = 'Ingrese nombre de flota';
+            
+            if (!empresa.nombre_fantasia || empresa.nombre_fantasia.trim() === '') {
+                nuevosErrores['empresa.nombre_fantasia'] = 'Ingrese nombre de fantasía';
+            }
+            
+            if (!empresa.razon_social || empresa.razon_social.trim() === '') {
+                nuevosErrores['empresa.razon_social'] = 'Ingrese razón social';
+            }
+            
+            if (!empresa.cuit || empresa.cuit.trim() === '') {
+                nuevosErrores['empresa.cuit'] = 'Ingrese CUIT';
+            } else {
+                const cuitLimpio = empresa.cuit.replace(/\D/g, '');
+                if (cuitLimpio.length !== 11) {
+                    nuevosErrores['empresa.cuit'] = 'CUIT debe tener 11 dígitos';
+                }
+            }
+            
+            if (!empresa.direccion_fiscal || empresa.direccion_fiscal.trim() === '') {
+                nuevosErrores['empresa.direccion_fiscal'] = 'Ingrese dirección fiscal';
+            }
+            
+            if (!empresa.codigo_postal_fiscal || empresa.codigo_postal_fiscal.trim() === '') {
+                nuevosErrores['empresa.codigo_postal_fiscal'] = 'Ingrese código postal fiscal';
+            }
+            
+            if (!empresa.localidad_fiscal_id ) {
+                nuevosErrores['empresa.localidad_fiscal_id'] = 'Seleccione localidad fiscal';
+            }
+            
+            if (!empresa.telefono_fiscal || empresa.telefono_fiscal.trim() === '') {
+                nuevosErrores['empresa.telefono_fiscal'] = 'Ingrese teléfono fiscal';
+            }
+            
+            if (!empresa.email_fiscal || empresa.email_fiscal.trim() === '') {
+                nuevosErrores['empresa.email_fiscal'] = 'Ingrese email fiscal';
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(empresa.email_fiscal)) {
+                nuevosErrores['empresa.email_fiscal'] = 'Email inválido';
+            }
+            
+            if (!empresa.rubro_id) {
+                nuevosErrores['empresa.rubro_id'] = 'Seleccione rubro';
+            }
+            
+            if (!empresa.cat_fiscal_id ) {
+                nuevosErrores['empresa.cat_fiscal_id'] = 'Seleccione categoría fiscal';
+            }
+            
+            if (!empresa.plataforma_id) {
+                nuevosErrores['empresa.plataforma_id'] = 'Seleccione plataforma';
+            }
+            
+            if (!empresa.nombre_flota || empresa.nombre_flota.trim() === '') {
+                nuevosErrores['empresa.nombre_flota'] = 'Ingrese nombre de flota';
+            }
         }
 
         setErrores(nuevosErrores);
-        return Object.keys(nuevosErrores).length === 0;
+        
+        if (Object.keys(nuevosErrores).length > 0) {
+            const primerError = Object.values(nuevosErrores)[0];
+            toast.error(primerError);
+            return false;
+        }
+        
+        return true;
     };
 
     const handleSubmitPaso1 = () => {
@@ -333,8 +442,13 @@ export default function AltaEmpresaModal({
             },
             onError: (errors) => {
                 console.error('Errores paso 1:', errors);
-                setErrores(errors);
-                toast.error('Error al actualizar lead');
+                const backendErrors: Record<string, string> = {};
+                Object.keys(errors).forEach(key => {
+                    backendErrors[`lead.${key}`] = errors[key];
+                });
+                setErrores(backendErrors);
+                const primerError = Object.values(backendErrors)[0];
+                toast.error(primerError || 'Error al actualizar lead');
                 setIsSubmitting(false);
             }
         });
@@ -358,8 +472,13 @@ export default function AltaEmpresaModal({
             },
             onError: (errors) => {
                 console.error('Errores paso 2:', errors);
-                setErrores(errors);
-                toast.error('Error al guardar datos personales');
+                const backendErrors: Record<string, string> = {};
+                Object.keys(errors).forEach(key => {
+                    backendErrors[`contacto.${key}`] = errors[key];
+                });
+                setErrores(backendErrors);
+                const primerError = Object.values(backendErrors)[0];
+                toast.error(primerError || 'Error al guardar datos personales');
                 setIsSubmitting(false);
             }
         });
@@ -380,10 +499,8 @@ export default function AltaEmpresaModal({
                 toast.success('Empresa creada exitosamente');
                 setIsSubmitting(false);
                 
-                // Si estamos en modo completar para cliente, después de guardar vamos a la página de contrato
                 if (modoCompletar && esCliente && presupuestoId) {
                     toast.success('Datos guardados. Complete los vehículos para generar el contrato');
-                    // Cerramos el modal y le decimos que vaya a la página de contrato
                     onClose(false, true);
                 } else {
                     onClose(true);
@@ -391,18 +508,25 @@ export default function AltaEmpresaModal({
             },
             onError: (errors) => {
                 console.error('Errores paso 3:', errors);
-                setErrores(errors);
-                toast.error('Error al crear empresa');
+                const backendErrors: Record<string, string> = {};
+                Object.keys(errors).forEach(key => {
+                    backendErrors[`empresa.${key}`] = errors[key];
+                });
+                setErrores(backendErrors);
+                const primerError = Object.values(backendErrors)[0];
+                toast.error(primerError || 'Error al crear empresa');
                 setIsSubmitting(false);
             }
         });
     };
 
     const handleSiguiente = () => {
-        if (pasoActual === 1) {
-            handleSubmitPaso1();
-        } else if (pasoActual === 2) {
-            handleSubmitPaso2();
+        if (validarPaso(pasoActual)) {
+            if (pasoActual === 1) {
+                handleSubmitPaso1();
+            } else if (pasoActual === 2) {
+                handleSubmitPaso2();
+            }
         }
     };
 
@@ -466,7 +590,6 @@ export default function AltaEmpresaModal({
     };
 
     const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        // Solo cerrar si el click fue en el overlay, no en el contenido
         if (e.target === e.currentTarget) {
             onClose(false);
         }
@@ -474,7 +597,6 @@ export default function AltaEmpresaModal({
 
     if (!isMounted && !isOpen) return null;
 
-    // Determinar el título según el modo
     const titulo = modoCompletar 
         ? 'Completar datos para contrato' 
         : 'Alta de Empresa';
@@ -578,7 +700,7 @@ export default function AltaEmpresaModal({
                                         onChange={handleChangeLead}
                                         errores={errores}
                                         localidadInicial={lead?.localidad?.nombre || ''}
-                                        provinciaInicial={lead?.localidad?.provincia_id || ''}
+                                        provinciaInicial={lead?.localidad?.provincia_id ? String(lead.localidad.provincia_id) : ''}
                                     />
                                 )}
                                 

@@ -25,12 +25,13 @@ class Contrato extends Model
     protected $keyType = 'int';
     
     protected $fillable = [
-        'id', // ← Agregado para permitir asignación manual
+        'id',
         'presupuesto_id',
         'lead_id',
         'empresa_id',
         'fecha_emision',
         'estado_id',
+        'tipo_operacion',           // ← AGREGADO
         'vendedor_nombre',
         'vendedor_prefijo',
         'cliente_nombre_completo',
@@ -86,7 +87,8 @@ class Contrato extends Model
         'presupuesto_total_mensual' => 'decimal:2',
         'activo' => 'boolean',
         'created' => 'datetime',
-        'modified' => 'datetime'
+        'modified' => 'datetime',
+        'tipo_operacion' => 'string',          // ← AGREGADO
     ];
     
     /**
@@ -183,5 +185,19 @@ class Contrato extends Model
     public function getNumeroContratoAttribute(): string
     {
         return str_pad($this->id, 8, '0', STR_PAD_LEFT);
+    }
+    
+    /**
+     * Accessor para obtener el tipo de operación en español
+     */
+    public function getTipoOperacionTextoAttribute(): string
+    {
+        return match($this->tipo_operacion) {
+            'venta_cliente' => 'Venta a Cliente',
+            'alta_nueva' => 'Alta Nueva',
+            'cambio_titularidad' => 'Cambio de Titularidad',
+            'cambio_razon_social' => 'Cambio de Razón Social',
+            default => 'No especificado'
+        };
     }
 }

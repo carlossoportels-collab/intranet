@@ -14,9 +14,9 @@ class AdminVehiculo extends Model
     protected $fillable = [
         'ab_alta',
         'ab_inicio',
-        'codigoalfa',        // Completo: BA-1007
-        'prefijo_codigo',    // Nuevo: BA
-        'numero_alfa',       // Nuevo: 1007
+        'codigoalfa',        
+        'prefijo_codigo',   
+        'numero_alfa',    
         'nombre_mix',
         'razonsoc',
         'avl_identificador',
@@ -25,7 +25,7 @@ class AdminVehiculo extends Model
         'avl_modelo',
         'avl_anio',
         'avl_color',
-        'empresa_id'         // FK a admin_empresas.id
+        'empresa_id'         
     ];
     
     protected $casts = [

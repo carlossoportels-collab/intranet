@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Empresa extends Model
 {
@@ -73,14 +74,34 @@ class Empresa extends Model
         return $this->belongsTo(Plataforma::class, 'plataforma_id');
     }
     
+    /**
+     * Relación con vehículos (AdminVehiculo)
+     * Los vehículos están vinculados a través de admin_empresas
+     */
     public function vehiculos(): HasMany
     {
-        return $this->hasMany(Vehiculo::class);
+        // Primero obtener admin_empresa relacionada, luego los vehículos
+        return $this->hasMany(AdminVehiculo::class, 'empresa_id', 'id')
+            ->whereHas('adminEmpresa', function($q) {
+                $q->where('codigoalf2', $this->numeroalfa);
+            });
     }
     
+    /**
+     * Relación con vehículos a través de admin_empresas (más directa)
+     */
+    public function adminVehiculos(): HasMany
+    {
+        return $this->hasMany(AdminVehiculo::class, 'empresa_id');
+    }
+    
+    /**
+     * Relación con vehículos para obtener abonos
+     */
     public function vehiculosConAbonos(): HasMany
     {
-        return $this->hasMany(Vehiculo::class)->with(['abonosActivos']);
+        return $this->hasMany(AdminVehiculo::class, 'empresa_id')
+            ->with(['abonos']);
     }
     
     public function contactos(): HasMany
@@ -137,7 +158,7 @@ class Empresa extends Model
         return $this->nombre_fantasia ?? $this->razon_social ?? 'Sin nombre';
     }
 
-        /**
+    /**
      * Responsables de la empresa
      */
     public function responsables(): HasMany
@@ -156,13 +177,24 @@ class Empresa extends Model
 
     public function cambiosRazonSocial()
     {
-    return $this->hasMany(CambioRazonSocial::class, 'empresa_id');
+        return $this->hasMany(CambioRazonSocial::class, 'empresa_id');
     }
+    
     /**
      * Relación con admin_empresas a través de numeroalfa
      */
-    public function adminEmpresa()
+    public function adminEmpresa(): HasOne
     {
         return $this->hasOne(AdminEmpresa::class, 'codigoalf2', 'numeroalfa');
     }
+
+    /**
+     * Accessor para mantener compatibilidad con código antiguo
+     * Si se accede a $empresa->vehiculos, devuelve admin_vehiculos
+     */
+    public function getVehiculosAttribute()
+    {
+        return $this->adminVehiculos;
+    }
+
 }

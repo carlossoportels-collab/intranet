@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Empresa;
 use App\Models\AdminVehiculo;
+use App\Models\AdminEmpresa;
 use App\Models\CambioTitularidad;
 use App\Models\OrigenContacto;
 use App\Models\Rubro;
@@ -45,7 +46,7 @@ class CambioTitularidadController extends Controller
         // ============================================
         // 1. OBTENER VEHÍCULOS CON FILTROS DE PERMISOS
         // ============================================
-        $vehiculosQuery = AdminVehiculo::with('empresaSistema')
+        $vehiculosQuery = AdminVehiculo::with(['empresaSistema'])
             ->whereHas('empresaSistema', function($query) use ($usuario, $prefijosPermitidos) {
                 if (!$usuario->ve_todas_cuentas) {
                     if (!empty($prefijosPermitidos)) {
@@ -72,7 +73,7 @@ class CambioTitularidadController extends Controller
             
             $vehiculosPorEmpresa[$empresaId][] = [
                 'id' => $vehiculo->id,
-                'codigo_alfa' => $vehiculo->codigoalfa ?? $vehiculo->codigo_completo,
+                'codigo_alfa' => $vehiculo->codigo_completo,
                 'avl_patente' => $vehiculo->avl_patente ?? '',
                 'avl_marca' => $vehiculo->avl_marca ?? '',
                 'avl_modelo' => $vehiculo->avl_modelo ?? '',
@@ -192,7 +193,6 @@ class CambioTitularidadController extends Controller
             'prefijos' => $prefijosPermitidos,
         ];
 
-        // 🔥 IMPORTANTE: AGREGAR EL RETURN DE LA VISTA
         return Inertia::render('Comercial/Cuentas/CambioTitularidad', [
             'vehiculos' => $vehiculosPorEmpresa,
             'empresas' => $empresas,
@@ -209,138 +209,248 @@ class CambioTitularidadController extends Controller
         ]);
     }
 
-    /**
-     * Guardar cambio de titularidad (SIMPLE)
-     */
-    public function store(Request $request)
-    {
-        $this->authorizePermiso(config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
+/**
+ * Guardar cambio de titularidad
+ */
+public function store(Request $request)
+{
+    $this->authorizePermiso(config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
+    
+    $request->validate([
+        'tipo_operacion' => 'required|in:entre_empresas,nueva_empresa',
+        'empresa_origen_id' => 'required|exists:empresas,id',
+        'vehiculos' => 'required|array|min:1',
+        'vehiculos.*' => 'exists:admin_vehiculos,id',
+        'empresa_destino_id' => 'required_if:tipo_operacion,entre_empresas|nullable|exists:empresas,id',
         
-        $request->validate([
-            'tipo_operacion' => 'required|in:entre_empresas,nueva_empresa',
-            'empresa_origen_id' => 'required|exists:empresas,id',
-            'vehiculos' => 'required|array|min:1',
-            'vehiculos.*' => 'exists:admin_vehiculos,id', // 🔥 CAMBIADO: validar en admin_vehiculos
-            'empresa_destino_id' => 'required_if:tipo_operacion,entre_empresas|nullable|exists:empresas,id',
-            
-            // Solo para nueva empresa
-            'nombre_fantasia' => 'required_if:tipo_operacion,nueva_empresa|nullable|string|max:200',
-            'razon_social' => 'required_if:tipo_operacion,nueva_empresa|nullable|string|max:200',
-            'cuit' => 'required_if:tipo_operacion,nueva_empresa|nullable|string|max:13',
-        ]);
+        // Solo para nueva empresa
+        'nombre_fantasia' => 'required_if:tipo_operacion,nueva_empresa|nullable|string|max:200',
+        'razon_social' => 'required_if:tipo_operacion,nueva_empresa|nullable|string|max:200',
+        'cuit' => 'required_if:tipo_operacion,nueva_empresa|nullable|string|max:13',
+    ]);
 
-        $usuario = Auth::user();
-        $prefijosPermitidos = $this->getPrefijosPermitidos();
+    $usuario = Auth::user();
+    $prefijosPermitidos = $this->getPrefijosPermitidos();
+    
+    // LOG DE DEPURACIÓN
+    Log::info('CambioTitularidad - Inicio', [
+        'request' => $request->all(),
+        'usuario_id' => $usuario->id,
+        'vehiculos_solicitados' => $request->vehiculos
+    ]);
+    
+    DB::beginTransaction();
+    
+    try {
+        // ============================================
+        // VALIDAR EMPRESA ORIGEN
+        // ============================================
+        $empresaOrigen = Empresa::find($request->empresa_origen_id);
+        if (!$empresaOrigen) {
+            throw new \Exception('Empresa origen no encontrada');
+        }
         
-        DB::beginTransaction();
+        Log::info('Empresa origen encontrada', [
+            'empresa_id' => $empresaOrigen->id,
+            'empresa_nombre' => $empresaOrigen->nombre_fantasia,
+            'numeroalfa' => $empresaOrigen->numeroalfa
+        ]);
         
-        try {
-            // ============================================
-            // VALIDAR EMPRESA ORIGEN
-            // ============================================
-            $empresaOrigen = Empresa::find($request->empresa_origen_id);
-            if (!$empresaOrigen) {
-                throw new \Exception('Empresa origen no encontrada');
+        if (!$usuario->ve_todas_cuentas) {
+            if (empty($prefijosPermitidos) || !in_array($empresaOrigen->prefijo_id, $prefijosPermitidos)) {
+                throw new \Exception('No tiene permisos para ver esta empresa origen');
             }
+        }
+        
+        // ============================================
+        // OBTENER ADMIN_EMPRESA DE LA EMPRESA ORIGEN
+        // ============================================
+        $adminEmpresaOrigen = AdminEmpresa::where('codigoalf2', $empresaOrigen->numeroalfa)->first();
+        
+        Log::info('AdminEmpresa origen', [
+            'codigoalf2' => $empresaOrigen->numeroalfa,
+            'admin_empresa_encontrada' => $adminEmpresaOrigen ? $adminEmpresaOrigen->id : 'NO ENCONTRADA'
+        ]);
+        
+        if (!$adminEmpresaOrigen) {
+            throw new \Exception('No se encontró el registro de la empresa en admin_empresas');
+        }
+        
+        // ============================================
+        // VALIDAR VEHÍCULOS - BUSCAR POR admin_empresa_id
+        // ============================================
+        $vehiculos = AdminVehiculo::whereIn('id', $request->vehiculos)
+            ->where('empresa_id', $adminEmpresaOrigen->id)
+            ->get();
+        
+        Log::info('Vehículos encontrados', [
+            'admin_empresa_id' => $adminEmpresaOrigen->id,
+            'vehiculos_encontrados' => $vehiculos->pluck('id')->toArray(),
+            'vehiculos_solicitados' => $request->vehiculos,
+            'cantidad_encontrados' => $vehiculos->count()
+        ]);
+        
+        if ($vehiculos->isEmpty()) {
+            // Mostrar vehículos disponibles para depuración
+            $vehiculosDisponibles = AdminVehiculo::where('empresa_id', $adminEmpresaOrigen->id)
+                ->limit(10)
+                ->get(['id', 'codigoalfa', 'avl_patente'])
+                ->toArray();
+            
+            Log::warning('No se encontraron vehículos', [
+                'admin_empresa_id' => $adminEmpresaOrigen->id,
+                'vehiculos_disponibles' => $vehiculosDisponibles
+            ]);
+            
+            throw new \Exception('No se encontraron los vehículos seleccionados para esta empresa. Verifique que los vehículos pertenezcan a la empresa origen.');
+        }
+        
+        // Verificar que se encontraron todos los vehículos solicitados
+        if ($vehiculos->count() != count($request->vehiculos)) {
+            $encontrados = $vehiculos->pluck('id')->toArray();
+            $faltantes = array_diff($request->vehiculos, $encontrados);
+            
+            // Obtener información de los vehículos faltantes
+            $vehiculosFaltantes = AdminVehiculo::whereIn('id', $faltantes)
+                ->get(['id', 'codigoalfa', 'avl_patente', 'empresa_id'])
+                ->toArray();
+            
+            Log::warning('Vehículos faltantes', [
+                'faltantes' => $faltantes,
+                'info_faltantes' => $vehiculosFaltantes
+            ]);
+            
+            throw new \Exception('Algunos vehículos no pertenecen a esta empresa: ' . implode(', ', $faltantes));
+        }
+
+        // ============================================
+        // DETERMINAR EMPRESA DESTINO
+        // ============================================
+        $empresaDestinoId = null;
+        $empresaDestino = null;
+        
+        if ($request->tipo_operacion === 'entre_empresas') {
+            // Empresa existente
+            $empresaDestino = Empresa::findOrFail($request->empresa_destino_id);
             
             if (!$usuario->ve_todas_cuentas) {
-                if (empty($prefijosPermitidos) || !in_array($empresaOrigen->prefijo_id, $prefijosPermitidos)) {
-                    throw new \Exception('No tiene permisos para ver esta empresa origen');
+                if (empty($prefijosPermitidos) || !in_array($empresaDestino->prefijo_id, $prefijosPermitidos)) {
+                    throw new \Exception('No tiene permisos para ver esta empresa destino');
                 }
             }
             
-            // ============================================
-            // VALIDAR VEHÍCULOS (USANDO ADMIN_VEHICULO)
-            // ============================================
-            $vehiculos = AdminVehiculo::whereIn('id', $request->vehiculos)
-                ->where('empresa_id', $empresaOrigen->id)
-                ->get();
+            $empresaDestinoId = $empresaDestino->id;
             
-            if ($vehiculos->isEmpty()) {
-                throw new \Exception('No se encontraron los vehículos seleccionados');
-            }
-
-            // ============================================
-            // DETERMINAR EMPRESA DESTINO
-            // ============================================
-            $empresaDestinoId = null;
+            Log::info('Empresa destino existente', [
+                'empresa_id' => $empresaDestino->id,
+                'numeroalfa' => $empresaDestino->numeroalfa
+            ]);
             
-            if ($request->tipo_operacion === 'entre_empresas') {
-                // Empresa existente
-                $empresaDestino = Empresa::findOrFail($request->empresa_destino_id);
-                
-                if (!$usuario->ve_todas_cuentas) {
-                    if (empty($prefijosPermitidos) || !in_array($empresaDestino->prefijo_id, $prefijosPermitidos)) {
-                        throw new \Exception('No tiene permisos para ver esta empresa destino');
-                    }
-                }
-                
-                $empresaDestinoId = $empresaDestino->id;
-                
-            } else {
-                // Crear empresa mínima
-                $prefijoPorDefecto = !empty($prefijosPermitidos) ? $prefijosPermitidos[0] : 1;
-                
-                $empresaDestino = Empresa::create([
-                    'nombre_fantasia' => $request->nombre_fantasia,
-                    'razon_social' => $request->razon_social,
-                    'cuit' => $request->cuit,
-                    'prefijo_id' => $prefijoPorDefecto,
-                    'numeroalfa' => $this->generarNumeroAlfa(),
-                    'es_activo' => 1,
-                    'created_by' => $usuario->id,
-                    'created' => now(),
-                ]);
-                
-                $empresaDestinoId = $empresaDestino->id;
-            }
-
-            // ============================================
-            // ACTUALIZAR VEHÍCULOS A NUEVA EMPRESA (USANDO ADMIN_VEHICULO)
-            // ============================================
-            foreach ($vehiculos as $vehiculo) {
-                $vehiculo->empresa_id = $empresaDestinoId;
-                $vehiculo->save();
-            }
-
-            // ============================================
-            // REGISTRAR EN HISTORIAL
-            // ============================================
-            $vehiculosData = $vehiculos->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'codigo_alfa' => $v->codigoalfa ?? $v->codigo_completo,
-                    'patente' => $v->avl_patente,
-                    'marca' => $v->avl_marca,
-                    'modelo' => $v->avl_modelo,
-                    'anio' => $v->avl_anio,
-                    'color' => $v->avl_color,
-                ];
-            })->toArray();
-
-            $cambio = CambioTitularidad::create([
-                'empresa_origen_id' => $empresaOrigen->id,
-                'empresa_destino_id' => $empresaDestinoId,
-                'vehiculos' => json_encode($vehiculosData),
-                'fecha_cambio' => now(),
-                'usuario_id' => $usuario->id,
-                'observaciones' => "Cambio de titularidad de {$vehiculos->count()} vehículo(s)",
+        } else {
+            // Crear empresa mínima
+            $prefijoPorDefecto = !empty($prefijosPermitidos) ? $prefijosPermitidos[0] : 1;
+            
+            $empresaDestino = Empresa::create([
+                'nombre_fantasia' => $request->nombre_fantasia,
+                'razon_social' => $request->razon_social,
+                'cuit' => $request->cuit,
+                'prefijo_id' => $prefijoPorDefecto,
+                'numeroalfa' => $this->generarNumeroAlfa(),
+                'es_activo' => 1,
+                'created_by' => $usuario->id,
+                'created' => now(),
             ]);
-
-            DB::commit();
-
-            return redirect()->route('comercial.contratos.desde-empresa', ['empresaId' => $empresaDestinoId])
-                ->with('success', 'Cambio de titularidad registrado. Ahora complete el contrato.');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error al registrar cambio de titularidad: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'usuario_id' => $usuario->id,
+            
+            $empresaDestinoId = $empresaDestino->id;
+            
+            Log::info('Nueva empresa creada', [
+                'empresa_id' => $empresaDestino->id,
+                'numeroalfa' => $empresaDestino->numeroalfa
             ]);
-            return back()->withErrors(['error' => 'Error al registrar el cambio: ' . $e->getMessage()]);
         }
+
+        // ============================================
+        // OBTENER/CREAR ADMIN_EMPRESA DESTINO
+        // ============================================
+        $adminEmpresaDestino = AdminEmpresa::where('codigoalf2', $empresaDestino->numeroalfa)->first();
+        
+        if (!$adminEmpresaDestino) {
+            $adminEmpresaDestino = AdminEmpresa::create([
+                'codigoalf2' => $empresaDestino->numeroalfa,
+                'nombre_fantasia' => $empresaDestino->nombre_fantasia,
+                'razon_social' => $empresaDestino->razon_social,
+                'cuit' => $empresaDestino->cuit,
+                'es_activo' => 1,
+            ]);
+            
+            Log::info('AdminEmpresa destino creada', [
+                'admin_empresa_id' => $adminEmpresaDestino->id
+            ]);
+        } else {
+            Log::info('AdminEmpresa destino encontrada', [
+                'admin_empresa_id' => $adminEmpresaDestino->id
+            ]);
+        }
+
+        // ============================================
+        // ACTUALIZAR VEHÍCULOS A NUEVA EMPRESA
+        // ============================================
+        $vehiculosActualizados = [];
+        foreach ($vehiculos as $vehiculo) {
+            // Guardar datos antes de actualizar
+            $vehiculosActualizados[] = [
+                'id' => $vehiculo->id,
+                'codigo_alfa' => $vehiculo->codigo_completo,
+                'patente' => $vehiculo->avl_patente,
+                'marca' => $vehiculo->avl_marca,
+                'modelo' => $vehiculo->avl_modelo,
+                'anio' => $vehiculo->avl_anio,
+                'color' => $vehiculo->avl_color,
+                'identificador' => $vehiculo->avl_identificador,
+            ];
+            
+            // Actualizar empresa_id en admin_vehiculos al ID de admin_empresa destino
+            $vehiculo->empresa_id = $adminEmpresaDestino->id;
+            $vehiculo->save();
+        }
+        
+        Log::info('Vehículos actualizados', [
+            'vehiculos_actualizados' => count($vehiculosActualizados)
+        ]);
+
+        // ============================================
+        // REGISTRAR EN HISTORIAL
+        // ============================================
+        $cambio = CambioTitularidad::create([
+            'empresa_origen_id' => $empresaOrigen->id,
+            'empresa_destino_id' => $empresaDestinoId,
+            'vehiculos' => json_encode($vehiculosActualizados),
+            'fecha_cambio' => now(),
+            'usuario_id' => $usuario->id,
+            'observaciones' => "Cambio de titularidad de " . count($vehiculos) . " vehículo(s)",
+        ]);
+
+        DB::commit();
+
+        Log::info('Cambio de titularidad registrado exitosamente', [
+            'cambio_id' => $cambio->id,
+            'vehiculos' => count($vehiculos)
+        ]);
+
+        // Redirigir a creación de contrato con la empresa destino
+        return redirect()->route('comercial.contratos.desde-empresa', ['empresaId' => $empresaDestinoId])
+            ->with('success', 'Cambio de titularidad registrado. Ahora complete el contrato.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error al registrar cambio de titularidad: ' . $e->getMessage(), [
+            'trace' => $e->getTraceAsString(),
+            'usuario_id' => $usuario->id,
+            'request' => $request->all()
+        ]);
+        return back()->withErrors(['error' => 'Error al registrar el cambio: ' . $e->getMessage()]);
     }
+}
 
     /**
      * Obtener detalles de un cambio específico
@@ -396,7 +506,7 @@ class CambioTitularidadController extends Controller
     }
 
     /**
-     * Obtener vehículos de una empresa (USANDO ADMIN_VEHICULO)
+     * Obtener vehículos de una empresa
      */
     public function getVehiculosEmpresa($id)
     {
@@ -414,19 +524,27 @@ class CambioTitularidadController extends Controller
             }
         }
         
-        $vehiculos = AdminVehiculo::where('empresa_id', $id) // 🔥 CAMBIADO: usar AdminVehiculo
+        // Obtener admin_empresa relacionada
+        $adminEmpresa = AdminEmpresa::where('codigoalf2', $empresa->numeroalfa)->first();
+        
+        if (!$adminEmpresa) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+        
+        $vehiculos = AdminVehiculo::where('empresa_id', $adminEmpresa->id)
             ->orderBy('codigoalfa')
             ->get()
             ->map(function ($vehiculo) {
                 return [
                     'id' => $vehiculo->id,
-                    'codigo_alfa' => $vehiculo->codigoalfa ?? $vehiculo->codigo_completo,
+                    'codigo_alfa' => $vehiculo->codigo_completo,
                     'avl_patente' => $vehiculo->avl_patente,
                     'avl_marca' => $vehiculo->avl_marca,
                     'avl_modelo' => $vehiculo->avl_modelo,
                     'avl_anio' => $vehiculo->avl_anio,
                     'avl_color' => $vehiculo->avl_color,
                     'nombre_mix' => $vehiculo->nombre_mix,
+                    'identificador' => $vehiculo->avl_identificador,
                 ];
             });
 

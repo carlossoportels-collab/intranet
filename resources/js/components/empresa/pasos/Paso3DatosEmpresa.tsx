@@ -14,7 +14,7 @@ interface Props {
     onChange: (field: string, value: any) => void;
     errores: Record<string, string>;
     localidadInicial?: string;
-    provinciaInicial?: number | string;
+    provinciaInicial?: string | number;
 }
 
 export default function Paso3DatosEmpresa({
@@ -32,13 +32,12 @@ export default function Paso3DatosEmpresa({
     const [showLocalidadesDropdown, setShowLocalidadesDropdown] = useState(false);
     const [searching, setSearching] = useState(false);
     const [localidadesResult, setLocalidadesResult] = useState<Localidad[]>([]);
-    const [provinciaId, setProvinciaId] = useState<number | string>(provinciaInicial);
+    const [provinciaId, setProvinciaId] = useState<string>(provinciaInicial ? String(provinciaInicial) : '');
 
     // Actualizar cuando cambian las props iniciales
     useEffect(() => {
-        
         if (provinciaInicial) {
-            setProvinciaId(provinciaInicial);
+            setProvinciaId(String(provinciaInicial));
         }
         
         if (localidadInicial) {
@@ -54,7 +53,7 @@ export default function Paso3DatosEmpresa({
             try {
                 const params = new URLSearchParams({
                     search: value,
-                    ...(provinciaId && { provincia_id: provinciaId.toString() })
+                    ...(provinciaId && { provincia_id: provinciaId })
                 });
                 
                 const response = await fetch(`/comercial/localidades/buscar?${params}`);
@@ -63,7 +62,7 @@ export default function Paso3DatosEmpresa({
                 if (result.success) {
                     const localidadesTransformadas = result.data.map((item: any) => ({
                         id: item.id,
-                        nombre: item.nombre || item.localidad, // ← Cambiado a 'nombre'
+                        nombre: item.nombre || item.localidad,
                         provincia_id: item.provincia_id,
                         provincia: item.provincia,
                         codigo_postal: item.codigo_postal,
@@ -84,14 +83,14 @@ export default function Paso3DatosEmpresa({
 
     const handleSelectLocalidad = (localidad: Localidad) => {
         onChange('localidad_fiscal_id', localidad.id);
-        setSearchLocalidad(localidad.nombre); // ← Cambiado a 'nombre'
-        setProvinciaId(localidad.provincia_id || '');
+        setSearchLocalidad(localidad.nombre);
+        setProvinciaId(String(localidad.provincia_id || ''));
         setShowLocalidadesDropdown(false);
         setLocalidadesResult([]);
     };
 
     const handleProvinciaChange = (value: string) => {
-        setProvinciaId(value ? Number(value) : '');
+        setProvinciaId(value);
         onChange('localidad_fiscal_id', '');
         setSearchLocalidad('');
         setLocalidadesResult([]);
@@ -302,8 +301,8 @@ export default function Paso3DatosEmpresa({
                 >
                     <option value="">Seleccionar provincia</option>
                     {provincias.map((provincia) => (
-                        <option key={provincia.id} value={provincia.id}>
-                            {provincia.nombre} {/* ← Cambiado de 'provincia' a 'nombre' */}
+                        <option key={provincia.id} value={String(provincia.id)}>
+                            {provincia.nombre}
                         </option>
                     ))}
                 </select>
@@ -339,7 +338,7 @@ export default function Paso3DatosEmpresa({
                                     onClick={() => handleSelectLocalidad(localidad)}
                                     className="w-full text-left px-4 py-2 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 border-b border-gray-100 last:border-b-0"
                                 >
-                                    <div className="font-medium">{localidad.nombre}</div> {/* ← Cambiado a 'nombre' */}
+                                    <div className="font-medium">{localidad.nombre}</div>
                                     <div className="text-sm text-gray-600">{localidad.provincia}</div>
                                 </button>
                             ))}
