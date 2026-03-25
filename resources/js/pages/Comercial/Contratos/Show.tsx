@@ -388,10 +388,6 @@ const getTipoOperacionBadge = () => {
                             <p className="text-xs sm:text-sm text-green-600 mb-1">Costo Mensual</p>
                             <Amount value={contrato.presupuesto_total_mensual} className="text-base sm:text-lg lg:text-xl font-bold text-green-700" />
                         </div>
-                        <div className="bg-orange-50 p-3 sm:p-4 rounded-lg border border-orange-200 sm:col-span-2 lg:col-span-1">
-                            <p className="text-xs sm:text-sm text-orange-600 mb-1">Total Primer Mes</p>
-                            <Amount value={Number(contrato.presupuesto_total_inversion) + Number(contrato.presupuesto_total_mensual)} className="text-base sm:text-lg lg:text-xl font-bold text-orange-700" />
-                        </div>
                     </div>
                 </DataCard>
 

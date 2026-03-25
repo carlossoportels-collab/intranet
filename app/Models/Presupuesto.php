@@ -136,6 +136,11 @@ class Presupuesto extends Model
         );
     }
 
+    public function createdBy()
+{
+    return $this->belongsTo(Usuario::class, 'created_by');
+}
+
 public function getNombreComercialAttribute()
 {
     if (!$this->prefijo_id) {

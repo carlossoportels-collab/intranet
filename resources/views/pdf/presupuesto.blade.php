@@ -434,22 +434,22 @@
 
     <!-- TOTALES -->
     <div class="totals">
-        <div class="total-line">
+        <div class="total-line grand-total">
             <span class="total-label">Inversión Inicial:</span>
             <span class="total-value">{{ $formatMoney($inversionInicial) }}</span>
         </div>
-        <div class="total-line">
+        <div class="total-line grand-total">
             <span class="total-label">Costo Mensual:</span>
             <span class="total-value">{{ $formatMoney($costoMensual) }}</span>
         </div>
         <div class="divider"></div>
-        <div class="total-line grand-total">
+         <!--  <div class="total-line grand-total">
             <span class="total-label">TOTAL PRIMER MES:</span>
             <span class="total-value">{{ $formatMoney($totalPrimerMes) }}</span>
         </div>
         <div class="note">
             * Costo mensual desde el 2° mes: {{ $formatMoney($costoMensual) }}
-        </div>
+        </div> -->
     </div>
 
     <!-- TÉRMINOS Y CONDICIONES -->

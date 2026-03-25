@@ -12,10 +12,7 @@ import {
     TipoDocumento, 
     Nacionalidad,
     CategoriaFiscal, 
-    Plataforma,
-    Paso1Response,
-    Paso2Response,
-    Paso3Response
+    Plataforma
 } from '@/types/empresa';
 import { Lead, Origen, Rubro, Provincia } from '@/types/leads';
 
@@ -34,6 +31,10 @@ interface Props {
     pasoInicial?: number;
     esCliente?: boolean;
     modoCompletar?: boolean;
+    datosExistentes?: {
+        empresa?: any;
+        contacto?: any;
+    };
 }
 
 const PASOS = [
@@ -52,7 +53,8 @@ export default function AltaEmpresaModal({
     provincias = [],
     pasoInicial = 1,
     esCliente = false,
-    modoCompletar = false
+    modoCompletar = false,
+    datosExistentes
 }: Props) {
     const [isMounted, setIsMounted] = useState(false);
     const [pasoActual, setPasoActual] = useState(pasoInicial);
@@ -136,14 +138,15 @@ export default function AltaEmpresaModal({
         };
     }, [isOpen, pasoInicial]);
 
-    // Cargar datos del lead cuando se abre el modal
+    // Cargar datos del lead y datos existentes cuando se abre el modal
     useEffect(() => {
         if (isOpen && lead) {
+            // Cargar datos del lead
             setFormData(prev => ({
                 ...prev,
                 lead: {
                     nombre_completo: lead.nombre_completo || '',
-                    genero: (lead.genero || 'no_especifica') as 'masculino' | 'femenino' | 'otro' | 'no_especifica',
+                    genero: (lead.genero || 'no_especifica') as any,
                     telefono: lead.telefono || '',
                     email: lead.email || '',
                     localidad_id: lead.localidad_id || '',
@@ -152,47 +155,45 @@ export default function AltaEmpresaModal({
                 }
             }));
 
-            if ((lead as any).empresa_contacto) {
-                const empresaContacto = (lead as any).empresa_contacto;
-                const empresa = empresaContacto?.empresa;
-                
-                if (empresa) {
+            // Cargar datos existentes de empresa y contacto
+            if (datosExistentes) {
+                if (datosExistentes.empresa) {
                     setFormData(prev => ({
                         ...prev,
                         empresa: {
-                            nombre_fantasia: empresa.nombre_fantasia || '',
-                            razon_social: empresa.razon_social || '',
-                            cuit: empresa.cuit || '',
-                            direccion_fiscal: empresa.direccion_fiscal || '',
-                            codigo_postal_fiscal: empresa.codigo_postal_fiscal || '',
-                            localidad_fiscal_id: empresa.localidad_fiscal_id || '',
-                            telefono_fiscal: empresa.telefono_fiscal || '',
-                            email_fiscal: empresa.email_fiscal || '',
-                            rubro_id: empresa.rubro_id || '',
-                            cat_fiscal_id: empresa.cat_fiscal_id || '',
-                            plataforma_id: empresa.plataforma_id || '',
-                            nombre_flota: empresa.nombre_flota || '',
+                            nombre_fantasia: datosExistentes.empresa.nombre_fantasia || '',
+                            razon_social: datosExistentes.empresa.razon_social || '',
+                            cuit: datosExistentes.empresa.cuit || '',
+                            direccion_fiscal: datosExistentes.empresa.direccion_fiscal || '',
+                            codigo_postal_fiscal: datosExistentes.empresa.codigo_postal_fiscal || '',
+                            localidad_fiscal_id: datosExistentes.empresa.localidad_fiscal_id || '',
+                            telefono_fiscal: datosExistentes.empresa.telefono_fiscal || '',
+                            email_fiscal: datosExistentes.empresa.email_fiscal || '',
+                            rubro_id: datosExistentes.empresa.rubro_id || '',
+                            cat_fiscal_id: datosExistentes.empresa.cat_fiscal_id || '',
+                            plataforma_id: datosExistentes.empresa.plataforma_id || '',
+                            nombre_flota: datosExistentes.empresa.nombre_flota || '',
                         }
                     }));
                 }
-
-                if (empresaContacto) {
+                
+                if (datosExistentes.contacto) {
                     setFormData(prev => ({
                         ...prev,
                         contacto: {
-                            tipo_responsabilidad_id: empresaContacto.tipo_responsabilidad_id || '',
-                            tipo_documento_id: empresaContacto.tipo_documento_id || '',
-                            nro_documento: empresaContacto.nro_documento || '',
-                            nacionalidad_id: empresaContacto.nacionalidad_id || '',
-                            fecha_nacimiento: empresaContacto.fecha_nacimiento || '',
-                            direccion_personal: empresaContacto.direccion_personal || '',
-                            codigo_postal_personal: empresaContacto.codigo_postal_personal || '',
+                            tipo_responsabilidad_id: datosExistentes.contacto.tipo_responsabilidad_id || '',
+                            tipo_documento_id: datosExistentes.contacto.tipo_documento_id || '',
+                            nro_documento: datosExistentes.contacto.nro_documento || '',
+                            nacionalidad_id: datosExistentes.contacto.nacionalidad_id || '',
+                            fecha_nacimiento: datosExistentes.contacto.fecha_nacimiento || '',
+                            direccion_personal: datosExistentes.contacto.direccion_personal || '',
+                            codigo_postal_personal: datosExistentes.contacto.codigo_postal_personal || '',
                         }
                     }));
                 }
             }
         }
-    }, [isOpen, lead]);
+    }, [isOpen, lead, datosExistentes]);
 
     const resetForm = () => {
         setPasoActual(1);
@@ -262,9 +263,6 @@ export default function AltaEmpresaModal({
         }
     };
 
-    /**
-     * VALIDACIÓN MEJORADA DE CADA PASO
-     */
     const validarPaso = (paso: number): boolean => {
         const nuevosErrores: Record<string, string> = {};
 
@@ -304,7 +302,7 @@ export default function AltaEmpresaModal({
                 nuevosErrores['lead.rubro_id'] = 'El rubro es requerido';
             }
             
-            if (!lead.origen_id ) {
+            if (!lead.origen_id) {
                 nuevosErrores['lead.origen_id'] = 'El origen de contacto es requerido';
             }
         }
@@ -312,11 +310,11 @@ export default function AltaEmpresaModal({
         if (paso === 2) {
             const { contacto } = formData;
             
-            if (!contacto.tipo_responsabilidad_id) {
+            if (!contacto.tipo_responsabilidad_id ) {
                 nuevosErrores['contacto.tipo_responsabilidad_id'] = 'Seleccione tipo de responsabilidad';
             }
             
-            if (!contacto.tipo_documento_id) {
+            if (!contacto.tipo_documento_id ) {
                 nuevosErrores['contacto.tipo_documento_id'] = 'Seleccione tipo de documento';
             }
             
@@ -326,7 +324,7 @@ export default function AltaEmpresaModal({
                 nuevosErrores['contacto.nro_documento'] = 'El número de documento debe tener al menos 7 caracteres';
             }
             
-            if (!contacto.nacionalidad_id) {
+            if (!contacto.nacionalidad_id ) {
                 nuevosErrores['contacto.nacionalidad_id'] = 'Seleccione nacionalidad';
             }
             
@@ -382,7 +380,7 @@ export default function AltaEmpresaModal({
                 nuevosErrores['empresa.codigo_postal_fiscal'] = 'Ingrese código postal fiscal';
             }
             
-            if (!empresa.localidad_fiscal_id ) {
+            if (!empresa.localidad_fiscal_id) {
                 nuevosErrores['empresa.localidad_fiscal_id'] = 'Seleccione localidad fiscal';
             }
             
@@ -400,7 +398,7 @@ export default function AltaEmpresaModal({
                 nuevosErrores['empresa.rubro_id'] = 'Seleccione rubro';
             }
             
-            if (!empresa.cat_fiscal_id ) {
+            if (!empresa.cat_fiscal_id) {
                 nuevosErrores['empresa.cat_fiscal_id'] = 'Seleccione categoría fiscal';
             }
             
@@ -424,101 +422,143 @@ export default function AltaEmpresaModal({
         return true;
     };
 
-    const handleSubmitPaso1 = () => {
-        if (!validarPaso(1)) return;
+const handleSubmitPaso1 = () => {
+    if (!validarPaso(1)) return;
 
-        setIsSubmitting(true);
-        
-        router.post('/comercial/utils/empresa/paso1', {
-            lead_id: lead?.id,
-            ...formData.lead
-        }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Lead actualizado correctamente');
-                setPaso1Completado(true);
-                setPasoActual(2);
-                setIsSubmitting(false);
-            },
-            onError: (errors) => {
-                console.error('Errores paso 1:', errors);
-                const backendErrors: Record<string, string> = {};
-                Object.keys(errors).forEach(key => {
-                    backendErrors[`lead.${key}`] = errors[key];
-                });
-                setErrores(backendErrors);
-                const primerError = Object.values(backendErrors)[0];
-                toast.error(primerError || 'Error al actualizar lead');
-                setIsSubmitting(false);
-            }
-        });
+    setIsSubmitting(true);
+    
+    // Determinar si es update (siempre será update porque el lead ya existe)
+    const esUpdate = true;
+    const leadId = lead?.id;
+    
+    if (!leadId) {
+        toast.error('No se encontró el lead para actualizar');
+        setIsSubmitting(false);
+        return;
+    }
+    
+    const url = '/comercial/utils/empresa/paso1';
+    const method = 'post'; // El método es POST según tu ruta
+    
+    router[method](url, {
+        lead_id: leadId,
+        ...formData.lead
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success('Datos del lead actualizados correctamente');
+            setPaso1Completado(true);
+            setPasoActual(2);
+            setIsSubmitting(false);
+        },
+        onError: (errors) => {
+            console.error('Errores paso 1:', errors);
+            const backendErrors: Record<string, string> = {};
+            Object.keys(errors).forEach(key => {
+                backendErrors[`lead.${key}`] = errors[key];
+            });
+            setErrores(backendErrors);
+            const primerError = Object.values(backendErrors)[0];
+            toast.error(primerError || 'Error al actualizar lead');
+            setIsSubmitting(false);
+        }
+    });
+};
+
+const handleSubmitPaso2 = () => {
+    if (!validarPaso(2)) return;
+
+    setIsSubmitting(true);
+    
+    const contactoId = datosExistentes?.contacto?.id || (lead as any)?.empresa_contacto?.id;
+    const esUpdate = !!contactoId;
+    
+    const url = esUpdate 
+        ? `/comercial/utils/empresa/paso2/${contactoId}`
+        : '/comercial/utils/empresa/paso2';
+    
+    const method = esUpdate ? 'put' : 'post';
+    
+    // 🔥 Asegurar que solo envías campos de contacto
+    const contactoData = {
+        lead_id: lead?.id,
+        tipo_responsabilidad_id: formData.contacto.tipo_responsabilidad_id,
+        tipo_documento_id: formData.contacto.tipo_documento_id,
+        nro_documento: formData.contacto.nro_documento,
+        nacionalidad_id: formData.contacto.nacionalidad_id,
+        fecha_nacimiento: formData.contacto.fecha_nacimiento,
+        direccion_personal: formData.contacto.direccion_personal,
+        codigo_postal_personal: formData.contacto.codigo_postal_personal,
     };
+    
+    console.log('Enviando datos paso 2:', contactoData);
+    
+    router[method](url, contactoData, {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success(esUpdate ? 'Datos personales actualizados' : 'Datos personales guardados');
+            setPaso2Completado(true);
+            setPasoActual(3);
+            setIsSubmitting(false);
+        },
+        onError: (errors) => {
+            console.error('Errores paso 2:', errors);
+            const backendErrors: Record<string, string> = {};
+            Object.keys(errors).forEach(key => {
+                backendErrors[`contacto.${key}`] = errors[key];
+            });
+            setErrores(backendErrors);
+            const primerError = Object.values(backendErrors)[0];
+            toast.error(primerError || 'Error al guardar datos personales');
+            setIsSubmitting(false);
+        }
+    });
+};
 
-    const handleSubmitPaso2 = () => {
-        if (!validarPaso(2)) return;
+const handleSubmitPaso3 = () => {
+    if (!validarPaso(3)) return;
 
-        setIsSubmitting(true);
-        
-        router.post('/comercial/utils/empresa/paso2', {
-            lead_id: lead?.id,
-            ...formData.contacto
-        }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Datos personales guardados correctamente');
-                setPaso2Completado(true);
-                setPasoActual(3);
-                setIsSubmitting(false);
-            },
-            onError: (errors) => {
-                console.error('Errores paso 2:', errors);
-                const backendErrors: Record<string, string> = {};
-                Object.keys(errors).forEach(key => {
-                    backendErrors[`contacto.${key}`] = errors[key];
-                });
-                setErrores(backendErrors);
-                const primerError = Object.values(backendErrors)[0];
-                toast.error(primerError || 'Error al guardar datos personales');
-                setIsSubmitting(false);
+    setIsSubmitting(true);
+    
+    const empresaId = datosExistentes?.empresa?.id || (lead as any)?.empresa_contacto?.empresa?.id;
+    const esUpdate = !!empresaId;
+    
+    const url = esUpdate 
+        ? `/comercial/utils/empresa/paso3/${empresaId}`
+        : '/comercial/utils/empresa/paso3';
+    
+    const method = esUpdate ? 'put' : 'post';
+    
+    router[method](url, {
+        presupuesto_id: presupuestoId,
+        lead_id: lead?.id,
+        ...formData.empresa
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            // El backend ya devuelve una redirección con el mensaje de éxito
+            setIsSubmitting(false);
+            
+            if (modoCompletar && esCliente && presupuestoId) {
+                toast.success('Datos guardados. Complete los vehículos para generar el contrato');
+                onClose(false, true);
+            } else {
+                onClose(true);
             }
-        });
-    };
-
-    const handleSubmitPaso3 = () => {
-        if (!validarPaso(3)) return;
-
-        setIsSubmitting(true);
-        
-        router.post('/comercial/utils/empresa/paso3', {
-            presupuesto_id: presupuestoId,
-            lead_id: lead?.id,
-            ...formData.empresa
-        }, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                toast.success('Empresa creada exitosamente');
-                setIsSubmitting(false);
-                
-                if (modoCompletar && esCliente && presupuestoId) {
-                    toast.success('Datos guardados. Complete los vehículos para generar el contrato');
-                    onClose(false, true);
-                } else {
-                    onClose(true);
-                }
-            },
-            onError: (errors) => {
-                console.error('Errores paso 3:', errors);
-                const backendErrors: Record<string, string> = {};
-                Object.keys(errors).forEach(key => {
-                    backendErrors[`empresa.${key}`] = errors[key];
-                });
-                setErrores(backendErrors);
-                const primerError = Object.values(backendErrors)[0];
-                toast.error(primerError || 'Error al crear empresa');
-                setIsSubmitting(false);
-            }
-        });
-    };
+        },
+        onError: (errors) => {
+            console.error('Errores paso 3:', errors);
+            const backendErrors: Record<string, string> = {};
+            Object.keys(errors).forEach(key => {
+                backendErrors[`empresa.${key}`] = errors[key];
+            });
+            setErrores(backendErrors);
+            const primerError = Object.values(backendErrors)[0];
+            toast.error(primerError || 'Error al guardar datos');
+            setIsSubmitting(false);
+        }
+    });
+};
 
     const handleSiguiente = () => {
         if (validarPaso(pasoActual)) {
@@ -599,11 +639,13 @@ export default function AltaEmpresaModal({
 
     const titulo = modoCompletar 
         ? 'Completar datos para contrato' 
-        : 'Alta de Empresa';
+        : (lead?.es_cliente ? 'Completar datos de la empresa' : 'Alta de Empresa');
     
     const descripcion = modoCompletar
         ? 'Complete los datos faltantes para generar el contrato'
-        : 'Complete los datos paso a paso';
+        : (lead?.es_cliente 
+            ? 'Complete los datos pendientes de la empresa para generar el contrato'
+            : 'Complete los datos paso a paso');
 
     return (
         <div className={`fixed inset-0 z-50 overflow-y-auto transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -700,7 +742,7 @@ export default function AltaEmpresaModal({
                                         onChange={handleChangeLead}
                                         errores={errores}
                                         localidadInicial={lead?.localidad?.nombre || ''}
-                                        provinciaInicial={lead?.localidad?.provincia_id ? String(lead.localidad.provincia_id) : ''}
+                                        provinciaInicial={lead?.localidad?.provincia_id || ''}
                                     />
                                 )}
                                 

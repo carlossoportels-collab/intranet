@@ -40,12 +40,12 @@ class LoginController extends Controller
         }
 
         // Rate limiting
-        if (!$this->checkRateLimit($ip, 10, 15)) {
+        if (!$this->checkRateLimit($ip, 50, 15)) {
             $this->blockIp($ip, 60);
             
             $this->securityNotification->notifyIpBlocked(
                 $ip,
-                'Excedió el límite de intentos (10 en 15 minutos)',
+                'Excedió el límite de intentos (50 en 15 minutos)',
                 now()->addMinutes(60)
             );
             
@@ -85,6 +85,15 @@ class LoginController extends Controller
             'activo' => 1
         ], $request->boolean('remember'))) {
             
+
+           \Log::info('Login exitoso', [
+            'user_id' => Auth::id(),
+            'session_id' => session()->getId(),
+            'session_name' => session()->getName(),
+            'cookie_domain' => config('session.domain'),
+            'cookie_secure' => config('session.secure')
+        ]);
+
             $usuario = Auth::user();
             $usuario->ultimo_acceso = now();
             $usuario->save();

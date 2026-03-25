@@ -130,48 +130,8 @@ class Paso3EmpresaController extends Controller
             session()->forget(['contacto_id', 'responsable_3_id', 'responsable_4_id', 'responsable_5_id']);
             Log::info('🟢 [PASO3] Sesión limpiada');
 
-            // 🔥 VERIFICAR LA RUTA ANTES DE REDIRIGIR
-            $routeName = 'comercial.contratos.create';
-            $routeParams = ['presupuestoId' => $presupuesto->id];
-            
-            Log::info('🟢 [PASO3] Preparando redirección', [
-                'route_name' => $routeName,
-                'route_params' => $routeParams,
-                'full_url' => route($routeName, $routeParams)
-            ]);
-            
-            // Verificar si la ruta existe
-            try {
-                $url = route($routeName, $routeParams);
-                Log::info('🟢 [PASO3] Ruta válida', ['url' => $url]);
-            } catch (\Exception $e) {
-                Log::error('❌ [PASO3] La ruta no existe', [
-                    'error' => $e->getMessage(),
-                    'route_name' => $routeName
-                ]);
-                throw new \Exception('La ruta ' . $routeName . ' no existe. Verifica el nombre en routes/web.php');
-            }
-            
-            // Verificar permisos
-            $user = auth()->user();
-            $permisoService = app(\App\Services\PermisoService::class);
-            $tienePermiso = $permisoService->usuarioTienePermiso($user->id, config('permisos.GESTIONAR_CONTRATOS'));
-            
-            Log::info('🟢 [PASO3] Verificando permisos', [
-                'user_id' => $user->id,
-                'user_rol' => $user->rol_id,
-                'permiso_necesario' => config('permisos.GESTIONAR_CONTRATOS'),
-                'tiene_permiso' => $tienePermiso
-            ]);
-
-            if (!$tienePermiso) {
-                Log::warning('⚠️ [PASO3] Usuario sin permiso para crear contrato', [
-                    'user_id' => $user->id,
-                    'rol' => $user->rol_id
-                ]);
-            }
-
-            return redirect()->route($routeName, $routeParams)
+            // 🔥 Redirigir a la página de creación de contrato con Inertia
+            return redirect()->route('comercial.contratos.create', ['presupuestoId' => $presupuesto->id])
                 ->with('success', 'Empresa creada exitosamente. Complete los datos del contrato.')
                 ->with('lead_id', $lead->id)
                 ->with('empresa_id', $empresa->id);
@@ -185,14 +145,55 @@ class Paso3EmpresaController extends Controller
                 'request_data' => $request->all()
             ]);
             
-            if (request()->expectsJson()) {
-                return response()->json([
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ], 500);
-            }
+            // 🔥 Devolver respuesta Inertia con error
+            return redirect()->back()->withErrors(['error' => 'Error al crear empresa: ' . $e->getMessage()]);
+        }
+    }
+
+    public function update(Request $request, $empresaId)
+    {
+        try {
+            Log::info('=== UPDATE EMPRESA ===', [
+                'empresa_id' => $empresaId,
+                'request_data' => $request->all(),
+                'user_id' => auth()->id()
+            ]);
             
-            return redirect()->back()->with('error', 'Error al crear empresa: ' . $e->getMessage());
+            $validated = $request->validate([
+                'presupuesto_id' => 'nullable|exists:presupuestos,id',
+                'lead_id' => 'required|exists:leads,id',
+                'nombre_fantasia' => 'required|string|max:200',
+                'razon_social' => 'required|string|max:200',
+                'cuit' => 'required|string|max:13',
+                'direccion_fiscal' => 'required|string|max:255',
+                'codigo_postal_fiscal' => 'required|string|max:10',
+                'localidad_fiscal_id' => 'required|exists:localidades,id',
+                'telefono_fiscal' => 'required|string|max:30',
+                'email_fiscal' => 'required|email|max:150',
+                'rubro_id' => 'required|exists:rubros,id',
+                'cat_fiscal_id' => 'required|exists:categorias_fiscales,id',
+                'plataforma_id' => 'required|exists:plataformas,id',
+                'nombre_flota' => 'required|string|max:200',
+            ]);
+
+            // Buscar la empresa
+            $empresa = Empresa::findOrFail($empresaId);
+            
+            // Actualizar la empresa
+            $empresa->update($validated);
+            
+            // 🔥 Redirigir de vuelta con mensaje de éxito
+            return redirect()->back()->with('success', 'Datos de empresa actualizados correctamente');
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()->withErrors($e->errors());
+        } catch (\Exception $e) {
+            Log::error('Error actualizando empresa:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return redirect()->back()->withErrors(['error' => 'Error al actualizar empresa: ' . $e->getMessage()]);
         }
     }
 }

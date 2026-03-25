@@ -432,6 +432,7 @@ export default function EnviarEmailAdministracionModal({
         setArchivosPlataforma(prev => prev.filter((_, i) => i !== index));
     };
 
+    // 🔥 HANDLER CORREGIDO - No serializar campos de texto como JSON
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.to) {
@@ -443,25 +444,48 @@ export default function EnviarEmailAdministracionModal({
         toast.info('Enviando email a administración...');
 
         try {
-            const emailData = {
-                to: formData.to,
-                cc: formData.cc ? formData.cc.split(',').map(email => email.trim()) : [],
-                bcc: formData.bcc ? formData.bcc.split(',').map(email => email.trim()) : [],
-                subject: formData.subject,
-                body: formData.body,
-                contratoId: contrato.id,
-                numeroContrato: contrato.numero_contrato,
-                tipo: 'administracion'
-            };
-
             const formDataToSend = new FormData();
-            Object.keys(emailData).forEach(key => {
-                formDataToSend.append(key, JSON.stringify(emailData[key as keyof typeof emailData]));
+            
+            // 🔥 PROCESAR DESTINATARIOS - Convertir string con ; a array JSON
+            const toArray = formData.to.split(';').map(email => email.trim()).filter(email => email);
+            formDataToSend.append('to', JSON.stringify(toArray));
+            
+            // CC - soportar múltiples separadores
+            if (formData.cc) {
+                const ccArray = formData.cc.split(/[;,]+/).map(email => email.trim()).filter(email => email);
+                formDataToSend.append('cc', JSON.stringify(ccArray));
+            }
+            
+            // BCC
+            if (formData.bcc) {
+                const bccArray = formData.bcc.split(/[;,]+/).map(email => email.trim()).filter(email => email);
+                formDataToSend.append('bcc', JSON.stringify(bccArray));
+            }
+            
+            // 🔥 CAMPOS QUE NO DEBEN SER JSON - Enviar como texto plano
+            formDataToSend.append('subject', formData.subject);
+            formDataToSend.append('body', formData.body);
+            formDataToSend.append('contratoId', String(contrato.id));
+            formDataToSend.append('numeroContrato', contrato.numero_contrato);
+            formDataToSend.append('tipo', 'administracion');
+            
+            // Opciones de bienvenida (false para administración)
+            formDataToSend.append('incluirBienvenida', JSON.stringify(false));
+            
+            // Adjuntar PDF
+            if (pdfFile) {
+                formDataToSend.append('pdf', pdfFile);
+            }
+            
+            // Documentos locales
+            archivosLocales.forEach((file, index) => {
+                formDataToSend.append(`documento_local_${index}`, file);
             });
-
-            if (pdfFile) formDataToSend.append('pdf', pdfFile);
-            archivosLocales.forEach((file, index) => formDataToSend.append(`documento_local_${index}`, file));
-            archivosPlataforma.forEach((file, index) => formDataToSend.append(`documento_plataforma_${index}`, file));
+            
+            // Documentos de plataforma
+            archivosPlataforma.forEach((file, index) => {
+                formDataToSend.append(`documento_plataforma_${index}`, file);
+            });
 
             router.post('/api/email/enviar-contrato', formDataToSend, {
                 preserveScroll: true,
@@ -470,6 +494,7 @@ export default function EnviarEmailAdministracionModal({
                     onClose();
                 },
                 onError: (errors: any) => {
+                    console.error('Errores:', errors);
                     toast.error(errors?.error || 'Error al enviar el email');
                     setIsSubmitting(false);
                 },

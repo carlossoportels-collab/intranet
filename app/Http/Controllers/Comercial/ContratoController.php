@@ -39,6 +39,12 @@ class ContratoController extends Controller
 
     public function __construct()
     {
+         \Log::info('ContratoController constructor', [
+        'user_id' => auth()->id(),
+        'is_authenticated' => auth()->check(),
+        'session_id' => session()->getId()
+    ]);
+
         $this->initializeAuthorization();
     }
 
@@ -304,177 +310,250 @@ public function index(Request $request)
     /**
      * Guardar nuevo contrato desde presupuesto
      */
-    public function store(Request $request)
-    {
-        $this->authorizePermiso(config('permisos.GESTIONAR_CONTRATOS'));
+/**
+ * Guardar nuevo contrato desde presupuesto
+ */
+public function store(Request $request)
+{
+    Log::info('🔵 store INICIO', [
+        'user_id' => auth()->id(),
+        'authenticated' => auth()->check(),
+        'session_id' => session()->getId()
+    ]);
+    
+    $this->authorizePermiso(config('permisos.GESTIONAR_CONTRATOS'));
+    
+    Log::info('🔵 store DESPUÉS DE authorizePermiso', [
+        'user_id' => auth()->id(),
+        'authenticated' => auth()->check()
+    ]);
+    
+    try {
+        DB::beginTransaction();
+
+        $presupuesto = Presupuesto::with([
+            'lead.localidad.provincia',
+            'lead.rubro',
+            'lead.origen',
+            'prefijo.comercial.personal',
+            'prefijo.comercial.compania',
+            'promocion',
+            'createdBy'
+        ])->findOrFail($request->presupuesto_id);
+
+        $vendedorNombre = null;
+    $vendedorPrefijo = null;
+    
+    // Buscar el comercial del presupuesto a través del usuario que lo creó
+    if ($presupuesto->created_by) {
+        $usuarioCreador = \App\Models\Usuario::with('personal')->find($presupuesto->created_by);
         
-        try {
-            DB::beginTransaction();
-
-            $presupuesto = Presupuesto::with([
-                'lead.localidad.provincia',
-                'lead.rubro',
-                'lead.origen',
-                'prefijo.comercial.personal',
-                'prefijo.comercial.compania',
-                'promocion'
-            ])->findOrFail($request->presupuesto_id);
-
-            $empresa = Empresa::with([
-                'localidadFiscal.provincia',
-                'rubro',
-                'categoriaFiscal',
-                'plataforma'
-            ])->findOrFail($request->empresa_id);
-
-            $contacto = EmpresaContacto::with([
-                'tipoResponsabilidad',
-                'tipoDocumento',
-                'nacionalidad'
-            ])->findOrFail($request->contacto_id);
-
-            $lead = $contacto->lead;
-
-            $contratoId = ContratoHelper::generarNumeroContrato($presupuesto->prefijo_id);
-
-            // Determinar si es cliente
-            $esCliente = false;
-            if ($lead && $lead->es_cliente) {
-                $esCliente = true;
-            }
-            if ($lead && $lead->estado_lead && $lead->estado_lead->tipo === 'final_positivo') {
-                $esCliente = true;
-            }
-            $contratosPrevios = Contrato::where('lead_id', $lead->id)->count();
-            if ($contratosPrevios > 0) {
-                $esCliente = true;
-            }
-
-            $contratoData = [
-                'id' => $contratoId,
-                'presupuesto_id' => $presupuesto->id,
-                'lead_id' => $presupuesto->lead_id,
-                'empresa_id' => $empresa->id,
-                'fecha_emision' => now(),
-                'estado_id' => 1,
-                'tipo_operacion' => $esCliente ? 'venta_cliente' : 'alta_nueva',
-                'vendedor_nombre' => optional(optional($presupuesto->prefijo?->comercial?->first())?->personal)->nombre_completo,
-                'vendedor_prefijo' => $presupuesto->prefijo?->codigo,
-                'cliente_nombre_completo' => $presupuesto->lead->nombre_completo,
-                'cliente_genero' => $presupuesto->lead->genero,
-                'cliente_telefono' => $presupuesto->lead->telefono,
-                'cliente_email' => $presupuesto->lead->email,
-                'cliente_localidad' => $presupuesto->lead->localidad?->nombre,
-                'cliente_provincia' => $presupuesto->lead->localidad?->provincia?->nombre,
-                'cliente_rubro' => $presupuesto->lead->rubro?->nombre,
-                'cliente_origen' => $presupuesto->lead->origen?->nombre,
-                'contacto_tipo_responsabilidad' => $contacto->tipoResponsabilidad?->nombre,
-                'contacto_tipo_documento' => $contacto->tipoDocumento?->nombre,
-                'contacto_nro_documento' => $contacto->nro_documento,
-                'contacto_nacionalidad' => $contacto->nacionalidad?->pais,
-                'contacto_fecha_nacimiento' => $contacto->fecha_nacimiento,
-                'contacto_direccion_personal' => $contacto->direccion_personal,
-                'contacto_codigo_postal_personal' => $contacto->codigo_postal_personal,
-                'empresa_nombre_fantasia' => $empresa->nombre_fantasia,
-                'empresa_razon_social' => $empresa->razon_social,
-                'empresa_cuit' => $empresa->cuit,
-                'empresa_domicilio_fiscal' => $empresa->direccion_fiscal,
-                'empresa_codigo_postal_fiscal' => $empresa->codigo_postal_fiscal,
-                'empresa_localidad_fiscal' => $empresa->localidadFiscal?->nombre,
-                'empresa_provincia_fiscal' => $empresa->localidadFiscal?->provincia?->nombre,
-                'empresa_telefono_fiscal' => $empresa->telefono_fiscal,
-                'empresa_email_fiscal' => $empresa->email_fiscal,
-                'empresa_actividad' => $empresa->rubro?->nombre,
-                'empresa_situacion_afip' => $empresa->categoriaFiscal?->nombre,
-                'empresa_plataforma' => $empresa->plataforma?->nombre,
-                'empresa_nombre_flota' => $empresa->nombre_flota,
-                'presupuesto_referencia' => $presupuesto->referencia,
-                'presupuesto_cantidad_vehiculos' => $presupuesto->cantidad_vehiculos,
-                'presupuesto_total_inversion' => $presupuesto->total_presupuesto,
-                'presupuesto_total_mensual' => $presupuesto->subtotal_abono,
-                'presupuesto_promocion' => $presupuesto->promocion?->nombre,
-                'created_by' => auth()->id(),
-            ];
-
-            $contrato = Contrato::create($contratoData);
-
-            $empresa->update(['numeroalfa' => $contratoId]);
-
-            $responsableFlota = EmpresaResponsable::where('empresa_id', $empresa->id)
-                ->where('es_activo', true)
-                ->whereIn('tipo_responsabilidad_id', [3, 5])
+        if ($usuarioCreador && $usuarioCreador->personal) {
+            // El usuario que creó el presupuesto tiene un personal asociado
+            $vendedorNombre = $usuarioCreador->personal->nombre_completo;
+            
+            // Buscar el comercial asociado a ese personal
+            $comercial = \App\Models\Comercial::where('personal_id', $usuarioCreador->personal->id)
+                ->where('activo', 1)
                 ->first();
-
-            $responsablePagos = EmpresaResponsable::where('empresa_id', $empresa->id)
-                ->where('es_activo', true)
-                ->whereIn('tipo_responsabilidad_id', [4, 5])
-                ->first();
-
-            $contrato->update([
-                'responsable_flota_nombre' => $responsableFlota?->nombre_completo,
-                'responsable_flota_telefono' => $responsableFlota?->telefono,
-                'responsable_flota_email' => $responsableFlota?->email,
-                'responsable_pagos_nombre' => $responsablePagos?->nombre_completo,
-                'responsable_pagos_telefono' => $responsablePagos?->telefono,
-                'responsable_pagos_email' => $responsablePagos?->email,
-            ]);
-
-            foreach ($request->vehiculos as $index => $vehiculo) {
-                if (!empty($vehiculo['patente'])) {
-                    ContratoVehiculo::create([
-                        'contrato_id' => $contrato->id,
-                        'patente' => $vehiculo['patente'],
-                        'marca' => $vehiculo['marca'] ?? null,
-                        'modelo' => $vehiculo['modelo'] ?? null,
-                        'anio' => $vehiculo['anio'] ?? null,
-                        'color' => $vehiculo['color'] ?? null,
-                        'identificador' => $vehiculo['identificador'] ?? null,
-                        'orden' => $index + 1,
-                        'created' => now(),
-                    ]);
-                }
+                
+            if ($comercial && $comercial->prefijo) {
+                $vendedorPrefijo = $comercial->prefijo->codigo;
             }
-
-            if ($request->metodo_pago === 'cbu' && $request->datos_cbu) {
-                DebitoCbu::create([
-                    'contrato_id' => $contrato->id,
-                    'nombre_banco' => $request->datos_cbu['nombre_banco'],
-                    'cbu' => $request->datos_cbu['cbu'],
-                    'alias_cbu' => $request->datos_cbu['alias_cbu'] ?? null,
-                    'titular_cuenta' => $request->datos_cbu['titular_cuenta'],
-                    'tipo_cuenta' => $request->datos_cbu['tipo_cuenta'],
-                    'es_activo' => true,
-                    'created_by' => auth()->id(),
-                ]);
-            } elseif ($request->metodo_pago === 'tarjeta' && $request->datos_tarjeta) {
-                DebitoTarjeta::create([
-                    'contrato_id' => $contrato->id,
-                    'tarjeta_emisor' => $request->datos_tarjeta['tarjeta_emisor'],
-                    'tarjeta_expiracion' => $request->datos_tarjeta['tarjeta_expiracion'],
-                    'tarjeta_numero' => $request->datos_tarjeta['tarjeta_numero'],
-                    'tarjeta_codigo' => $request->datos_tarjeta['tarjeta_codigo'] ?? null,
-                    'tarjeta_banco' => $request->datos_tarjeta['tarjeta_banco'],
-                    'titular_tarjeta' => $request->datos_tarjeta['titular_tarjeta'],
-                    'tipo_tarjeta' => $request->datos_tarjeta['tipo_tarjeta'],
-                    'es_activo' => true,
-                    'created_by' => auth()->id(),
-                ]);
-            }
-
-            DB::commit();
-
-            return redirect()->route('comercial.contratos.show', $contrato->id)
-                ->with('success', 'Contrato generado exitosamente');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error al generar contrato:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return redirect()->back()->with('error', 'Error al generar contrato: ' . $e->getMessage());
         }
     }
+    
+    // Si no se encontró por el usuario creador, usar el comercial del prefijo
+    if (!$vendedorNombre) {
+        $comercial = $presupuesto->prefijo?->comercial?->first();
+        if ($comercial && $comercial->personal) {
+            $vendedorNombre = $comercial->personal->nombre_completo;
+            $vendedorPrefijo = $presupuesto->prefijo?->codigo;
+        }
+    }
+    
+    Log::info('Vendedor asignado al contrato', [
+        'presupuesto_id' => $presupuesto->id,
+        'created_by' => $presupuesto->created_by,
+        'vendedor_nombre' => $vendedorNombre,
+        'vendedor_prefijo' => $vendedorPrefijo
+    ]);
+
+        $empresa = Empresa::with([
+            'localidadFiscal.provincia',
+            'rubro',
+            'categoriaFiscal',
+            'plataforma'
+        ])->findOrFail($request->empresa_id);
+
+        $contacto = EmpresaContacto::with([
+            'tipoResponsabilidad',
+            'tipoDocumento',
+            'nacionalidad'
+        ])->findOrFail($request->contacto_id);
+
+        $lead = $contacto->lead;
+
+        // Generar ID del contrato
+        Log::info('Generando ID con Helper', ['prefijo_id' => $presupuesto->prefijo_id]);
+        $contratoId = ContratoHelper::generarNumeroContrato($presupuesto->prefijo_id);
+        Log::info('ID generado por Helper', ['contrato_id' => $contratoId]);
+
+        // Determinar si es cliente
+        $esCliente = false;
+        if ($lead && $lead->es_cliente) {
+            $esCliente = true;
+        }
+        if ($lead && $lead->estado_lead && $lead->estado_lead->tipo === 'final_positivo') {
+            $esCliente = true;
+        }
+        $contratosPrevios = Contrato::where('lead_id', $lead->id)->count();
+        if ($contratosPrevios > 0) {
+            $esCliente = true;
+        }
+
+        $contratoData = [
+            'id' => $contratoId,
+            'presupuesto_id' => $presupuesto->id,
+            'lead_id' => $presupuesto->lead_id,
+            'empresa_id' => $empresa->id,
+            'fecha_emision' => now(),
+            'estado_id' => 1,
+            'tipo_operacion' => $esCliente ? 'venta_cliente' : 'alta_nueva',
+            'vendedor_nombre' => $vendedorNombre,
+            'vendedor_prefijo' => $vendedorPrefijo,
+            'cliente_nombre_completo' => $presupuesto->lead->nombre_completo,
+            'cliente_genero' => $presupuesto->lead->genero,
+            'cliente_telefono' => $presupuesto->lead->telefono,
+            'cliente_email' => $presupuesto->lead->email,
+            'cliente_localidad' => $presupuesto->lead->localidad?->nombre,
+            'cliente_provincia' => $presupuesto->lead->localidad?->provincia?->nombre,
+            'cliente_rubro' => $presupuesto->lead->rubro?->nombre,
+            'cliente_origen' => $presupuesto->lead->origen?->nombre,
+            'contacto_tipo_responsabilidad' => $contacto->tipoResponsabilidad?->nombre,
+            'contacto_tipo_documento' => $contacto->tipoDocumento?->nombre,
+            'contacto_nro_documento' => $contacto->nro_documento,
+            'contacto_nacionalidad' => $contacto->nacionalidad?->pais,
+            'contacto_fecha_nacimiento' => $contacto->fecha_nacimiento,
+            'contacto_direccion_personal' => $contacto->direccion_personal,
+            'contacto_codigo_postal_personal' => $contacto->codigo_postal_personal,
+            'empresa_nombre_fantasia' => $empresa->nombre_fantasia,
+            'empresa_razon_social' => $empresa->razon_social,
+            'empresa_cuit' => $empresa->cuit,
+            'empresa_domicilio_fiscal' => $empresa->direccion_fiscal,
+            'empresa_codigo_postal_fiscal' => $empresa->codigo_postal_fiscal,
+            'empresa_localidad_fiscal' => $empresa->localidadFiscal?->nombre,
+            'empresa_provincia_fiscal' => $empresa->localidadFiscal?->provincia?->nombre,
+            'empresa_telefono_fiscal' => $empresa->telefono_fiscal,
+            'empresa_email_fiscal' => $empresa->email_fiscal,
+            'empresa_actividad' => $empresa->rubro?->nombre,
+            'empresa_situacion_afip' => $empresa->categoriaFiscal?->nombre,
+            'empresa_plataforma' => $empresa->plataforma?->nombre,
+            'empresa_nombre_flota' => $empresa->nombre_flota,
+            'presupuesto_referencia' => $presupuesto->referencia,
+            'presupuesto_cantidad_vehiculos' => $presupuesto->cantidad_vehiculos,
+            'presupuesto_total_inversion' => $presupuesto->total_presupuesto,
+            'presupuesto_total_mensual' => $presupuesto->subtotal_abono,
+            'presupuesto_promocion' => $presupuesto->promocion?->nombre,
+            'created_by' => auth()->id(),
+        ];
+
+        $contrato = Contrato::create($contratoData);
+        Log::info('Contrato creado con ID', ['contrato_id' => $contrato->id]);
+
+        $empresa->update(['numeroalfa' => $contratoId]);
+
+        $responsableFlota = EmpresaResponsable::where('empresa_id', $empresa->id)
+            ->where('es_activo', true)
+            ->whereIn('tipo_responsabilidad_id', [3, 5])
+            ->first();
+
+        $responsablePagos = EmpresaResponsable::where('empresa_id', $empresa->id)
+            ->where('es_activo', true)
+            ->whereIn('tipo_responsabilidad_id', [4, 5])
+            ->first();
+
+        $contrato->update([
+            'responsable_flota_nombre' => $responsableFlota?->nombre_completo,
+            'responsable_flota_telefono' => $responsableFlota?->telefono,
+            'responsable_flota_email' => $responsableFlota?->email,
+            'responsable_pagos_nombre' => $responsablePagos?->nombre_completo,
+            'responsable_pagos_telefono' => $responsablePagos?->telefono,
+            'responsable_pagos_email' => $responsablePagos?->email,
+        ]);
+
+        foreach ($request->vehiculos as $index => $vehiculo) {
+            if (!empty($vehiculo['patente'])) {
+                ContratoVehiculo::create([
+                    'contrato_id' => $contrato->id,
+                    'patente' => $vehiculo['patente'],
+                    'marca' => $vehiculo['marca'] ?? null,
+                    'modelo' => $vehiculo['modelo'] ?? null,
+                    'anio' => $vehiculo['anio'] ?? null,
+                    'color' => $vehiculo['color'] ?? null,
+                    'identificador' => $vehiculo['identificador'] ?? null,
+                    'orden' => $index + 1,
+                    'created' => now(),
+                ]);
+            }
+        }
+
+        if ($request->metodo_pago === 'cbu' && $request->datos_cbu) {
+            DebitoCbu::create([
+                'contrato_id' => $contrato->id,
+                'nombre_banco' => $request->datos_cbu['nombre_banco'],
+                'cbu' => $request->datos_cbu['cbu'],
+                'alias_cbu' => $request->datos_cbu['alias_cbu'] ?? null,
+                'titular_cuenta' => $request->datos_cbu['titular_cuenta'],
+                'tipo_cuenta' => $request->datos_cbu['tipo_cuenta'],
+                'es_activo' => true,
+                'created_by' => auth()->id(),
+            ]);
+        } elseif ($request->metodo_pago === 'tarjeta' && $request->datos_tarjeta) {
+            DebitoTarjeta::create([
+                'contrato_id' => $contrato->id,
+                'tarjeta_emisor' => $request->datos_tarjeta['tarjeta_emisor'],
+                'tarjeta_expiracion' => $request->datos_tarjeta['tarjeta_expiracion'],
+                'tarjeta_numero' => $request->datos_tarjeta['tarjeta_numero'],
+                'tarjeta_codigo' => $request->datos_tarjeta['tarjeta_codigo'] ?? null,
+                'tarjeta_banco' => $request->datos_tarjeta['tarjeta_banco'],
+                'titular_tarjeta' => $request->datos_tarjeta['titular_tarjeta'],
+                'tipo_tarjeta' => $request->datos_tarjeta['tipo_tarjeta'],
+                'es_activo' => true,
+                'created_by' => auth()->id(),
+            ]);
+        }
+
+        DB::commit();
+
+        Log::info('🔵 store - ANTES DE REDIRIGIR', [
+            'user_id' => auth()->id(),
+            'authenticated' => auth()->check(),
+            'session_id' => session()->getId(),
+            'contrato_id' => $contrato->id
+        ]);
+
+        // 🔥 CRUCIAL: Guardar la sesión explícitamente
+        session()->save();
+
+        Log::info('🔵 store - SESIÓN GUARDADA', [
+            'session_name' => session()->getName(),
+            'session_id' => session()->getId()
+        ]);
+
+        // 🔥 USAR Inertia::location para forzar la redirección
+        return Inertia::location(route('comercial.contratos.show', $contrato->id));
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error al generar contrato:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return redirect()->back()->with('error', 'Error al generar contrato: ' . $e->getMessage());
+    }
+}
     
     /**
      * Mostrar un contrato específico
@@ -1238,6 +1317,7 @@ public function index(Request $request)
                 'lead.rubro',
                 'lead.origen',
                 'prefijo.comercial.personal',
+                'createdBy.personal',
                 'promocion.productos',
                 'agregados' => function($query) {
                     $query->with('productoServicio.tipo');
@@ -1247,6 +1327,24 @@ public function index(Request $request)
                 'tasaMetodoPago',
                 'abonoMetodoPago'
             ])->findOrFail($presupuestoId);
+
+              $vendedorNombre = null;
+    $vendedorPrefijo = null;
+    
+    if ($presupuesto->created_by) {
+        $usuarioCreador = $presupuesto->createdBy;
+        if ($usuarioCreador && $usuarioCreador->personal) {
+            $vendedorNombre = $usuarioCreador->personal->nombre_completo;
+            
+            $comercial = \App\Models\Comercial::where('personal_id', $usuarioCreador->personal->id)
+                ->where('activo', 1)
+                ->first();
+                
+            if ($comercial && $comercial->prefijo) {
+                $vendedorPrefijo = $comercial->prefijo->codigo;
+            }
+        }
+    }
 
             $empresa = Empresa::with([
                 'localidadFiscal.provincia',
@@ -1311,6 +1409,8 @@ public function index(Request $request)
 
             return Inertia::render('Comercial/Contratos/Create', [
                 'presupuesto' => $presupuesto,
+                'vendedor_nombre' => $vendedorNombre,
+                'vendedor_prefijo' => $vendedorPrefijo,
                 'empresa' => $empresa,
                 'contacto' => $contacto,
                 'responsables' => $responsables,

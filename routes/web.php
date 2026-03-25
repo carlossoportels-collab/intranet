@@ -217,7 +217,13 @@ Route::prefix('temp')->name('temp.')->group(function () {
         // ===== CONTRATOS =====
         Route::prefix('contratos')->name('contratos.')->group(function () {
             Route::get('/', [ContratoController::class, 'index'])->name('index')->middleware('permiso:' . config('permisos.VER_CONTRATOS'));
+            
+            // Ruta para crear contrato desde presupuesto (la que ya tenías)
             Route::get('/crear/{presupuestoId}', [ContratoController::class, 'create'])->name('create')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
+            
+            // Ruta para crear contrato desde lead (la que estás usando)
+            Route::get('/create-from-lead/{presupuestoId}', [ContratoController::class, 'createFromLead'])->name('create-from-lead')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
+            
             Route::post('/', [ContratoController::class, 'store'])->name('store')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
             Route::get('/{id}/pdf', [ContratoController::class, 'generarPdf'])->name('pdf')->middleware('permiso:' . config('permisos.VER_CONTRATOS'));
             Route::get('/{id}', [ContratoController::class, 'show'])->name('show')->middleware('permiso:' . config('permisos.VER_CONTRATOS'));
@@ -284,6 +290,9 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::post('/empresa/paso2', [Paso2ContactoController::class, 'store']);
             Route::post('/empresa/paso3', [Paso3EmpresaController::class, 'store']);
             Route::post('/auditoria/dato-sensible', [AuditoriaDatoSensibleController::class, 'store'])->name('auditoria.dato-sensible');
+            Route::put('/empresa/paso1/{contactoId}', [Paso2ContactoController::class, 'update'])->name('empresa.paso1.update');
+            Route::put('/empresa/paso2/{contactoId}', [Paso2ContactoController::class, 'update'])->name('empresa.paso2.update');
+            Route::put('/empresa/paso3/{empresaId}', [Paso3EmpresaController::class, 'update'])->name('empresa.paso3.update');
         });
     });
     

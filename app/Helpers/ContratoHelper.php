@@ -5,6 +5,7 @@ namespace App\Helpers;
 
 use App\Models\Contrato;
 use App\Models\Prefijo;
+use App\Models\Comercial;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -23,16 +24,40 @@ class ContratoHelper
             throw new \Exception("Prefijo no encontrado");
         }
 
-        // Obtener el comercial asociado al prefijo
-        $comercial = $prefijo->comercial->first();
+        // 🔥 OBTENER EL COMERCIAL ACTIVO CORRECTAMENTE
+        $comercial = null;
+        
+        // Buscar comercial activo para este prefijo
+        $comercial = Comercial::with('compania')
+            ->where('prefijo_id', $prefijoId)
+            ->where('activo', 1)
+            ->first();
+        
+        // Si no hay comercial activo, intentar con el primero de la relación
+        if (!$comercial && $prefijo->comercial) {
+            $comercial = $prefijo->comercial->first();
+        }
         
         // Determinar compañía (por defecto Localsat = 1)
         $companiaId = 1;
         
-        if ($comercial && $comercial->compania) {
-            $companiaId = $comercial->compania->id;
-        } elseif ($comercial && $comercial->compania_id) {
-            $companiaId = $comercial->compania_id;
+        if ($comercial) {
+            if ($comercial->compania) {
+                $companiaId = $comercial->compania->id;
+                Log::info('Compañía obtenida del comercial', [
+                    'prefijo_id' => $prefijoId,
+                    'comercial_id' => $comercial->id,
+                    'compania_id' => $companiaId,
+                    'compania_nombre' => $comercial->compania->nombre
+                ]);
+            } elseif ($comercial->compania_id) {
+                $companiaId = $comercial->compania_id;
+                Log::info('Compañía obtenida del comercial_id', [
+                    'prefijo_id' => $prefijoId,
+                    'comercial_id' => $comercial->id,
+                    'compania_id' => $companiaId
+                ]);
+            }
         }
         
         // Obtener el rango según la compañía
@@ -87,22 +112,32 @@ class ContratoHelper
     public static function generarNumeroContratoSimple($prefijoId)
     {
         // Obtener el prefijo con su comercial
-        $prefijo = Prefijo::with('comercial.compania')->find($prefijoId);
+        $prefijo = Prefijo::find($prefijoId);
         
         if (!$prefijo) {
             throw new \Exception("Prefijo no encontrado");
         }
         
-        // Obtener el comercial asociado al prefijo
-        $comercial = $prefijo->comercial->first();
+        // 🔥 OBTENER EL COMERCIAL ACTIVO CORRECTAMENTE
+        $comercial = Comercial::with('compania')
+            ->where('prefijo_id', $prefijoId)
+            ->where('activo', 1)
+            ->first();
+        
+        // Si no hay comercial activo, intentar con el primero de la relación
+        if (!$comercial && $prefijo->comercial) {
+            $comercial = $prefijo->comercial->first();
+        }
         
         // Determinar compañía (por defecto Localsat = 1)
         $companiaId = 1;
         
-        if ($comercial && $comercial->compania) {
-            $companiaId = $comercial->compania->id;
-        } elseif ($comercial && $comercial->compania_id) {
-            $companiaId = $comercial->compania_id;
+        if ($comercial) {
+            if ($comercial->compania) {
+                $companiaId = $comercial->compania->id;
+            } elseif ($comercial->compania_id) {
+                $companiaId = $comercial->compania_id;
+            }
         }
         
         $rango = self::getRangoPorCompania($companiaId);
@@ -141,9 +176,9 @@ class ContratoHelper
      */
     public static function determinarCompaniaPorId($id)
     {
-        if ($id >= 800000 && $id <= 899999) {
+        if ($id >= 800624 && $id <= 899999) {
             return 'SMARTSAT';
-        } elseif ($id >= 500000 && $id <= 599999) {
+        } elseif ($id >= 502447 && $id <= 599999) {
             return 'LOCALSAT';
         }
         return 'LOCALSAT'; // Por defecto
@@ -155,8 +190,9 @@ class ContratoHelper
     public static function getRangoPorCompania($companiaId)
     {
         return match($companiaId) {
-            2 => ['min' => 800000, 'max' => 899999], // Smartsat
-            default => ['min' => 500000, 'max' => 599999], // Localsat
+            2 => ['min' => 800624, 'max' => 899999], // Smartsat
+            3 => ['min' => 900000, 'max' => 999999], // 360 SAT
+            default => ['min' => 502447, 'max' => 599999], // Localsat
         };
     }
     

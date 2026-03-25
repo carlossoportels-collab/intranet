@@ -25,11 +25,23 @@
         }
         .logo {
             max-height: 60px;
-            max-width: 200px; 
+            max-width: 200px;
         }
         .content {
             padding: 30px 20px;
             background: white;
+        }
+        .email-body {
+            font-family: 'Courier New', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            background-color: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
         .footer {
             margin-top: 20px;
@@ -49,7 +61,6 @@
                 if (!empty($compania['logo']) && file_exists($compania['logo'])) {
                     $logoPath = $compania['logo'];
                 } elseif (!empty($compania['logo_public'])) {
-                    // Alternativa: usar URL pública
                     $logoPath = $compania['logo_public'];
                 }
             @endphp
@@ -62,11 +73,31 @@
                 <h2>{{ $compania['nombre'] ?? config('app.name') }}</h2>
             @endif
         </div>
-        <div class="content">
-            {!! nl2br(e($body)) !!}
-        </div>
+        
+    <div class="content">
+    @php
+        // 🔥 PROCESAMIENTO SIMPLE
+        $texto = $body;
+        
+        // Solo quitar comillas si existen
+        $texto = preg_replace('/^"|"$/', '', $texto);
+        
+        // Convertir \n literales a saltos de línea reales
+        $texto = str_replace('\\n', "\n", $texto);
+        
+        // Normalizar saltos de línea
+        $texto = preg_replace("/\r\n|\r|\n/", "\n", $texto);
+        
+        // Convertir a HTML con <br>
+        $textoHtml = nl2br(e($texto));
+    @endphp
+    
+    <div class="email-body">
+        {!! $textoHtml !!}
+    </div>
+</div>
+        
         <div class="footer">
-
             <p>&copy; {{ date('Y') }} {{ $compania['nombre'] ?? config('app.name') }}. Todos los derechos reservados.</p>
         </div>
     </div>

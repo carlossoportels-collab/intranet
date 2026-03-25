@@ -9,62 +9,188 @@ use App\Mail\PresupuestoEnviado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class EmailController extends Controller
 {
+    /**
+     * Normalizar un campo que puede venir como JSON string con comillas escapadas
+     */
+    private function normalizeField($value)
+    {
+        if (!is_string($value)) {
+            return $value;
+        }
+        
+        // Quitar comillas al inicio y final si existen
+        $value = preg_replace('/^"|"$/', '', $value);
+        
+        // Si parece JSON string, intentar decodificar
+        if (strpos($value, '\\"') !== false || strpos($value, '"') !== false) {
+            $decoded = json_decode('"' . str_replace('"', '\"', $value) . '"');
+            if (json_last_error() === JSON_ERROR_NONE && is_string($decoded)) {
+                return $decoded;
+            }
+            
+            // Intentar decodificar directamente
+            $decoded = json_decode($value);
+            if (json_last_error() === JSON_ERROR_NONE && is_string($decoded)) {
+                return $decoded;
+            }
+        }
+        
+        // Decodificar escapes de JSON
+        $value = stripslashes($value);
+        
+        return $value;
+    }
+
+    /**
+     * Procesar destinatarios desde un string que puede tener múltiples formatos
+     */
+    private function parseRecipients($input)
+    {
+        if (empty($input)) {
+            return [];
+        }
+        
+        // Normalizar el input
+        $input = $this->normalizeField($input);
+        
+        // Si es un array, devolverlo
+        if (is_array($input)) {
+            return array_filter($input, function($email) {
+                return filter_var($email, FILTER_VALIDATE_EMAIL);
+            });
+        }
+        
+        // Si es string, intentar decodificar JSON
+        if (is_string($input)) {
+            $decoded = json_decode($input, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return array_filter($decoded, function($email) {
+                    return filter_var($email, FILTER_VALIDATE_EMAIL);
+                });
+            }
+            
+            // Separar por ; o , y limpiar
+            $recipients = preg_split('/[;,]+/', $input);
+            $recipients = array_map('trim', $recipients);
+            $recipients = array_filter($recipients, function($email) {
+                return !empty($email) && filter_var($email, FILTER_VALIDATE_EMAIL);
+            });
+            
+            return $recipients;
+        }
+        
+        return [];
+    }
+
     /**
      * Enviar contrato por email
      */
     public function enviarContrato(Request $request)
     {
         try {
-            $request->validate([
-                'to' => 'required|json',
-                'cc' => 'nullable|json',
-                'bcc' => 'nullable|json',
+            Log::info('Datos recibidos para enviar contrato (original):', [
+                'tipo' => $request->tipo,
+                'to' => $request->to,
+                'subject' => $request->subject,
+                'contratoId' => $request->contratoId,
+                'numeroContrato' => $request->numeroContrato,
+            ]);
+            
+            // 🔥 NORMALIZAR TODOS LOS CAMPOS DE TEXTO
+            $tipo = $this->normalizeField($request->input('tipo'));
+            $body = $this->normalizeField($request->input('body'));
+            $numeroContrato = $this->normalizeField($request->input('numeroContrato'));
+            $subject = $this->normalizeField($request->input('subject'));
+            
+            // Normalizar tipo
+            if (empty($tipo) || $tipo === 'null' || $tipo === 'undefined') {
+                $tipo = null;
+            }
+            
+            if (in_array(strtolower($tipo), ['administracion', 'cliente'])) {
+                $tipo = strtolower($tipo);
+            }
+            
+            // Normalizar body (saltos de línea)
+            $body = str_replace(['\\n', '\n'], "\n", $body);
+            $body = str_replace(['\\r', '\r'], "\n", $body);
+            $body = preg_replace("/\r\n|\r|\n/", "\n", $body);
+            
+            // Eliminar saltos de línea excesivos
+            $lines = explode("\n", $body);
+            $filteredLines = [];
+            $lastWasEmpty = false;
+            
+            foreach ($lines as $line) {
+                $line = rtrim($line);
+                
+                if ($line === '') {
+                    if (!$lastWasEmpty && !empty($filteredLines)) {
+                        $filteredLines[] = '';
+                        $lastWasEmpty = true;
+                    }
+                } else {
+                    $filteredLines[] = $line;
+                    $lastWasEmpty = false;
+                }
+            }
+            
+            $body = implode("\n", $filteredLines);
+            
+            // Reemplazar en el request
+            $request->merge([
+                'tipo' => $tipo,
+                'body' => $body,
+                'numeroContrato' => $numeroContrato,
+                'subject' => $subject,
+            ]);
+            
+            // Validación básica
+            $validated = $request->validate([
+                'to' => 'required',
+                'cc' => 'nullable',
+                'bcc' => 'nullable',
                 'subject' => 'required|string|max:255',
                 'body' => 'required|string',
                 'contratoId' => 'required|integer',
                 'numeroContrato' => 'required|string',
                 'tipo' => 'nullable|string|in:administracion,cliente',
-                'incluirBienvenida' => 'nullable|json',
-                'bienvenidaData' => 'nullable|json',
+                'incluirBienvenida' => 'nullable',
+                'bienvenidaData' => 'nullable',
                 'pdf' => 'nullable|file|mimes:pdf|max:10240'
             ]);
-
-            // Decodificar JSON
-            $to = json_decode($request->to, true);
-            $cc = $request->cc ? json_decode($request->cc, true) : [];
-            $bcc = $request->bcc ? json_decode($request->bcc, true) : [];
-            $incluirBienvenida = $request->incluirBienvenida ? json_decode($request->incluirBienvenida, true) : false;
-            $bienvenidaDataRaw = $request->bienvenidaData ? json_decode($request->bienvenidaData, true) : null;
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception('Error al decodificar JSON: ' . json_last_error_msg());
-            }
-
-            // Asegurar que $to sea un array
-            if (!is_array($to)) {
-                if (is_string($to) && filter_var($to, FILTER_VALIDATE_EMAIL)) {
-                    $to = [$to];
-                } else {
-                    throw new \Exception('El formato de destinatarios no es válido');
-                }
-            }
-
-            if (!is_array($cc)) {
-                $cc = is_string($cc) && filter_var($cc, FILTER_VALIDATE_EMAIL) ? [$cc] : [];
+            
+            // 🔥 PROCESAR DESTINATARIOS
+            $to = $this->parseRecipients($request->to);
+            $cc = $this->parseRecipients($request->cc);
+            $bcc = $this->parseRecipients($request->bcc);
+            
+            if (empty($to)) {
+                throw new \Exception('Debe especificar al menos un destinatario válido');
             }
             
-            if (!is_array($bcc)) {
-                $bcc = is_string($bcc) && filter_var($bcc, FILTER_VALIDATE_EMAIL) ? [$bcc] : [];
+            // Procesar incluirBienvenida
+            $incluirBienvenida = false;
+            if ($request->incluirBienvenida) {
+                $bienvenidaRaw = $this->normalizeField($request->incluirBienvenida);
+                $incluirBienvenida = json_decode($bienvenidaRaw, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $incluirBienvenida = filter_var($bienvenidaRaw, FILTER_VALIDATE_BOOLEAN);
+                }
             }
-
-            if (empty($to)) {
-                throw new \Exception('Debe especificar al menos un destinatario');
+            
+            // Procesar bienvenidaData
+            $bienvenidaDataRaw = null;
+            if ($request->bienvenidaData) {
+                $bienvenidaDataRaw = json_decode($this->normalizeField($request->bienvenidaData), true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $bienvenidaDataRaw = null;
+                }
             }
-
+            
             // Obtener datos del contrato
             $contrato = \App\Models\Contrato::with([
                 'presupuesto.prefijo.comercial.compania',
@@ -73,7 +199,7 @@ class EmailController extends Controller
             
             $compania = $this->getCompaniaDataFromContrato($contrato);
             
-            // Preparar datos para la vista de bienvenida (si está incluida)
+            // Preparar datos para la vista de bienvenida
             $bienvenidaViewData = null;
             $bienvenidaView = null;
             
@@ -86,7 +212,6 @@ class EmailController extends Controller
                 $comercialEmail = $bienvenidaDataRaw['comercialEmail'];
                 $comercialTelefono = $bienvenidaDataRaw['comercialTelefono'] ?? '11 3456-7890';
                 
-                // Generar nombre de archivo de la foto del comercial
                 $fotoComercial = strtolower(preg_replace('/\s+/', '', $comercialNombre)) . '.png';
                 
                 $bienvenidaViewData = [
@@ -99,7 +224,6 @@ class EmailController extends Controller
                     'fotoComercial' => $fotoComercial,
                 ];
                 
-                // Elegir la vista según compañía y plataforma
                 if ($companiaId == 2) {
                     $bienvenidaView = 'emails.bienvenida.smartsat';
                 } elseif ($plataforma === 'DELTA') {
@@ -108,36 +232,34 @@ class EmailController extends Controller
                     $bienvenidaView = 'emails.bienvenida.localsat_alpha';
                 }
             }
-
+            
             $data = [
-                'subject' => $request->subject,
-                'body' => $request->body,
+                'subject' => $subject,
+                'body' => $body,
                 'cc' => $cc,
                 'bcc' => $bcc,
-                'filename' => "Contrato_{$request->numeroContrato}.pdf",
-                'tipo' => $request->tipo ?? 'cliente',
+                'filename' => "Contrato_{$numeroContrato}.pdf",
+                'tipo' => $tipo ?? 'cliente',
                 'compania' => $compania,
                 'incluirBienvenida' => $incluirBienvenida,
                 'bienvenidaView' => $bienvenidaView,
                 'bienvenidaViewData' => $bienvenidaViewData,
             ];
-
+            
+            // Procesar PDF
             $pdfPath = null;
             $attachments = [];
-
-            // Guardar PDF temporal
+            
             if ($request->hasFile('pdf')) {
                 $pdfFile = $request->file('pdf');
                 $pdfPath = storage_path("app/temp/contrato_{$request->contratoId}_" . time() . ".pdf");
-                
                 $tempDir = storage_path('app/temp');
                 if (!file_exists($tempDir)) {
                     mkdir($tempDir, 0755, true);
                 }
-                
                 file_put_contents($pdfPath, file_get_contents($pdfFile->getRealPath()));
             }
-
+            
             // Procesar documentos adicionales
             if ($request->has('documento_local_0') || $request->has('documento_plataforma_0')) {
                 foreach ($request->allFiles() as $key => $file) {
@@ -152,13 +274,13 @@ class EmailController extends Controller
                     }
                 }
             }
-
+            
             $data['attachments'] = $attachments;
-
+            
             $usuario = auth()->user();
             $fromEmail = $usuario->personal->email ?? env('MAIL_FROM_ADDRESS', 'noreply@localsat.com.ar');
             $fromName = $usuario->personal->nombre_completo ?? $usuario->name ?? 'LocalSat';
-
+            
             foreach ($to as $destinatario) {
                 if (filter_var($destinatario, FILTER_VALIDATE_EMAIL)) {
                     Mail::to($destinatario)
@@ -167,7 +289,7 @@ class EmailController extends Controller
                     Log::warning('Email inválido ignorado:', ['email' => $destinatario]);
                 }
             }
-
+            
             // Limpiar archivos temporales
             if ($pdfPath && file_exists($pdfPath)) {
                 unlink($pdfPath);
@@ -178,36 +300,48 @@ class EmailController extends Controller
                     unlink($attachment['path']);
                 }
             }
-
+            
             Log::info('Contrato enviado por email', [
                 'contrato_id' => $request->contratoId,
                 'destinatarios' => $to,
-                'incluir_bienvenida' => $incluirBienvenida,
-                'bienvenida_view' => $bienvenidaView,
+                'tipo' => $tipo,
                 'usuario_id' => auth()->id(),
-                'from_email' => $fromEmail,
-                'compania' => $compania['nombre'] ?? 'LocalSat'
             ]);
-
+            
             if ($request->header('X-Inertia')) {
                 return redirect()->back()->with('success', 'Email enviado correctamente');
             }
-
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Email enviado correctamente'
             ]);
-
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Error de validación:', [
+                'errors' => $e->errors(),
+                'received_data' => $request->except(['pdf'])
+            ]);
+            
+            if ($request->header('X-Inertia')) {
+                return redirect()->back()->withErrors($e->errors());
+            }
+            
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors()
+            ], 422);
+            
         } catch (\Exception $e) {
             Log::error('Error enviando contrato por email:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-
+            
             if ($request->header('X-Inertia')) {
                 return redirect()->back()->with('error', 'Error al enviar el email: ' . $e->getMessage());
             }
-
+            
             return response()->json([
                 'success' => false,
                 'error' => 'Error al enviar el email: ' . $e->getMessage()
@@ -333,7 +467,6 @@ class EmailController extends Controller
             $comercialEmail = $validated['comercialEmail'];
             $comercialTelefono = $validated['comercialTelefono'] ?? '11 3456-7890';
             
-            // Generar nombre de archivo de la foto del comercial
             $fotoComercial = strtolower(preg_replace('/\s+/', '', $comercialNombre)) . '.png';
             
             $bienvenidaViewData = [

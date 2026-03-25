@@ -200,4 +200,9 @@ class Contrato extends Model
             default => 'No especificado'
         };
     }
+
+    public function createdBy()
+{
+    return $this->belongsTo(Usuario::class, 'created_by');
+}
 }

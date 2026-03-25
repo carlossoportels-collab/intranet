@@ -85,7 +85,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                         { id: 'motivos-baja', name: 'Motivos baja', href: '/config/parametros/motivos-baja', icon: <Lightbulb size={12} />, permiso: 'gestionar_parametros' },
                         { id: 'origen-prospecto', name: 'Origen de prospecto', href: '/config/parametros/origen-prospecto', icon: <Target size={12} />, permiso: 'gestionar_parametros' },
                         { id: 'rubros', name: 'Rubros', href: '/config/parametros/rubros', icon: <Layers size={12} />, permiso: 'gestionar_parametros' },
-                        { id: 'terminos-condiciones', name: 'Términos y condiciones', href: '/config/parametros/terminos-condiciones', icon: <FileText size={12} />, permiso: 'gestionar_parametros' },
+                       //   { id: 'terminos-condiciones', name: 'Términos y condiciones', href: '/config/parametros/terminos-condiciones', icon: <FileText size={12} />, permiso: 'gestionar_parametros' },
                     ]
                 },
                 {
@@ -108,7 +108,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     icon: <UserCog size={14} />,
                     permiso: 'gestionar_usuarios',
                     children: [
-                        { id: 'usuarios-sistema', name: 'Usuarios del sistema', href: '/config/usuarios', icon: <User size={12} />, permiso: 'gestionar_usuarios' },
+                      //   { id: 'usuarios-sistema', name: 'Usuarios del sistema', href: '/config/usuarios', icon: <User size={12} />, permiso: 'gestionar_usuarios' },
                         { id: 'roles-permisos', name: 'Roles y permisos', href: '/config/usuarios/roles', icon: <Shield size={12} />, permiso: 'gestionar_roles_permisos' },
                     ]
                 }
@@ -160,26 +160,26 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                 { id: 'perdidas', name: 'Leads perdidos', href: '/comercial/leads-perdidos', icon: <Receipt size={14} />, permiso: 'ver_leads_perdidos' },
             ]
         },
-        {
-            id: 'estadisticas',
-            name: 'Estadísticas',
-            icon: <BarChart size={16} />,
-            visibleForUsers: [3, 5],
-            children: [
-                { 
-                    id: 'comercial-grupal', 
-                    name: 'Desempeño Grupal', 
-                    href: '/estadisticas/comercial-ggrupal', 
-                    icon: <Users size={14} />,
-                },
-                { 
-                    id: 'comercial-individual', 
-                    name: 'Rendimiento Individual', 
-                    href: '/estadisticas/comercial-iindividual', 
-                    icon: <User size={14} />,
-                },
-            ]
-        },
+        //  {
+        //      id: 'estadisticas',
+            //  name: 'Estadísticas',
+          //    icon: <BarChart size={16} />,
+          //    visibleForUsers: [3, 5],
+         //     children: [
+          //        { 
+           //           id: 'comercial-grupal', 
+           //           name: 'Desempeño Grupal', 
+            //          href: '/estadisticas/comercial-ggrupal', 
+           //           icon: <Users size={14} />,
+         //        },
+       //           { 
+          //            id: 'comercial-individual', 
+         //             name: 'Rendimiento Individual', 
+        //              href: '/estadisticas/comercial-iindividual', 
+           //           icon: <User size={14} />,
+        //          },
+         //     ]
+       //   },
         {
             id: 'rrhh',
             name: 'Recursos Humanos',
