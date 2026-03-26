@@ -25,6 +25,7 @@ class ContratoVehiculo extends Model
         'anio',
         'color',
         'identificador',
+        'tipo', 
         'orden',
         'deleted_by'
     ];
@@ -57,5 +58,9 @@ class ContratoVehiculo extends Model
     public function getPatenteFormateadaAttribute(): string
     {
         return strtoupper($this->patente);
+    }
+      public function setTipoAttribute($value)
+    {
+        $this->attributes['tipo'] = $value ?: null;
     }
 }

@@ -109,16 +109,16 @@ const LeadHeader: React.FC<LeadHeaderProps> = ({
               {getIconoGenero()}
               {lead.nombre_completo}
             </h2>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
               <UserCheck className="h-4 w-4" />
               <div>
-                <span>Asignado a: {(lead as any).asignado_nombre || 'Sin asignar'}</span>
-                {lead.prefijo?.codigo && (
-                  <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                    <Hash className="h-3 w-3 inline mr-1" />
-                    {lead.prefijo.codigo}
-                  </span>
-                )}
+                  <span>Asignado a: {lead.asignado_nombre || 'Sin asignar'}</span>
+                  {lead.prefijo?.codigo && (
+                      <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          <Hash className="h-3 w-3 inline mr-1" />
+                          {lead.prefijo.codigo}
+                      </span>
+                  )}
               </div>
             </div>
           </div>

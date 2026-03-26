@@ -20,15 +20,14 @@ class EmpresaResponsableController extends Controller
 
     public function store(Request $request)
     {
-     
         $this->authorizePermiso(config('permisos.GESTIONAR_EMPRESAS', 'gestionar_empresas'));
         
         try {
             $validated = $request->validate([
                 'empresa_id' => 'required|integer|exists:empresas,id',
                 'tipo_responsabilidad_id' => 'required|integer|exists:tipos_responsabilidad,id',
-                'nombre' => 'required|string|max:100',
-                'apellido' => 'required|string|max:100',
+                'nombre_completo' => 'required|string|max:200',
+                // 'cargo' => 'nullable|string|max:100', // ← Eliminar validación de cargo
                 'telefono' => 'nullable|string|max:20',
                 'email' => 'nullable|email|max:150',
             ]);
@@ -36,8 +35,8 @@ class EmpresaResponsableController extends Controller
             $responsable = EmpresaResponsable::create([
                 'empresa_id' => $request->empresa_id,
                 'tipo_responsabilidad_id' => $request->tipo_responsabilidad_id,
-                'nombre' => $request->nombre,
-                'apellido' => $request->apellido,
+                'nombre_completo' => $request->nombre_completo,
+                // 'cargo' => $request->cargo, // ← Eliminar línea
                 'telefono' => $request->telefono,
                 'email' => $request->email,
                 'es_activo' => true,
@@ -61,7 +60,6 @@ class EmpresaResponsableController extends Controller
 
     public function destroy($id)
     {
-       
         $this->authorizePermiso(config('permisos.GESTIONAR_EMPRESAS', 'gestionar_empresas'));
         
         try {

@@ -42,9 +42,9 @@ class Lead extends Model
         'modified' => 'datetime'
     ];
     
-    protected $appends = ['localidad_completa'];
+    protected $appends = ['localidad_completa', 'asignado_nombre']; // ← Agregar 'asignado_nombre'
     
-    // Relaciones
+    // Relaciones existentes...
     public function origen(): BelongsTo
     {
         return $this->belongsTo(OrigenContacto::class, 'origen_id');
@@ -73,8 +73,8 @@ class Lead extends Model
     public function comercial(): BelongsTo
     {
         return $this->belongsTo(Comercial::class, 'prefijo_id', 'prefijo_id');
+
     }
-    
     public function notas(): HasMany
     {
         return $this->hasMany(NotaLead::class, 'lead_id');
@@ -196,5 +196,38 @@ public function recordatoriosNoLeidos()
         ->where('leida', false)
         ->whereNull('deleted_at');
 }
+
+ /**
+     * Accessor para obtener el nombre del comercial asignado
+     */
+    public function getAsignadoNombreAttribute(): ?string
+    {
+        // Intentar obtener desde la relación prefijo
+        if ($this->relationLoaded('prefijo') && $this->prefijo) {
+            $comercial = $this->prefijo->comercial;
+            if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
+                $comercial = $comercial->first();
+            }
+            if ($comercial && $comercial->personal) {
+                return $comercial->personal->nombre_completo;
+            }
+        }
+        
+        // Si no está cargada la relación, buscar directamente
+        if ($this->prefijo_id) {
+            $prefijo = Prefijo::with('comercial.personal')->find($this->prefijo_id);
+            if ($prefijo && $prefijo->comercial) {
+                $comercial = $prefijo->comercial;
+                if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
+                    $comercial = $comercial->first();
+                }
+                if ($comercial && $comercial->personal) {
+                    return $comercial->personal->nombre_completo;
+                }
+            }
+        }
+        
+        return 'Sin asignar';
+    }
 
 }

@@ -1,6 +1,6 @@
 // resources/js/components/empresa/AltaEmpresaModal.tsx
 import { router } from '@inertiajs/react';
-import { X, User, Building, Check, ChevronLeft, ChevronRight, Loader, AlertCircle } from 'lucide-react';
+import { X, User, Building, Check, ChevronLeft, ChevronRight, Loader, AlertCircle, UserPlus } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { useToast } from '@/contexts/ToastContext';
@@ -14,7 +14,7 @@ import {
     CategoriaFiscal, 
     Plataforma
 } from '@/types/empresa';
-import { Lead, Origen, Rubro, Provincia } from '@/types/leads';
+import { Lead, Origen, Rubro, Provincia, Comercial } from '@/types/leads';
 
 import Paso1DatosLead from './pasos/Paso1DatosLead';
 import Paso2DatosContacto from './pasos/Paso2DatosContacto';
@@ -35,10 +35,13 @@ interface Props {
         empresa?: any;
         contacto?: any;
     };
+    usuario?: any;
+    comerciales?: Comercial[];
+    hayComerciales?: boolean;
 }
 
 const PASOS = [
-    { id: 1, nombre: 'Actualizar Lead', icon: User },
+    { id: 1, nombre: 'Datos del Lead', icon: User },
     { id: 2, nombre: 'Datos Personales', icon: User },
     { id: 3, nombre: 'Datos de Empresa', icon: Building },
 ];
@@ -54,7 +57,10 @@ export default function AltaEmpresaModal({
     pasoInicial = 1,
     esCliente = false,
     modoCompletar = false,
-    datosExistentes
+    datosExistentes,
+    usuario,
+    comerciales = [],
+    hayComerciales = false
 }: Props) {
     const [isMounted, setIsMounted] = useState(false);
     const [pasoActual, setPasoActual] = useState(pasoInicial);
@@ -72,9 +78,15 @@ export default function AltaEmpresaModal({
     const [categoriasFiscales, setCategoriasFiscales] = useState<CategoriaFiscal[]>([]);
     const [plataformas, setPlataformas] = useState<Plataforma[]>([]);
 
+    // Determinar si el usuario es comercial
+    const esComercial = usuario?.rol_id === 5;
+    // Determinar si debe mostrar selector de comercial
+    const mostrarSelectorComercial = !esComercial && hayComerciales && !lead?.prefijo_id;
+
     // Estado del formulario
     const [formData, setFormData] = useState({
         lead: {
+            prefijo_id: '' as string,
             nombre_completo: '',
             genero: 'no_especifica' as 'masculino' | 'femenino' | 'otro' | 'no_especifica',
             telefono: '',
@@ -117,6 +129,23 @@ export default function AltaEmpresaModal({
             document.body.style.overflow = 'hidden';
             cargarDatosIniciales();
             
+            // Configurar prefijo inicial
+            let prefijoInicial = '';
+            
+            if (lead?.prefijo_id) {
+                prefijoInicial = String(lead.prefijo_id);
+            } else if (esComercial && usuario?.comercial?.prefijo_id) {
+                prefijoInicial = String(usuario.comercial.prefijo_id);
+            }
+            
+            setFormData(prev => ({
+                ...prev,
+                lead: {
+                    ...prev.lead,
+                    prefijo_id: prefijoInicial
+                }
+            }));
+            
             if (pasoInicial > 1) {
                 setPaso1Completado(true);
             }
@@ -136,15 +165,15 @@ export default function AltaEmpresaModal({
         return () => {
             document.body.style.overflow = 'unset';
         };
-    }, [isOpen, pasoInicial]);
+    }, [isOpen, pasoInicial, lead, esComercial, usuario]);
 
-    // Cargar datos del lead y datos existentes cuando se abre el modal
+    // Cargar datos del lead cuando se abre
     useEffect(() => {
         if (isOpen && lead) {
-            // Cargar datos del lead
             setFormData(prev => ({
                 ...prev,
                 lead: {
+                    ...prev.lead,
                     nombre_completo: lead.nombre_completo || '',
                     genero: (lead.genero || 'no_especifica') as any,
                     telefono: lead.telefono || '',
@@ -154,46 +183,48 @@ export default function AltaEmpresaModal({
                     origen_id: lead.origen_id || '',
                 }
             }));
+        }
+    }, [isOpen, lead]);
 
-            // Cargar datos existentes de empresa y contacto
-            if (datosExistentes) {
-                if (datosExistentes.empresa) {
-                    setFormData(prev => ({
-                        ...prev,
-                        empresa: {
-                            nombre_fantasia: datosExistentes.empresa.nombre_fantasia || '',
-                            razon_social: datosExistentes.empresa.razon_social || '',
-                            cuit: datosExistentes.empresa.cuit || '',
-                            direccion_fiscal: datosExistentes.empresa.direccion_fiscal || '',
-                            codigo_postal_fiscal: datosExistentes.empresa.codigo_postal_fiscal || '',
-                            localidad_fiscal_id: datosExistentes.empresa.localidad_fiscal_id || '',
-                            telefono_fiscal: datosExistentes.empresa.telefono_fiscal || '',
-                            email_fiscal: datosExistentes.empresa.email_fiscal || '',
-                            rubro_id: datosExistentes.empresa.rubro_id || '',
-                            cat_fiscal_id: datosExistentes.empresa.cat_fiscal_id || '',
-                            plataforma_id: datosExistentes.empresa.plataforma_id || '',
-                            nombre_flota: datosExistentes.empresa.nombre_flota || '',
-                        }
-                    }));
-                }
-                
-                if (datosExistentes.contacto) {
-                    setFormData(prev => ({
-                        ...prev,
-                        contacto: {
-                            tipo_responsabilidad_id: datosExistentes.contacto.tipo_responsabilidad_id || '',
-                            tipo_documento_id: datosExistentes.contacto.tipo_documento_id || '',
-                            nro_documento: datosExistentes.contacto.nro_documento || '',
-                            nacionalidad_id: datosExistentes.contacto.nacionalidad_id || '',
-                            fecha_nacimiento: datosExistentes.contacto.fecha_nacimiento || '',
-                            direccion_personal: datosExistentes.contacto.direccion_personal || '',
-                            codigo_postal_personal: datosExistentes.contacto.codigo_postal_personal || '',
-                        }
-                    }));
-                }
+    // Cargar datos existentes
+    useEffect(() => {
+        if (datosExistentes) {
+            if (datosExistentes.empresa) {
+                setFormData(prev => ({
+                    ...prev,
+                    empresa: {
+                        nombre_fantasia: datosExistentes.empresa.nombre_fantasia || '',
+                        razon_social: datosExistentes.empresa.razon_social || '',
+                        cuit: datosExistentes.empresa.cuit || '',
+                        direccion_fiscal: datosExistentes.empresa.direccion_fiscal || '',
+                        codigo_postal_fiscal: datosExistentes.empresa.codigo_postal_fiscal || '',
+                        localidad_fiscal_id: datosExistentes.empresa.localidad_fiscal_id || '',
+                        telefono_fiscal: datosExistentes.empresa.telefono_fiscal || '',
+                        email_fiscal: datosExistentes.empresa.email_fiscal || '',
+                        rubro_id: datosExistentes.empresa.rubro_id || '',
+                        cat_fiscal_id: datosExistentes.empresa.cat_fiscal_id || '',
+                        plataforma_id: datosExistentes.empresa.plataforma_id || '',
+                        nombre_flota: datosExistentes.empresa.nombre_flota || '',
+                    }
+                }));
+            }
+            
+            if (datosExistentes.contacto) {
+                setFormData(prev => ({
+                    ...prev,
+                    contacto: {
+                        tipo_responsabilidad_id: datosExistentes.contacto.tipo_responsabilidad_id || '',
+                        tipo_documento_id: datosExistentes.contacto.tipo_documento_id || '',
+                        nro_documento: datosExistentes.contacto.nro_documento || '',
+                        nacionalidad_id: datosExistentes.contacto.nacionalidad_id || '',
+                        fecha_nacimiento: datosExistentes.contacto.fecha_nacimiento || '',
+                        direccion_personal: datosExistentes.contacto.direccion_personal || '',
+                        codigo_postal_personal: datosExistentes.contacto.codigo_postal_personal || '',
+                    }
+                }));
             }
         }
-    }, [isOpen, lead, datosExistentes]);
+    }, [datosExistentes]);
 
     const resetForm = () => {
         setPasoActual(1);
@@ -202,6 +233,7 @@ export default function AltaEmpresaModal({
         setContactoId(null);
         setFormData({
             lead: {
+                prefijo_id: '',
                 nombre_completo: '',
                 genero: 'no_especifica',
                 telefono: '',
@@ -235,6 +267,8 @@ export default function AltaEmpresaModal({
             }
         });
         setErrores({});
+        window.sessionStorage.removeItem('temp_lead_id');
+        window.sessionStorage.removeItem('temp_lead_data');
     };
 
     const cargarDatosIniciales = async () => {
@@ -267,42 +301,47 @@ export default function AltaEmpresaModal({
         const nuevosErrores: Record<string, string> = {};
 
         if (paso === 1) {
-            const { lead } = formData;
+            const { lead: leadData } = formData;
             
-            if (!lead.nombre_completo || lead.nombre_completo.trim() === '') {
+            // Validar prefijo para usuarios no comerciales
+            if (mostrarSelectorComercial && !leadData.prefijo_id) {
+                nuevosErrores['lead.prefijo_id'] = 'Debe seleccionar un comercial para asignar el lead';
+            }
+            
+            if (!leadData.nombre_completo || leadData.nombre_completo.trim() === '') {
                 nuevosErrores['lead.nombre_completo'] = 'El nombre es requerido';
-            } else if (lead.nombre_completo.trim().length < 3) {
+            } else if (leadData.nombre_completo.trim().length < 3) {
                 nuevosErrores['lead.nombre_completo'] = 'El nombre debe tener al menos 3 caracteres';
             }
             
-            if (!lead.telefono || lead.telefono.trim() === '') {
+            if (!leadData.telefono || leadData.telefono.trim() === '') {
                 nuevosErrores['lead.telefono'] = 'El teléfono es requerido';
             } else {
-                const telefonoLimpio = lead.telefono.replace(/\D/g, '');
+                const telefonoLimpio = leadData.telefono.replace(/\D/g, '');
                 if (telefonoLimpio.length < 8) {
                     nuevosErrores['lead.telefono'] = 'El teléfono debe tener al menos 8 dígitos';
                 }
             }
             
-            if (!lead.email || lead.email.trim() === '') {
+            if (!leadData.email || leadData.email.trim() === '') {
                 nuevosErrores['lead.email'] = 'El email es requerido';
-            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email)) {
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadData.email)) {
                 nuevosErrores['lead.email'] = 'Email inválido (ej: nombre@dominio.com)';
             }
             
-            if (!lead.genero) {
+            if (!leadData.genero) {
                 nuevosErrores['lead.genero'] = 'El género es requerido';
             }
             
-            if (!lead.localidad_id ) {
+            if (!leadData.localidad_id) {
                 nuevosErrores['lead.localidad_id'] = 'La localidad es requerida (seleccione una de la lista)';
             }
             
-            if (!lead.rubro_id ) {
+            if (!leadData.rubro_id) {
                 nuevosErrores['lead.rubro_id'] = 'El rubro es requerido';
             }
             
-            if (!lead.origen_id) {
+            if (!leadData.origen_id) {
                 nuevosErrores['lead.origen_id'] = 'El origen de contacto es requerido';
             }
         }
@@ -310,11 +349,11 @@ export default function AltaEmpresaModal({
         if (paso === 2) {
             const { contacto } = formData;
             
-            if (!contacto.tipo_responsabilidad_id ) {
+            if (!contacto.tipo_responsabilidad_id) {
                 nuevosErrores['contacto.tipo_responsabilidad_id'] = 'Seleccione tipo de responsabilidad';
             }
             
-            if (!contacto.tipo_documento_id ) {
+            if (!contacto.tipo_documento_id) {
                 nuevosErrores['contacto.tipo_documento_id'] = 'Seleccione tipo de documento';
             }
             
@@ -324,7 +363,7 @@ export default function AltaEmpresaModal({
                 nuevosErrores['contacto.nro_documento'] = 'El número de documento debe tener al menos 7 caracteres';
             }
             
-            if (!contacto.nacionalidad_id ) {
+            if (!contacto.nacionalidad_id) {
                 nuevosErrores['contacto.nacionalidad_id'] = 'Seleccione nacionalidad';
             }
             
@@ -363,14 +402,15 @@ export default function AltaEmpresaModal({
                 nuevosErrores['empresa.razon_social'] = 'Ingrese razón social';
             }
             
-            if (!empresa.cuit || empresa.cuit.trim() === '') {
-                nuevosErrores['empresa.cuit'] = 'Ingrese CUIT';
-            } else {
-                const cuitLimpio = empresa.cuit.replace(/\D/g, '');
-                if (cuitLimpio.length !== 11) {
-                    nuevosErrores['empresa.cuit'] = 'CUIT debe tener 11 dígitos';
-                }
-            }
+             if (!empresa.cuit || empresa.cuit.trim() === '') {
+                nuevosErrores['empresa.cuit'] = 'Ingrese CUIT o DNI';
+                    } else {
+                        const numeros = empresa.cuit.replace(/\D/g, '');
+                        // Validar según longitud: 11 dígitos para CUIT, 7-8 dígitos para DNI
+                        if (numeros.length < 7 || numeros.length > 11) {
+                            nuevosErrores['empresa.cuit'] = 'CUIT debe tener 11 dígitos o DNI entre 7 y 8 dígitos';
+                        }
+                    }
             
             if (!empresa.direccion_fiscal || empresa.direccion_fiscal.trim() === '') {
                 nuevosErrores['empresa.direccion_fiscal'] = 'Ingrese dirección fiscal';
@@ -422,53 +462,92 @@ export default function AltaEmpresaModal({
         return true;
     };
 
-const handleSubmitPaso1 = () => {
+const handleSubmitPaso1 = async () => {
     if (!validarPaso(1)) return;
 
     setIsSubmitting(true);
     
-    // Determinar si es update (siempre será update porque el lead ya existe)
-    const esUpdate = true;
     const leadId = lead?.id;
+    const esUpdate = !!leadId;
     
-    if (!leadId) {
-        toast.error('No se encontró el lead para actualizar');
-        setIsSubmitting(false);
-        return;
+    const url = esUpdate 
+        ? `/comercial/utils/empresa/paso1/${leadId}`
+        : '/comercial/utils/empresa/paso1';
+    
+    const method = esUpdate ? 'PUT' : 'POST';
+    
+    const dataToSend: any = {
+        nombre_completo: formData.lead.nombre_completo,
+        genero: formData.lead.genero,
+        telefono: formData.lead.telefono,
+        email: formData.lead.email,
+        localidad_id: formData.lead.localidad_id,
+        rubro_id: formData.lead.rubro_id,
+        origen_id: formData.lead.origen_id,
+    };
+    
+    if (mostrarSelectorComercial && formData.lead.prefijo_id) {
+        dataToSend.prefijo_id = parseInt(formData.lead.prefijo_id);
+    } else if (esComercial && usuario?.comercial?.prefijo_id) {
+        dataToSend.prefijo_id = usuario.comercial.prefijo_id;
     }
     
-    const url = '/comercial/utils/empresa/paso1';
-    const method = 'post'; // El método es POST según tu ruta
-    
-    router[method](url, {
-        lead_id: leadId,
-        ...formData.lead
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            toast.success('Datos del lead actualizados correctamente');
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(dataToSend)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const nuevoLeadId = result.lead_id;
+            
+            if (nuevoLeadId) {
+                window.sessionStorage.setItem('temp_lead_id', String(nuevoLeadId));
+                console.log('Lead ID guardado:', nuevoLeadId);
+            }
+            
+            toast.success(esUpdate ? 'Datos del lead actualizados' : 'Lead creado correctamente');
             setPaso1Completado(true);
             setPasoActual(2);
-            setIsSubmitting(false);
-        },
-        onError: (errors) => {
-            console.error('Errores paso 1:', errors);
-            const backendErrors: Record<string, string> = {};
-            Object.keys(errors).forEach(key => {
-                backendErrors[`lead.${key}`] = errors[key];
-            });
-            setErrores(backendErrors);
-            const primerError = Object.values(backendErrors)[0];
-            toast.error(primerError || 'Error al actualizar lead');
-            setIsSubmitting(false);
+        } else {
+            throw new Error(result.error || 'Error al guardar');
         }
-    });
+    } catch (error) {
+        console.error('Errores paso 1:', error);
+        toast.error('Error al guardar datos del lead');
+    } finally {
+        setIsSubmitting(false);
+    }
 };
 
-const handleSubmitPaso2 = () => {
+
+
+const handleSubmitPaso2 = async () => {
     if (!validarPaso(2)) return;
 
     setIsSubmitting(true);
+    
+    // Obtener lead_id
+    let leadId = lead?.id;
+    if (!leadId) {
+        const tempLeadId = window.sessionStorage.getItem('temp_lead_id');
+        if (tempLeadId) {
+            leadId = parseInt(tempLeadId);
+        }
+    }
+    
+    if (!leadId) {
+        toast.error('No se pudo identificar el lead');
+        setIsSubmitting(false);
+        return;
+    }
     
     const contactoId = datosExistentes?.contacto?.id || (lead as any)?.empresa_contacto?.id;
     const esUpdate = !!contactoId;
@@ -477,48 +556,86 @@ const handleSubmitPaso2 = () => {
         ? `/comercial/utils/empresa/paso2/${contactoId}`
         : '/comercial/utils/empresa/paso2';
     
-    const method = esUpdate ? 'put' : 'post';
+    const method = esUpdate ? 'PUT' : 'POST';
     
-    // 🔥 Asegurar que solo envías campos de contacto
-    const contactoData = {
-        lead_id: lead?.id,
-        tipo_responsabilidad_id: formData.contacto.tipo_responsabilidad_id,
-        tipo_documento_id: formData.contacto.tipo_documento_id,
-        nro_documento: formData.contacto.nro_documento,
-        nacionalidad_id: formData.contacto.nacionalidad_id,
-        fecha_nacimiento: formData.contacto.fecha_nacimiento,
-        direccion_personal: formData.contacto.direccion_personal,
-        codigo_postal_personal: formData.contacto.codigo_postal_personal,
+    const dataToSend = {
+        lead_id: leadId,
+        ...formData.contacto
     };
     
-    console.log('Enviando datos paso 2:', contactoData);
+    console.log('Enviando paso 2:', { url, method, dataToSend, leadId });
     
-    router[method](url, contactoData, {
-        preserveScroll: true,
-        onSuccess: () => {
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(dataToSend)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log('Paso 2 éxito:', result);
+            
+            const nuevoContactoId = result.contacto_id;
+            
+            if (nuevoContactoId) {
+                setContactoId(nuevoContactoId);
+                // Guardar en sessionStorage
+                window.sessionStorage.setItem('temp_contacto_id', String(nuevoContactoId));
+                console.log('Contacto ID guardado:', nuevoContactoId);
+            }
+            
             toast.success(esUpdate ? 'Datos personales actualizados' : 'Datos personales guardados');
             setPaso2Completado(true);
             setPasoActual(3);
-            setIsSubmitting(false);
-        },
-        onError: (errors) => {
-            console.error('Errores paso 2:', errors);
-            const backendErrors: Record<string, string> = {};
-            Object.keys(errors).forEach(key => {
-                backendErrors[`contacto.${key}`] = errors[key];
-            });
-            setErrores(backendErrors);
-            const primerError = Object.values(backendErrors)[0];
-            toast.error(primerError || 'Error al guardar datos personales');
-            setIsSubmitting(false);
+        } else {
+            throw new Error(result.error || 'Error al guardar');
         }
-    });
+    } catch (error) {
+        console.error('Errores paso 2:', error);
+        toast.error('Error al guardar datos personales');
+    } finally {
+        setIsSubmitting(false);
+    }
 };
 
-const handleSubmitPaso3 = () => {
+const handleSubmitPaso3 = async () => {
     if (!validarPaso(3)) return;
 
     setIsSubmitting(true);
+    
+    let leadId = lead?.id;
+    if (!leadId) {
+        const tempLeadId = window.sessionStorage.getItem('temp_lead_id');
+        if (tempLeadId) {
+            leadId = parseInt(tempLeadId);
+        }
+    }
+    
+    let contactoIdLocal = contactoId;
+    if (!contactoIdLocal) {
+        const tempContactoId = window.sessionStorage.getItem('temp_contacto_id');
+        if (tempContactoId) {
+            contactoIdLocal = parseInt(tempContactoId);
+        }
+    }
+    
+    if (!leadId) {
+        toast.error('No se pudo identificar el lead');
+        setIsSubmitting(false);
+        return;
+    }
+    
+    if (!contactoIdLocal) {
+        toast.error('No se pudo identificar el contacto');
+        setIsSubmitting(false);
+        return;
+    }
     
     const empresaId = datosExistentes?.empresa?.id || (lead as any)?.empresa_contacto?.empresa?.id;
     const esUpdate = !!empresaId;
@@ -527,39 +644,58 @@ const handleSubmitPaso3 = () => {
         ? `/comercial/utils/empresa/paso3/${empresaId}`
         : '/comercial/utils/empresa/paso3';
     
-    const method = esUpdate ? 'put' : 'post';
+    const method = esUpdate ? 'PUT' : 'POST';
     
-    router[method](url, {
+    const dataToSend = {
         presupuesto_id: presupuestoId,
-        lead_id: lead?.id,
+        lead_id: leadId,
+        contacto_id: contactoIdLocal,
         ...formData.empresa
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            // El backend ya devuelve una redirección con el mensaje de éxito
-            setIsSubmitting(false);
+    };
+    
+    console.log('Enviando paso 3:', { url, method, dataToSend, leadId, contactoIdLocal });
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(dataToSend)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log('Paso 3 éxito:', result);
+            
+            // Limpiar sessionStorage
+            window.sessionStorage.removeItem('temp_lead_id');
+            window.sessionStorage.removeItem('temp_contacto_id');
             
             if (modoCompletar && esCliente && presupuestoId) {
                 toast.success('Datos guardados. Complete los vehículos para generar el contrato');
                 onClose(false, true);
+            } else if (presupuestoId) {
+                // Redirigir a creación de contrato desde presupuesto
+                router.visit(`/comercial/contratos/create-from-lead/${presupuestoId}`);
             } else {
-                onClose(true);
+                // Cambio de titularidad - redirigir a contrato desde empresa
+                router.visit(`/comercial/contratos/desde-empresa/${result.empresa_id}`);
             }
-        },
-        onError: (errors) => {
-            console.error('Errores paso 3:', errors);
-            const backendErrors: Record<string, string> = {};
-            Object.keys(errors).forEach(key => {
-                backendErrors[`empresa.${key}`] = errors[key];
-            });
-            setErrores(backendErrors);
-            const primerError = Object.values(backendErrors)[0];
-            toast.error(primerError || 'Error al guardar datos');
-            setIsSubmitting(false);
+            onClose(true);
+        } else {
+            throw new Error(result.error || 'Error al guardar');
         }
-    });
+    } catch (error) {
+        console.error('Errores paso 3:', error);
+        toast.error('Error al guardar datos de la empresa');
+    } finally {
+        setIsSubmitting(false);
+    }
 };
-
     const handleSiguiente = () => {
         if (validarPaso(pasoActual)) {
             if (pasoActual === 1) {
@@ -629,11 +765,12 @@ const handleSubmitPaso3 = () => {
         }
     };
 
-    const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (e.target === e.currentTarget) {
-            onClose(false);
-        }
-    };
+const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+        window.sessionStorage.removeItem('temp_lead_id');
+        onClose(false);
+    }
+};
 
     if (!isMounted && !isOpen) return null;
 
@@ -734,16 +871,53 @@ const handleSubmitPaso3 = () => {
                         ) : (
                             <>
                                 {pasoActual === 1 && (
-                                    <Paso1DatosLead
-                                        data={formData.lead}
-                                        origenes={origenes}
-                                        rubros={rubros}
-                                        provincias={provincias}
-                                        onChange={handleChangeLead}
-                                        errores={errores}
-                                        localidadInicial={lead?.localidad?.nombre || ''}
-                                        provinciaInicial={lead?.localidad?.provincia_id || ''}
-                                    />
+                                    <div className="space-y-6">
+                                        {/* Selector de comercial para usuarios no comerciales */}
+                                        {mostrarSelectorComercial && (
+                                            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                                                <div className="flex items-start gap-3">
+                                                    <UserPlus className="h-5 w-5 text-yellow-600 mt-0.5" />
+                                                    <div className="flex-1">
+                                                        <h4 className="font-medium text-yellow-800 mb-2">Asignar Comercial</h4>
+                                                        <p className="text-sm text-yellow-700 mb-3">
+                                                            Seleccione el comercial que gestionará este lead
+                                                        </p>
+                                                        <select
+                                                            value={formData.lead.prefijo_id}
+                                                            onChange={(e) => handleChangeLead('prefijo_id', e.target.value)}
+                                                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 ${
+                                                                errores['lead.prefijo_id'] ? 'border-red-300' : 'border-gray-300'
+                                                            }`}
+                                                        >
+                                                            <option value="">Seleccionar comercial</option>
+                                                            {comerciales.map(comercial => (
+                                                                <option key={comercial.prefijo_id} value={comercial.prefijo_id}>
+                                                                    {comercial.nombre} {comercial.personal?.email ? `(${comercial.personal.email})` : ''}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        {errores['lead.prefijo_id'] && (
+                                                            <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                                                                <AlertCircle className="h-3 w-3" />
+                                                                {errores['lead.prefijo_id']}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        <Paso1DatosLead
+                                            data={formData.lead}
+                                            origenes={origenes}
+                                            rubros={rubros}
+                                            provincias={provincias}
+                                            onChange={handleChangeLead}
+                                            errores={errores}
+                                            localidadInicial={lead?.localidad?.nombre || ''}
+                                            provinciaInicial={lead?.localidad?.provincia_id || ''}
+                                        />
+                                    </div>
                                 )}
                                 
                                 {pasoActual === 2 && (

@@ -279,6 +279,7 @@ Route::prefix('temp')->name('temp.')->group(function () {
         Route::post('/empresa/responsables', [EmpresaResponsableController::class, 'store'])->name('empresa.responsables.store');
         Route::delete('/empresa/responsables/{id}', [EmpresaResponsableController::class, 'destroy'])->name('empresa.responsables.destroy');
         
+
         Route::prefix('utils')->name('utils.')->group(function () {
             Route::get('/tipos-responsabilidad/activos', [TipoResponsabilidadController::class, 'activos']);
             Route::get('/tipos-documento/activos', [TipoDocumentoController::class, 'activos']);
@@ -286,13 +287,17 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::get('/categorias-fiscales/activas', [CategoriaFiscalController::class, 'activas']);
             Route::get('/plataformas/activas', [PlataformaController::class, 'activas']);
             Route::get('/rubros/activos', [RubroController::class, 'activos']);
-            Route::post('/empresa/paso1', [Paso1LeadController::class, 'update']);
-            Route::post('/empresa/paso2', [Paso2ContactoController::class, 'store']);
-            Route::post('/empresa/paso3', [Paso3EmpresaController::class, 'store']);
-            Route::post('/auditoria/dato-sensible', [AuditoriaDatoSensibleController::class, 'store'])->name('auditoria.dato-sensible');
-            Route::put('/empresa/paso1/{contactoId}', [Paso2ContactoController::class, 'update'])->name('empresa.paso1.update');
+            
+            Route::post('/empresa/paso1', [Paso1LeadController::class, 'store'])->name('empresa.paso1.store');
+            Route::put('/empresa/paso1/{leadId}', [Paso1LeadController::class, 'update'])->name('empresa.paso1.update');
+            
+            Route::post('/empresa/paso2', [Paso2ContactoController::class, 'store'])->name('empresa.paso2.store');
             Route::put('/empresa/paso2/{contactoId}', [Paso2ContactoController::class, 'update'])->name('empresa.paso2.update');
+            
+            Route::post('/empresa/paso3', [Paso3EmpresaController::class, 'store'])->name('empresa.paso3.store');
             Route::put('/empresa/paso3/{empresaId}', [Paso3EmpresaController::class, 'update'])->name('empresa.paso3.update');
+            
+            Route::post('/auditoria/dato-sensible', [AuditoriaDatoSensibleController::class, 'store'])->name('auditoria.dato-sensible');
         });
     });
     

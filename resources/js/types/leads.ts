@@ -57,6 +57,7 @@ export interface Lead {
     id: number;
     prefijo_id?: number;
     nombre_completo: string;
+    asignado_nombre?: string | null;
     genero: string;
     telefono?: string;
     email?: string;
@@ -180,4 +181,25 @@ export interface SeguimientoPerdida {
         id: number;
         nombre: string;
     };
+}
+
+export interface LeadDTO {
+    id: number;
+    nombre_completo: string;
+    email: string;
+    telefono?: string;
+    prefijo_id?: number;
+    prefijo?: PrefijoDTO | null;
+    es_cliente?: boolean;
+    genero?: string;
+    rubro_id?: number;
+    origen_id?: number;
+    estado_lead_id?: number;
+    localidad_id?: number;
+}
+
+export interface PrefijoDTO {
+    id: number;
+    codigo: string;
+    descripcion: string;
 }

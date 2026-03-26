@@ -4,7 +4,7 @@ import { Head, router } from '@inertiajs/react';
 import { ArrowLeft, FileText, Calendar, User, Building, Truck, CreditCard, Download, ChevronDown, ChevronUp, Mail, Send, Building2 } from 'lucide-react';
 import React, { useState } from 'react';
 import EnviarContratoEmailModal from '@/components/Modals/Emails/EnviarContratoEmailModal';
-import EnviarEmailAdministracionModal from '@/components/Modals/Emails/EnviarEmailAdministracionModal'; // Nuevo modal
+import EnviarEmailAdministracionModal from '@/components/Modals/Emails/EnviarEmailAdministracionModal';
 
 import { Amount } from '@/components/ui/Amount';
 import { DataCard } from '@/components/ui/DataCard';
@@ -22,10 +22,11 @@ interface Props {
 export default function ContratoShow({ contrato }: Props) {
     const toast = useToast();
     const [showEmailModal, setShowEmailModal] = useState(false);
-    const [showEmailAdminModal, setShowEmailAdminModal] = useState(false); // Nuevo estado
-    const [showOpcionesEmail, setShowOpcionesEmail] = useState(false); // Estado para el menú de opciones
+    const [showEmailAdminModal, setShowEmailAdminModal] = useState(false);
+    const [showOpcionesEmail, setShowOpcionesEmail] = useState(false);
     const [generandoPDF, setGenerandoPDF] = useState(false);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [mostrarVistaPDF, setMostrarVistaPDF] = useState(false);
 
     const [showMobileDetails, setShowMobileDetails] = useState<Record<string, boolean>>({
         cliente: false,
@@ -69,18 +70,17 @@ export default function ContratoShow({ contrato }: Props) {
         });
     };
 
-const handleOpenEmailOptions = async () => {
-    setGenerandoPDF(true);
-    toast.info('Preparando PDF...');
-    
-    const url = await generarPDFTemporal();
-    if (url) {
-        setPdfUrl(url);
-        // 🔥 CAMBIO: Siempre mostrar opciones, sin importar si es cliente o lead
-        setShowOpcionesEmail(true);
-    }
-    setGenerandoPDF(false);
-};
+    const handleOpenEmailOptions = async () => {
+        setGenerandoPDF(true);
+        toast.info('Preparando PDF...');
+        
+        const url = await generarPDFTemporal();
+        if (url) {
+            setPdfUrl(url);
+            setShowOpcionesEmail(true);
+        }
+        setGenerandoPDF(false);
+    };
 
     const handleSendToCliente = () => {
         setShowOpcionesEmail(false);
@@ -97,7 +97,12 @@ const handleOpenEmailOptions = async () => {
     };
 
     const handleVerPDF = () => {
-        window.open(`/comercial/contratos/${contrato.id}/pdf`, '_blank');
+        setMostrarVistaPDF(true);
+        if (!pdfUrl) {
+            generarPDFTemporal().then(url => {
+                if (url) setPdfUrl(url);
+            });
+        }
     };
 
     const toggleMobileSection = (section: string) => {
@@ -106,43 +111,24 @@ const handleOpenEmailOptions = async () => {
             [section]: !prev[section]
         }));
     };
-const getTipoOperacionBadge = () => {
-    const tipo = contrato?.tipo_operacion;
-    
-    switch(tipo) {
-        case 'venta_cliente':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
-        case 'alta_nueva':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
-        case 'cambio_titularidad':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
-        case 'cambio_razon_social':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
-        default:
-            return null;
-    }
-};
 
-// En el header, después del StatusBadge, agregar:
-<div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-        Contrato #{contrato.numero_contrato}
-    </h1>
-    <StatusBadge 
-        status={contrato.estado?.nombre || 'Sin estado'} 
-        color={getEstadoColor(contrato.estado_id)}
-    />
-    {getTipoOperacionBadge()}
-    {contrato.lead_es_cliente ? (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-            Cliente
-        </span>
-    ) : (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-            Lead
-        </span>
-    )}
-</div>
+    const getTipoOperacionBadge = () => {
+        const tipo = contrato?.tipo_operacion;
+        
+        switch(tipo) {
+            case 'venta_cliente':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
+            case 'alta_nueva':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
+            case 'cambio_titularidad':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
+            case 'cambio_razon_social':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
+            default:
+                return null;
+        }
+    };
+
     return (
         <AppLayout title={`Contrato #${contrato.numero_contrato}`}>
             <Head title={`Contrato #${contrato.numero_contrato}`} />
@@ -165,7 +151,7 @@ const getTipoOperacionBadge = () => {
                                 status={contrato.estado?.nombre || 'Sin estado'} 
                                 color={getEstadoColor(contrato.estado_id)}
                             />
-                            {/* Badge para mostrar si es cliente o lead */}
+                            {getTipoOperacionBadge()}
                             {contrato.lead_es_cliente ? (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                                     Cliente
@@ -213,72 +199,108 @@ const getTipoOperacionBadge = () => {
                     </div>
                 </div>
 
-                {/* Modal de opciones para clientes */}
-                    {showOpcionesEmail && (
-                        <>
-                            <div className="fixed inset-0 bg-black/60 z-[99990]" onClick={() => setShowOpcionesEmail(false)} />
-                            <div className="fixed inset-0 flex items-center justify-center p-8 z-[99995] pointer-events-none">
-                                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto border border-gray-100">
-                                    <div className="p-6 border-b border-gray-200">
-                                        <h3 className="text-xl font-semibold text-gray-900">¿A quién querés enviar el email?</h3>
-                                    </div>
-                                    <div className="p-6 space-y-4">
+                {/* Vista PDF Modal */}
+                {mostrarVistaPDF && pdfUrl && (
+                    <>
+                        <div className="fixed inset-0 bg-black/60 z-[99990]" onClick={() => setMostrarVistaPDF(false)} />
+                        <div className="fixed inset-0 z-[99995] p-4 flex items-center justify-center pointer-events-none">
+                            <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl h-[90vh] pointer-events-auto flex flex-col">
+                                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                                    <h3 className="text-lg font-semibold text-gray-900">
+                                        Vista Previa - Contrato #{contrato.numero_contrato}
+                                    </h3>
+                                    <div className="flex gap-2">
                                         <button
-                                            onClick={handleSendToCliente}
-                                            className="w-full p-4 border-2 border-blue-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                                            onClick={handleDescargarPDF}
+                                            className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 text-sm"
                                         >
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-3 bg-blue-100 rounded-xl group-hover:bg-blue-200">
-                                                    <Send className="h-6 w-6 text-blue-600" />
-                                                </div>
-                                                <div className="text-left">
-                                                    <h4 className="font-medium text-gray-900">Enviar al Cliente</h4>
-                                                    <p className="text-sm text-gray-500 mt-1">
-                                                        {contrato.cliente_email || 'No tiene email'}
-                                                    </p>
-                                                    {/* Mostrar si es lead o cliente */}
-                                                    {!contrato.lead_es_cliente && (
-                                                        <span className="inline-flex items-center px-2 py-0.5 mt-2 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                                                            Incluye mensaje de bienvenida
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
+                                            <Download className="h-4 w-4" />
+                                            Descargar
                                         </button>
-                                        
                                         <button
-                                            onClick={handleSendToAdministracion}
-                                            className="w-full p-4 border-2 border-purple-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                                            onClick={() => setMostrarVistaPDF(false)}
+                                            className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
                                         >
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-3 bg-purple-100 rounded-xl group-hover:bg-purple-200">
-                                                    <Building2 className="h-6 w-6 text-purple-600" />
-                                                </div>
-                                                <div className="text-left">
-                                                    <h4 className="font-medium text-gray-900">Enviar a Administración</h4>
-                                                    <p className="text-sm text-gray-500 mt-1">
-                                                        gfaure@localsat.com.ar
-                                                    </p>
-                                                    <p className="text-xs text-gray-400 mt-1">
-                                                        Incluye todos los datos del {contrato.lead_es_cliente ? 'cliente' : 'nuevo lead'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </button>
-                                    </div>
-                                    <div className="p-6 border-t border-gray-200 bg-gray-50">
-                                        <button
-                                            onClick={() => setShowOpcionesEmail(false)}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
-                                        >
-                                            Cancelar
+                                            Cerrar
                                         </button>
                                     </div>
                                 </div>
+                                <div className="flex-1 overflow-auto">
+                                    <iframe
+                                        src={pdfUrl}
+                                        className="w-full h-full"
+                                        title={`Contrato ${contrato.numero_contrato}`}
+                                    />
+                                </div>
                             </div>
-                        </>
-                    )}
+                        </div>
+                    </>
+                )}
 
+                {/* Modal de opciones para clientes */}
+                {showOpcionesEmail && (
+                    <>
+                        <div className="fixed inset-0 bg-black/60 z-[99990]" onClick={() => setShowOpcionesEmail(false)} />
+                        <div className="fixed inset-0 flex items-center justify-center p-8 z-[99995] pointer-events-none">
+                            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto border border-gray-100">
+                                <div className="p-6 border-b border-gray-200">
+                                    <h3 className="text-xl font-semibold text-gray-900">¿A quién querés enviar el email?</h3>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <button
+                                        onClick={handleSendToCliente}
+                                        className="w-full p-4 border-2 border-blue-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-blue-100 rounded-xl group-hover:bg-blue-200">
+                                                <Send className="h-6 w-6 text-blue-600" />
+                                            </div>
+                                            <div className="text-left">
+                                                <h4 className="font-medium text-gray-900">Enviar al Cliente</h4>
+                                                <p className="text-sm text-gray-500 mt-1">
+                                                    {contrato.cliente_email || 'No tiene email'}
+                                                </p>
+                                                {!contrato.lead_es_cliente && (
+                                                    <span className="inline-flex items-center px-2 py-0.5 mt-2 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                        Incluye mensaje de bienvenida
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </button>
+                                    
+                                    <button
+                                        onClick={handleSendToAdministracion}
+                                        className="w-full p-4 border-2 border-purple-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-purple-100 rounded-xl group-hover:bg-purple-200">
+                                                <Building2 className="h-6 w-6 text-purple-600" />
+                                            </div>
+                                            <div className="text-left">
+                                                <h4 className="font-medium text-gray-900">Enviar a Administración</h4>
+                                                <p className="text-sm text-gray-500 mt-1">
+                                                    gfaure@localsat.com.ar
+                                                </p>
+                                                <p className="text-xs text-gray-400 mt-1">
+                                                    Incluye todos los datos del {contrato.lead_es_cliente ? 'cliente' : 'nuevo lead'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </button>
+                                </div>
+                                <div className="p-6 border-t border-gray-200 bg-gray-50">
+                                    <button
+                                        onClick={() => setShowOpcionesEmail(false)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
                 {/* Información General - Mobile */}
                 <div className="block lg:hidden mb-4">
                     <DataCard title="Información del Contrato" icon={<FileText className="h-5 w-5" />}>
@@ -537,63 +559,86 @@ const getTipoOperacionBadge = () => {
                     </DataCard>
                 )}
 
-                {/* Vehículos - Mobile Accordion */}
-                {contrato.vehiculos?.length > 0 && (
-                    <div className="lg:hidden mb-4">
-                        <div className="border border-gray-200 rounded-lg overflow-hidden">
-                            <button
-                                onClick={() => toggleMobileSection('vehiculos')}
-                                className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between text-left"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <Truck className="h-5 w-5 text-gray-600" />
-                                    <span className="font-medium text-gray-900">Vehículos ({contrato.vehiculos.length})</span>
-                                </div>
-                                {showMobileDetails.vehiculos ? (
-                                    <ChevronUp className="h-5 w-5 text-gray-500" />
-                                ) : (
-                                    <ChevronDown className="h-5 w-5 text-gray-500" />
-                                )}
-                            </button>
-                            {showMobileDetails.vehiculos && (
-                                <div className="p-4 bg-white space-y-4">
-                                    {contrato.vehiculos.map((vehiculo: any) => (
-                                        <div key={vehiculo.id} className="border border-gray-200 rounded-lg p-3">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Truck className="h-4 w-4 text-gray-500" />
-                                                <span className="font-medium text-gray-900">{vehiculo.patente}</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                                <div>
-                                                    <p className="text-xs text-gray-500">Marca</p>
-                                                    <p className="text-gray-900">{vehiculo.marca || '-'}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-gray-500">Modelo</p>
-                                                    <p className="text-gray-900">{vehiculo.modelo || '-'}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-gray-500">Año</p>
-                                                    <p className="text-gray-900">{vehiculo.anio || '-'}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-gray-500">Color</p>
-                                                    <p className="text-gray-900">{vehiculo.color || '-'}</p>
-                                                </div>
-                                                {vehiculo.identificador && (
-                                                    <div className="col-span-2">
-                                                        <p className="text-xs text-gray-500">Identificador</p>
-                                                        <p className="text-gray-900">{vehiculo.identificador}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
+{/* Vehículos - Mobile Accordion */}
+{contrato.vehiculos?.length > 0 && (
+    <div className="lg:hidden mb-4">
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <button
+                onClick={() => toggleMobileSection('vehiculos')}
+                className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between text-left"
+            >
+                <div className="flex items-center gap-2">
+                    <Truck className="h-5 w-5 text-gray-600" />
+                    <span className="font-medium text-gray-900">Vehículos ({contrato.vehiculos.length})</span>
+                </div>
+                {showMobileDetails.vehiculos ? (
+                    <ChevronUp className="h-5 w-5 text-gray-500" />
+                ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-500" />
                 )}
+            </button>
+            {showMobileDetails.vehiculos && (
+                <div className="p-4 bg-white space-y-4">
+                    {contrato.vehiculos.map((vehiculo: any) => (
+                        <div key={vehiculo.id} className="border border-gray-200 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Truck className="h-4 w-4 text-gray-500" />
+                                <span className="font-medium text-gray-900">{vehiculo.patente}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                {/* Tipo */}
+                                <div>
+                                    <p className="text-xs text-gray-500">Tipo</p>
+                                    <p className="text-gray-900">
+                                        {vehiculo.tipo ? (
+                                            vehiculo.tipo === 'auto' ? '🚗 Auto' :
+                                            vehiculo.tipo === 'camioneta' ? '🚙 Camioneta' :
+                                            vehiculo.tipo === 'camion' ? '🚛 Camión' :
+                                            vehiculo.tipo === 'moto' ? '🏍️ Moto' :
+                                            vehiculo.tipo === 'utilitario' ? '🚐 Utilitario' :
+                                            vehiculo.tipo === 'minibus' ? '🚌 Minibus' :
+                                            vehiculo.tipo === 'colectivo' ? '🚌 Colectivo' :
+                                            vehiculo.tipo === 'maquinaria' ? '🏗️ Maquinaria' :
+                                            vehiculo.tipo === 'motoniveladora' ? '🚜 Motoniveladora' :
+                                            vehiculo.tipo === 'retroexcavadora' ? '🚜 Retroexcavadora' :
+                                            vehiculo.tipo === 'grua' ? '🏗️ Grúa' :
+                                            vehiculo.tipo === 'barco' ? '⛵ Barco' :
+                                            vehiculo.tipo === 'remolque' ? '🔗 Remolque' :
+                                            vehiculo.tipo === 'trailer' ? '🚛 Trailer' :
+                                            '📦 Otro'
+                                        ) : '-'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500">Marca</p>
+                                    <p className="text-gray-900">{vehiculo.marca || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500">Modelo</p>
+                                    <p className="text-gray-900">{vehiculo.modelo || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500">Año</p>
+                                    <p className="text-gray-900">{vehiculo.anio || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500">Color</p>
+                                    <p className="text-gray-900">{vehiculo.color || '-'}</p>
+                                </div>
+                                {vehiculo.identificador && (
+                                    <div className="col-span-2">
+                                        <p className="text-xs text-gray-500">Identificador</p>
+                                        <p className="text-gray-900">{vehiculo.identificador}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    </div>
+)}
 
                 {/* Vehículos - Desktop */}
                 {contrato.vehiculos?.length > 0 && (
@@ -603,6 +648,7 @@ const getTipoOperacionBadge = () => {
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patente</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marca</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Modelo</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Año</th>
@@ -614,6 +660,28 @@ const getTipoOperacionBadge = () => {
                                     {contrato.vehiculos.map((vehiculo: any) => (
                                         <tr key={vehiculo.id}>
                                             <td className="px-4 py-3 text-sm font-medium text-gray-900">{vehiculo.patente}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-700">
+                                                {vehiculo.tipo ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                                        {vehiculo.tipo === 'auto' && 'Auto'}
+                                                        {vehiculo.tipo === 'camioneta' && 'Camioneta'}
+                                                        {vehiculo.tipo === 'camion' && 'Camión'}
+                                                        {vehiculo.tipo === 'moto' && 'Moto'}
+                                                        {vehiculo.tipo === 'utilitario' && 'Utilitario'}
+                                                        {vehiculo.tipo === 'minibus' && 'Minibus'}
+                                                        {vehiculo.tipo === 'colectivo' && 'Colectivo'}
+                                                        {vehiculo.tipo === 'maquinaria' && 'Maquinaria'}
+                                                        {vehiculo.tipo === 'motoniveladora' && 'Motoniveladora'}
+                                                        {vehiculo.tipo === 'retroexcavadora' && 'Retroexcavadora'}
+                                                        {vehiculo.tipo === 'grua' && 'Grúa'}
+                                                        {vehiculo.tipo === 'barco' && 'Barco'}
+                                                        {vehiculo.tipo === 'remolque' && 'Remolque'}
+                                                        {vehiculo.tipo === 'trailer' && 'Trailer'}
+                                                        {vehiculo.tipo === 'otro' && 'Otro'}
+                                                        {!vehiculo.tipo && '-'}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
                                             <td className="px-4 py-3 text-sm text-gray-700">{vehiculo.marca || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-gray-700">{vehiculo.modelo || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-gray-700">{vehiculo.anio || '-'}</td>

@@ -1,6 +1,6 @@
 // resources/js/components/contratos/sections/VehiculosSection.tsx
-import { Truck, Trash2, AlertCircle } from 'lucide-react';
-import React, { useEffect } from 'react';
+import { Truck, Trash2, AlertCircle, Plus } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 
 interface Props {
     vehiculos: any[];
@@ -8,13 +8,34 @@ interface Props {
     cantidadMaxima: number;
 }
 
+// Tipos predefinidos de vehículos
+const TIPOS_VEHICULOS = [
+    { value: 'auto', label: 'Auto' },
+    { value: 'camioneta', label: 'Camioneta' },
+    { value: 'camion', label: 'Camión' },
+    { value: 'moto', label: 'Moto' },
+    { value: 'utilitario', label: 'Utilitario / Furgón' },
+    { value: 'minibus', label: 'Minibus' },
+    { value: 'colectivo', label: 'Colectivo / Ómnibus' },
+    { value: 'maquinaria', label: 'Maquinaria Pesada' },
+    { value: 'motoniveladora', label: 'Motoniveladora' },
+    { value: 'retroexcavadora', label: 'Retroexcavadora' },
+    { value: 'grua', label: 'Grúa' },
+    { value: 'barco', label: 'Barco / Embarcación' },
+    { value: 'remolque', label: 'Remolque / Semirremolque' },
+    { value: 'trailer', label: 'Trailer' },
+    { value: 'otro', label: 'Otro (especificar)' }
+];
+
 export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxima }: Props) {
+    const [otroTipoIndex, setOtroTipoIndex] = useState<number | null>(null);
+    const [otroTipoValue, setOtroTipoValue] = useState<string>('');
+
     // Efecto para generar automáticamente los vehículos según cantidadMaxima
     useEffect(() => {
         const vehiculosActuales = vehiculos.length;
         
         if (vehiculosActuales < cantidadMaxima) {
-            // Faltan vehículos, los agregamos
             const nuevosVehiculos = [...vehiculos];
             for (let i = vehiculosActuales; i < cantidadMaxima; i++) {
                 nuevosVehiculos.push({
@@ -23,12 +44,12 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                     modelo: '',
                     anio: '',
                     color: '',
-                    identificador: ''
+                    identificador: '',
+                    tipo: ''
                 });
             }
             setVehiculos(nuevosVehiculos);
         } else if (vehiculosActuales > cantidadMaxima) {
-            // Sobran vehículos (por si cambia la cantidad), recortamos
             setVehiculos(vehiculos.slice(0, cantidadMaxima));
         }
     }, [cantidadMaxima]);
@@ -36,7 +57,6 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
     const todosCompletados = vehiculos.every(v => v.patente && v.patente.trim() !== '');
     
     const eliminarVehiculo = (index: number) => {
-        // Evitar eliminar si estamos en el mínimo requerido
         if (vehiculos.length <= cantidadMaxima) {
             return;
         }
@@ -46,7 +66,40 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
     const updateVehiculo = (index: number, field: string, value: string) => {
         const nuevos = [...vehiculos];
         nuevos[index] = { ...nuevos[index], [field]: value };
+        
+        // Si cambia el tipo y no es "otro", limpiamos el estado de otro
+        if (field === 'tipo' && value !== 'otro') {
+            if (otroTipoIndex === index) {
+                setOtroTipoIndex(null);
+                setOtroTipoValue('');
+            }
+        }
+        
         setVehiculos(nuevos);
+    };
+
+    const handleTipoChange = (index: number, value: string) => {
+        if (value === 'otro') {
+            setOtroTipoIndex(index);
+            setOtroTipoValue('');
+            updateVehiculo(index, 'tipo', '');
+        } else {
+            updateVehiculo(index, 'tipo', value);
+            if (otroTipoIndex === index) {
+                setOtroTipoIndex(null);
+                setOtroTipoValue('');
+            }
+        }
+    };
+
+    const handleOtroTipoBlur = (index: number) => {
+        if (otroTipoValue.trim()) {
+            updateVehiculo(index, 'tipo', otroTipoValue.trim());
+        } else {
+            // Si está vacío, volvemos a selección vacía
+            setOtroTipoIndex(null);
+            setOtroTipoValue('');
+        }
     };
 
     return (
@@ -82,7 +135,6 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                         </span>
                                     )}
                                 </div>
-                                {/* Solo mostramos eliminar si hay más de la cantidad máxima (por si acaso) */}
                                 {vehiculos.length > cantidadMaxima && (
                                     <button
                                         onClick={() => eliminarVehiculo(index)}
@@ -94,10 +146,10 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                 )}
                             </div>
                             
-                            {/* Grid de campos - Actualizado para incluir IDENTIFICADOR */}
+                            {/* Grid de campos - Actualizado con TIPO */}
                             <div className="grid grid-cols-12 gap-2">
-                                {/* Patente - 3 columnas */}
-                                <div className="col-span-3">
+                                {/* Patente - 2 columnas */}
+                                <div className="col-span-2">
                                     <input
                                         type="text"
                                         value={vehiculo.patente}
@@ -109,8 +161,43 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                         required
                                     />
                                 </div>
-                            
-                                                                {/* IDENTIFICADOR - 2 columnas */}
+                                
+                                {/* TIPO - 2 columnas */}
+                                <div className="col-span-2">
+                                    {otroTipoIndex === index ? (
+                                        <div className="flex gap-1">
+                                            <input
+                                                type="text"
+                                                value={otroTipoValue}
+                                                onChange={(e) => setOtroTipoValue(e.target.value)}
+                                                onBlur={() => handleOtroTipoBlur(index)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        handleOtroTipoBlur(index);
+                                                    }
+                                                }}
+                                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="Especificar tipo"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    ) : (
+                                        <select
+                                            value={vehiculo.tipo || ''}
+                                            onChange={(e) => handleTipoChange(index, e.target.value)}
+                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                        >
+                                            <option value="">Seleccionar tipo</option>
+                                            {TIPOS_VEHICULOS.map((tipo) => (
+                                                <option key={tipo.value} value={tipo.value}>
+                                                    {tipo.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                                
+                                {/* IDENTIFICADOR - 2 columnas */}
                                 <div className="col-span-2">
                                     <input
                                         type="text"
@@ -121,7 +208,6 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                     />
                                 </div>
 
-                                
                                 {/* Marca - 2 columnas */}
                                 <div className="col-span-2">
                                     <input
@@ -155,8 +241,8 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                     />
                                 </div>
                                 
-                                {/* Color - 2 columnas */}
-                                <div className="col-span-2">
+                                {/* Color - 1 columna */}
+                                <div className="col-span-1">
                                     <input
                                         type="text"
                                         value={vehiculo.color}
@@ -165,7 +251,6 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                                         placeholder="Color"
                                     />
                                 </div>
-                                
                             </div>
                         </div>
                     ))}
@@ -176,7 +261,7 @@ export default function VehiculosSection({ vehiculos, setVehiculos, cantidadMaxi
                     <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-md">
                         <p className="text-xs text-amber-700 flex items-center gap-1">
                             <AlertCircle className="h-3.5 w-3.5" />
-                            Complete los datos de todos los vehículos para continuar
+                            Complete la patente de todos los vehículos para continuar
                         </p>
                     </div>
                 )}

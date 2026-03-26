@@ -158,10 +158,10 @@ export default function Contactos({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900">
-                            Contactos
+                            Clientes
                         </h1>
                         <p className="mt-1 text-gray-600 text-base">
-                            Gestión de clientes y contactos comerciales
+                            Gestión de clientes
                         </p>
                     </div>
                     

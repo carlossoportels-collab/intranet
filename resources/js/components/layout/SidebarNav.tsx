@@ -140,7 +140,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             permiso: 'ver_prospectos_leads',
             children: [
               //   { id: 'actividad', name: 'Actividad', href: '/comercial/actividad', icon: <Bell size={14} />, permiso: 'ver_actividad' },
-                { id: 'contactos', name: 'Contactos', href: '/comercial/contactos', icon: <Users size={14} />, permiso: 'ver_contactos' },
+                { id: 'contactos', name: 'Clientes', href: '/comercial/contactos', icon: <Users size={14} />, permiso: 'ver_contactos' },
                 {
                     id: 'cuentas',
                     name: 'Cuentas',

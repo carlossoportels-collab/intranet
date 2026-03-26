@@ -1,4 +1,5 @@
 <?php
+// app/Models/EmpresaResponsable.php
 
 namespace App\Models;
 
@@ -18,8 +19,8 @@ class EmpresaResponsable extends Model
     
     protected $fillable = [
         'empresa_id',
-        'nombre_completo',  // Cambiado de nombre/apellido a nombre_completo
-        'cargo',
+        'nombre_completo', 
+        // 'cargo', // ← ELIMINAR esta línea porque no existe en la tabla
         'telefono',
         'email',
         'tipo_responsabilidad_id',

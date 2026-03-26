@@ -23,16 +23,25 @@ import { usePresupuestoData } from '@/hooks/usePresupuestoData';
 import { useWhatsAppMessage } from '@/hooks/useWhatsAppMessage';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, toNumber } from '@/utils/formatters';
-
+import type { Origen, Rubro, Provincia } from '@/types/leads';
 
 interface Props {
     presupuesto: any;
+    origenes?: Origen[];   // ← Recibir del controlador
+    rubros?: Rubro[];      // ← Recibir del controlador
+    provincias?: Provincia[]; // ← Recibir del controlador
 }
 
-export default function PresupuestosShow({ presupuesto }: Props) {
+export default function PresupuestosShow({ 
+    presupuesto, 
+    origenes = [],   // ← Valor por defecto
+    rubros = [],     // ← Valor por defecto
+    provincias = []  // ← Valor por defecto
+}: Props) {
     const data = usePresupuestoData(presupuesto);
     const companiaNombre = presupuesto.compania?.nombre || 'LOCALSAT';
     const companiaId = presupuesto.compania?.id || 1;
+
 
     const mensajeWhatsApp = useWhatsAppMessage({
         presupuesto,
@@ -93,19 +102,25 @@ export default function PresupuestosShow({ presupuesto }: Props) {
                             </div>
                         </div>
                         
-                        <PresupuestoActions
-                            presupuestoId={presupuesto.id}
-                            referencia={data.referencia}
-                            tieneTelefono={!!presupuesto.lead?.telefono}
-                            mensajeWhatsApp={mensajeWhatsApp}
-                            telefono={presupuesto.lead?.telefono}
-                            leadNombre={presupuesto.lead?.nombre_completo || ''}
-                            leadEmail={presupuesto.lead?.email || ''}
-                            comercialEmail={presupuesto.comercial_email || ''} // ← Usar la propiedad que agregamos
-                            comercialNombre={presupuesto.nombre_comercial || ''}
-                            companiaId={presupuesto.compania_id || 1} // ← Usar la propiedad que agregamos
-                            companiaNombre={presupuesto.compania_nombre || 'LOCALSAT'} // ← Usar la propiedad que agregamos
-                        />
+                    <PresupuestoActions
+                        presupuestoId={presupuesto.id}
+                        referencia={data.referencia}
+                        tieneTelefono={!!presupuesto.lead?.telefono}
+                        mensajeWhatsApp={mensajeWhatsApp}
+                        telefono={presupuesto.lead?.telefono}
+                        leadNombre={presupuesto.lead?.nombre_completo || ''}
+                        leadEmail={presupuesto.lead?.email || ''}
+                        comercialEmail={presupuesto.comercial_email || ''}
+                        comercialNombre={presupuesto.nombre_comercial || ''}
+                        companiaId={presupuesto.compania_id || 1}
+                        companiaNombre={presupuesto.compania_nombre || 'LOCALSAT'}
+                        leadId={presupuesto.lead?.id}
+                        leadEsCliente={presupuesto.lead?.es_cliente || false}
+                        lead={presupuesto.lead ?? null}  // ← Convertir undefined a null
+                        origenes={origenes}
+                        rubros={rubros}
+                        provincias={provincias}
+                    />
                     </div>
                 </div>
 
@@ -340,21 +355,6 @@ export default function PresupuestosShow({ presupuesto }: Props) {
                 </div>
             </div>
         </div>
-
-        {/* RESUMEN TOTAL PRIMER MES */}
-        <div className="bg-gradient-to-r from-local-500 to-local-600 rounded-lg p-4 text-white shadow-lg">
-            <div className="flex justify-between items-center">
-                <div>
-                    <p className="text-sm opacity-90">Total a pagar</p>
-                    <p className="text-xs opacity-75">Primer mes (instalación + 1er mes)</p>
-                </div>
-                <div className="text-right">
-                    <p className="text-2xl font-bold">{formatMoney(data.totalPrimerMes)}</p>
-                    <p className="text-xs opacity-75">* Desde el 2° mes: {formatMoney(data.costoMensualTotal)}/mes</p>
-                </div>
-            </div>
-        </div>
-
         {/* PROMOCIÓN DESTACADA */}
         {data.tienePromocion && (
             <div className="bg-purple-50 rounded-lg border border-purple-200 p-3">
@@ -367,34 +367,6 @@ export default function PresupuestosShow({ presupuesto }: Props) {
         )}
     </div>
 </DataCard>
-
-                {/* Resumen Simplificado */}
-                <DataCard title="Resumen de Inversión">
-                    <div className="flex justify-end">
-                        <div className="w-full sm:w-96">
-                            <div className="space-y-3">
-                                {data.tienePromocion && (
-                                    <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                                        <div className="flex items-center gap-2 text-purple-800">
-                                            <Gift className="h-4 w-4" />
-                                            <span className="font-medium">Promoción aplicada:</span>
-                                            <span>{presupuesto.promocion?.nombre}</span>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                <InfoRow label="Inversión Inicial:" value={<Amount value={data.inversionInicial} className="font-bold text-local" />} />
-                                <InfoRow label="Costo Mensual:" value={<Amount value={data.costoMensualTotal} className="font-bold text-local" />} />
-                                <div className="border-t border-gray-200 pt-3 mt-2">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-base sm:text-lg font-bold text-gray-900">TOTAL PRIMER MES:</span>
-                                        <Amount value={data.totalPrimerMes} className="text-lg sm:text-xl font-bold text-local" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </DataCard>
             </div>
         </AppLayout>
     );

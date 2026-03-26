@@ -337,61 +337,73 @@ class PresupuestosController extends Controller
             ])->withInput();
         }
     }
-    public function show(Presupuesto $presupuesto)
-    {
-        //VERIFICAR ACCESO AL PRESUPUESTO (por prefijo)
-        $this->authorizeLeadAccess($presupuesto); // Reutilizamos la misma lógica
+
+public function show(Presupuesto $presupuesto)
+{
+    //VERIFICAR ACCESO AL PRESUPUESTO (por prefijo)
+    $this->authorizeLeadAccess($presupuesto);
+    
+    // Cargar todas las relaciones necesarias
+    $presupuesto->load([
+        'lead', 
+        'prefijo.comercial.personal',
+        'prefijo.comercial.compania', 
+        'tasa', 
+        'abono',
+        'promocion.productos',
+        'agregados.productoServicio.tipo',
+        'estado'
+    ]);
+
+    // Obtener el comercial correctamente
+    $comercial = null;
+    $comercialEmail = '';
+    $companiaNombre = 'LOCALSAT';
+    $companiaId = 1;
+
+    if ($presupuesto->prefijo) {
+        $comercial = $presupuesto->prefijo->comercial;
         
-        // Cargar todas las relaciones necesarias
-        $presupuesto->load([
-            'lead', 
-            'prefijo.comercial.personal',
-            'prefijo.comercial.compania', 
-            'tasa', 
-            'abono',
-            'promocion.productos',
-            'agregados.productoServicio.tipo',
-            'estado'
-        ]);
-
-        // Obtener el comercial correctamente (puede ser colección o modelo)
-        $comercial = null;
-        $comercialEmail = '';
-        $companiaNombre = 'LOCALSAT';
-        $companiaId = 1;
-
-        if ($presupuesto->prefijo) {
-            $comercial = $presupuesto->prefijo->comercial;
-            
-            if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
-                $comercial = $comercial->first();
+        if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
+            $comercial = $comercial->first();
+        }
+        
+        if ($comercial) {
+            if ($comercial->personal) {
+                $comercialEmail = $comercial->personal->email ?? '';
             }
             
-            if ($comercial) {
-                if ($comercial->personal) {
-                    $comercialEmail = $comercial->personal->email ?? '';
-                }
-                
-                $companiaId = $comercial->compania_id ?? 1;
-                
-                if ($comercial->compania) {
-                    $companiaNombre = $comercial->compania->nombre ?? 'LOCALSAT';
-                }
+            $companiaId = $comercial->compania_id ?? 1;
+            
+            if ($comercial->compania) {
+                $companiaNombre = $comercial->compania->nombre ?? 'LOCALSAT';
             }
         }
+    }
 
-        $presupuesto->comercial_email = $comercialEmail;
-        $presupuesto->compania_nombre = $companiaNombre;
-        $presupuesto->compania_id = $companiaId;
-        $presupuesto->nombre_comercial = $presupuesto->nombre_comercial;
-         $presupuesto->compania = (object) [
+    $presupuesto->comercial_email = $comercialEmail;
+    $presupuesto->compania_nombre = $companiaNombre;
+    $presupuesto->compania_id = $companiaId;
+    $presupuesto->nombre_comercial = $presupuesto->nombre_comercial;
+    $presupuesto->compania = (object) [
         'id' => $companiaId,
         'nombre' => $companiaNombre
     ];
-        return Inertia::render('Comercial/Presupuestos/Show', [
-            'presupuesto' => $presupuesto
-        ]);
-    }
+    
+    // 🔥 OBTENER DATOS PARA LOS SELECTS DEL MODAL DE ALTA EMPRESA
+    $origenes = \App\Models\OrigenContacto::where('activo', true)->get();
+    $rubros = \App\Models\Rubro::where('activo', true)->get();
+    $provincias = \App\Models\Provincia::where('activo', true)
+        ->orderBy('nombre')
+        ->get(['id', 'nombre']);
+    
+    return Inertia::render('Comercial/Presupuestos/Show', [
+        'presupuesto' => $presupuesto,
+        'origenes' => $origenes,    // ← Agregar
+        'rubros' => $rubros,        // ← Agregar
+        'provincias' => $provincias // ← Agregar
+    ]);
+}
 
     public function edit(Presupuesto $presupuesto)
     {

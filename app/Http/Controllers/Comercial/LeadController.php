@@ -44,6 +44,7 @@ class LeadController extends Controller
             'estadoLead',
             'seguimientoPerdida.motivo',
             'prefijo',
+            'prefijo.comercial.personal',
             'rubro',
             'origen',
             'localidad.provincia'

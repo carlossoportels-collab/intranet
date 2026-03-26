@@ -8,6 +8,8 @@ use App\Models\Presupuesto;
 use App\Models\Empresa;
 use App\Models\EmpresaContacto;
 use App\Models\EmpresaResponsable;
+use App\Models\CambioTitularidad; 
+use App\Models\CambioRazonSocial;
 use App\Models\DebitoCbu;
 use App\Models\DebitoTarjeta;
 use App\Models\ContratoVehiculo;
@@ -57,7 +59,7 @@ class ContratoService
     /**
      * Determinar si el lead es cliente
      */
-    public function determinarEsCliente($lead, $empresaId, $contratoId = null): bool
+    public function determinarEsCliente($lead, int $empresaId, ?int $contratoId = null): bool
     {
         if (!$lead) {
             return Contrato::where('empresa_id', $empresaId)->count() > 0;
@@ -71,19 +73,23 @@ class ContratoService
             $query->where('id', '!=', $contratoId);
         }
         
-        return $query->count() > 0;
+        if ($query->count() > 0) return true;
+        
+        return Contrato::where('empresa_id', $empresaId)
+            ->when($contratoId, fn($q) => $q->where('id', '!=', $contratoId))
+            ->count() > 0;
     }
 
     /**
      * Determinar tipo de operación
      */
-    public function determinarTipoOperacion($empresaId, $lead, $esCliente): string
+    public function determinarTipoOperacion(int $empresaId, $lead, bool $esCliente): string
     {
-        $cambioTitularidad = \App\Models\CambioTitularidad::where('empresa_destino_id', $empresaId)
+        $cambioTitularidad = CambioTitularidad::where('empresa_destino_id', $empresaId)
             ->orderBy('fecha_cambio', 'desc')
             ->first();
 
-        $cambioRazonSocial = \App\Models\CambioRazonSocial::where('empresa_id', $empresaId)
+        $cambioRazonSocial = CambioRazonSocial::where('empresa_id', $empresaId)
             ->orderBy('fecha_cambio', 'desc')
             ->first();
 
@@ -134,9 +140,9 @@ class ContratoService
     }
 
     /**
-     * Construir datos base del contrato
+     * Construir datos base del contrato desde presupuesto
      */
-    public function construirDatosBaseContrato($presupuesto, $empresa, $contacto, $lead, $vendedorData, $esCliente): array
+    public function construirDatosBaseContrato(Presupuesto $presupuesto, Empresa $empresa, $contacto, $lead, array $vendedorData, bool $esCliente): array
     {
         return [
             'presupuesto_id' => $presupuesto->id,
@@ -182,5 +188,85 @@ class ContratoService
             'presupuesto_promocion' => $presupuesto->promocion?->nombre,
             'created_by' => auth()->id(),
         ];
+    }
+
+    /**
+     * Guardar responsables del contrato
+     */
+    public function guardarResponsablesContrato(Contrato $contrato, int $empresaId): void
+    {
+        $responsableFlota = EmpresaResponsable::where('empresa_id', $empresaId)
+            ->where('es_activo', true)
+            ->whereIn('tipo_responsabilidad_id', [3, 5])
+            ->first();
+
+        $responsablePagos = EmpresaResponsable::where('empresa_id', $empresaId)
+            ->where('es_activo', true)
+            ->whereIn('tipo_responsabilidad_id', [4, 5])
+            ->first();
+
+        $contrato->update([
+            'responsable_flota_nombre' => $responsableFlota?->nombre_completo,
+            'responsable_flota_telefono' => $responsableFlota?->telefono,
+            'responsable_flota_email' => $responsableFlota?->email,
+            'responsable_pagos_nombre' => $responsablePagos?->nombre_completo,
+            'responsable_pagos_telefono' => $responsablePagos?->telefono,
+            'responsable_pagos_email' => $responsablePagos?->email,
+        ]);
+    }
+
+    /**
+     * Guardar vehículos del contrato
+     */
+    public function guardarVehiculosContrato(Contrato $contrato, array $vehiculos): void
+    {
+        foreach ($vehiculos as $index => $vehiculo) {
+            if (!empty($vehiculo['patente'])) {
+                ContratoVehiculo::create([
+                    'contrato_id' => $contrato->id,
+                    'patente' => $vehiculo['patente'],
+                    'marca' => $vehiculo['marca'] ?? null,
+                    'modelo' => $vehiculo['modelo'] ?? null,
+                    'anio' => $vehiculo['anio'] ?? null,
+                    'color' => $vehiculo['color'] ?? null,
+                    'identificador' => $vehiculo['identificador'] ?? null,
+                    'tipo' => $vehiculo['tipo'] ?? null,
+                    'orden' => $index + 1,
+                    'created' => now(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Guardar método de pago del contrato
+     */
+    public function guardarMetodoPago(Contrato $contrato, ?string $metodoPago, ?array $datos): void
+    {
+        if ($metodoPago === 'cbu' && $datos) {
+            DebitoCbu::create([
+                'contrato_id' => $contrato->id,
+                'nombre_banco' => $datos['nombre_banco'],
+                'cbu' => $datos['cbu'],
+                'alias_cbu' => $datos['alias_cbu'] ?? null,
+                'titular_cuenta' => $datos['titular_cuenta'],
+                'tipo_cuenta' => $datos['tipo_cuenta'],
+                'es_activo' => true,
+                'created_by' => auth()->id(),
+            ]);
+        } elseif ($metodoPago === 'tarjeta' && $datos) {
+            DebitoTarjeta::create([
+                'contrato_id' => $contrato->id,
+                'tarjeta_emisor' => $datos['tarjeta_emisor'],
+                'tarjeta_expiracion' => $datos['tarjeta_expiracion'],
+                'tarjeta_numero' => $datos['tarjeta_numero'],
+                'tarjeta_codigo' => $datos['tarjeta_codigo'] ?? null,
+                'tarjeta_banco' => $datos['tarjeta_banco'],
+                'titular_tarjeta' => $datos['titular_tarjeta'],
+                'tipo_tarjeta' => $datos['tipo_tarjeta'],
+                'es_activo' => true,
+                'created_by' => auth()->id(),
+            ]);
+        }
     }
 }

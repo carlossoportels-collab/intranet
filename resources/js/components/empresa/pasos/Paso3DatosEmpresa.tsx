@@ -1,5 +1,6 @@
 // resources/js/components/empresa/pasos/Paso3DatosEmpresa.tsx
-import { Building, Hash, MapPin, Phone, Mail, Briefcase, Tag, Truck, Search, Loader } from 'lucide-react';
+
+import { Building, Hash, MapPin, Phone, Mail, Briefcase, Tag, Truck, Search, Loader, User } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { DatosEmpresaForm, CategoriaFiscal, Plataforma } from '@/types/empresa';
@@ -33,6 +34,7 @@ export default function Paso3DatosEmpresa({
     const [searching, setSearching] = useState(false);
     const [localidadesResult, setLocalidadesResult] = useState<Localidad[]>([]);
     const [provinciaId, setProvinciaId] = useState<string>(provinciaInicial ? String(provinciaInicial) : '');
+    const [tipoDocumento, setTipoDocumento] = useState<'cuit' | 'dni'>('cuit'); // ← Nuevo estado
 
     // Actualizar cuando cambian las props iniciales
     useEffect(() => {
@@ -59,7 +61,7 @@ export default function Paso3DatosEmpresa({
                 const response = await fetch(`/comercial/localidades/buscar?${params}`);
                 const result = await response.json();
                 
-                if (result.success) {
+                if (result.success && result.data) {
                     const localidadesTransformadas = result.data.map((item: any) => ({
                         id: item.id,
                         nombre: item.nombre || item.localidad,
@@ -97,6 +99,35 @@ export default function Paso3DatosEmpresa({
         setShowLocalidadesDropdown(false);
     };
 
+    // 🔥 Formatear CUIT/DNI automáticamente
+    const formatCuit = (value: string) => {
+        const numeros = value.replace(/\D/g, '');
+        if (numeros.length <= 2) return numeros;
+        if (numeros.length <= 10) {
+            return `${numeros.slice(0, 2)}-${numeros.slice(2)}`;
+        }
+        return `${numeros.slice(0, 2)}-${numeros.slice(2, 10)}-${numeros.slice(10, 11)}`;
+    };
+
+    const formatDni = (value: string) => {
+        const numeros = value.replace(/\D/g, '');
+        if (numeros.length <= 2) return numeros;
+        if (numeros.length <= 8) {
+            return numeros.replace(/(\d{2})(\d{0,6})/, (_, p1, p2) => p2 ? `${p1}.${p2}` : p1);
+        }
+        return numeros.replace(/(\d{2})(\d{6})(\d{0,1})/, (_, p1, p2, p3) => p3 ? `${p1}.${p2}.${p3}` : `${p1}.${p2}`);
+    };
+
+    const handleDocumentoChange = (value: string) => {
+        if (tipoDocumento === 'cuit') {
+            const formateado = formatCuit(value);
+            onChange('cuit', formateado);
+        } else {
+            const formateado = formatDni(value);
+            onChange('cuit', formateado);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-6">
@@ -105,7 +136,7 @@ export default function Paso3DatosEmpresa({
                     <div>
                         <h3 className="font-medium text-green-900">Datos de la Empresa</h3>
                         <p className="text-sm text-green-700">
-                            Complete la información de la empresa (todos los campos son obligatorios)
+                            Complete la información de la empresa. Para consumidores finales, seleccione DNI.
                         </p>
                     </div>
                 </div>
@@ -154,27 +185,59 @@ export default function Paso3DatosEmpresa({
                     )}
                 </div>
 
-                {/* CUIT */}
+                {/* Tipo de Documento y Número */}
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
-                        CUIT <span className="text-red-500">*</span>
+                        Tipo de Documento <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setTipoDocumento('cuit');
+                                onChange('cuit', '');
+                            }}
+                            className={`flex-1 px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
+                                tipoDocumento === 'cuit'
+                                    ? 'bg-green-600 text-white border-green-600'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                        >
+                            CUIT
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setTipoDocumento('dni');
+                                onChange('cuit', '');
+                            }}
+                            className={`flex-1 px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
+                                tipoDocumento === 'dni'
+                                    ? 'bg-green-600 text-white border-green-600'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                        >
+                            DNI (Consumidor Final)
+                        </button>
+                    </div>
+                </div>
+
+                {/* Número de Documento */}
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        {tipoDocumento === 'cuit' ? 'CUIT' : 'DNI'} <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                         <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <input
                             type="text"
                             value={data.cuit}
-                            onChange={(e) => {
-                                const value = e.target.value.replace(/[^0-9-]/g, '');
-                                if (value.length <= 13) {
-                                    onChange('cuit', value);
-                                }
-                            }}
-                            maxLength={13}
+                            onChange={(e) => handleDocumentoChange(e.target.value)}
+                            maxLength={tipoDocumento === 'cuit' ? 13 : 11}
                             className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
                                 errores['empresa.cuit'] ? 'border-red-300' : 'border-gray-300'
                             }`}
-                            placeholder="Ej: 30-12345678-9"
+                            placeholder={tipoDocumento === 'cuit' ? 'Ej: 30-12345678-9' : 'Ej: 20.123.456'}
                             required
                         />
                     </div>

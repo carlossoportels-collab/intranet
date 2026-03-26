@@ -12,7 +12,8 @@ import {
 } from 'lucide-react';
 
 // Componentes reutilizables
-import AltaEmpresaModal from '@/components/empresa/AltaEmpresaModal';
+import AltaEmpresaModal from '@/components/empresa/AltaEmpresaModal'
+import { Comercial } from '@/types/leads'; 
 
 // Tipos
 interface Vehiculo {
@@ -79,9 +80,14 @@ interface Props {
     tiposResponsabilidad: any[];
     categoriasFiscales: any[];
     plataformas: any[];
+    comerciales: Comercial[];
     usuario: {
         ve_todas_cuentas: boolean;
         prefijos: number[];
+        rol_id: number;
+        comercial?: {
+            prefijo_id?: number;
+        };
     };
 }
 
@@ -98,6 +104,7 @@ export default function CambioTitularidad({
     nacionalidades = [],
     tiposResponsabilidad = [],
     categoriasFiscales = [],
+    comerciales = [],
     plataformas = [],
     usuario,
 }: Props) {
@@ -813,6 +820,9 @@ export default function CambioTitularidad({
                 origenes={origenes}
                 rubros={rubros}
                 provincias={provincias}
+                usuario={usuario}
+                comerciales={comerciales} 
+                hayComerciales={comerciales.length > 0}  
             />
 
             {/* MODAL DE DETALLE */}

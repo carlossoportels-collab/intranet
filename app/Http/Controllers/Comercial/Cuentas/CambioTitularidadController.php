@@ -193,6 +193,30 @@ class CambioTitularidadController extends Controller
             'prefijos' => $prefijosPermitidos,
         ];
 
+        // ============================================
+    // OBTENER COMERCIALES ACTIVOS
+    // ============================================
+    $comerciales = \App\Models\Comercial::with('personal')
+        ->where('activo', 1)
+        ->get()
+        ->map(function($comercial) {
+            return [
+                'id' => $comercial->id,
+                'prefijo_id' => $comercial->prefijo_id,
+                'nombre' => $comercial->personal->nombre_completo ?? 'Sin nombre',
+                'email' => $comercial->personal->email ?? '',
+                'telefono' => $comercial->personal->telefono ?? '',
+                'personal' => $comercial->personal ? [
+                    'id' => $comercial->personal->id,
+                    'nombre' => $comercial->personal->nombre,
+                    'apellido' => $comercial->personal->apellido,
+                    'email' => $comercial->personal->email,
+                    'telefono' => $comercial->personal->telefono,
+                    'nombre_completo' => $comercial->personal->nombre_completo,
+                ] : null,
+            ];
+        });
+
         return Inertia::render('Comercial/Cuentas/CambioTitularidad', [
             'vehiculos' => $vehiculosPorEmpresa,
             'empresas' => $empresas,
@@ -205,6 +229,7 @@ class CambioTitularidadController extends Controller
             'tiposResponsabilidad' => $tiposResponsabilidad,
             'categoriasFiscales' => $categoriasFiscales,
             'plataformas' => $plataformas,
+            'comerciales' => $comerciales, 
             'usuario' => $infoUsuario,
         ]);
     }

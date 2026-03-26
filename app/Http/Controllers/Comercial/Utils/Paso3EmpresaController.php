@@ -25,11 +25,12 @@ class Paso3EmpresaController extends Controller
 
         try {
             $validated = $request->validate([
-                'presupuesto_id' => 'required|integer|exists:presupuestos,id',
+                'presupuesto_id' => 'nullable|integer|exists:presupuestos,id',
                 'lead_id' => 'required|integer|exists:leads,id',
+                'contacto_id' => 'required|integer|exists:empresa_contactos,id',
                 'nombre_fantasia' => 'required|string|max:200',
                 'razon_social' => 'required|string|max:200',
-                'cuit' => 'required|string|max:13',
+                'cuit' => 'required|string|max:20',
                 'direccion_fiscal' => 'required|string|max:255',
                 'codigo_postal_fiscal' => 'required|string|max:10',
                 'localidad_fiscal_id' => 'required|integer|exists:localidades,id',
@@ -45,23 +46,18 @@ class Paso3EmpresaController extends Controller
             Log::info('🟢 [PASO3] Transacción iniciada');
 
             $lead = Lead::findOrFail($request->lead_id);
-            $presupuesto = Presupuesto::findOrFail($request->presupuesto_id);
+            $contacto = EmpresaContacto::findOrFail($request->contacto_id);
             
-            Log::info('🟢 [PASO3] Datos encontrados', [
-                'lead_id' => $lead->id,
-                'presupuesto_id' => $presupuesto->id,
-                'presupuesto_estado' => $presupuesto->estado_id
-            ]);
-            
-            $contactoId = session('contacto_id');
-            Log::info('🟢 [PASO3] Contacto de sesión', ['contacto_id' => $contactoId]);
-            
-            if (!$contactoId) {
-                throw new \Exception('No se encontró el contacto. Complete el paso 2 primero.');
+            if ($contacto->lead_id != $request->lead_id) {
+                throw new \Exception('El contacto no pertenece al lead indicado');
             }
             
-            $contacto = EmpresaContacto::findOrFail($contactoId);
-            Log::info('🟢 [PASO3] Contacto encontrado', ['contacto_id' => $contacto->id]);
+            $presupuesto = null;
+            if ($request->presupuesto_id) {
+                $presupuesto = Presupuesto::find($request->presupuesto_id);
+            } else {
+                Log::info('🟢 [PASO3] Sin presupuesto (cambio de titularidad)');
+            }
 
             // Crear la empresa
             $empresa = Empresa::create([
@@ -85,17 +81,13 @@ class Paso3EmpresaController extends Controller
                 'created' => now(),
             ]);
 
-            Log::info('🟢 [PASO3] Empresa creada', [
-                'empresa_id' => $empresa->id,
-                'nombre' => $empresa->nombre_fantasia
-            ]);
+            Log::info('🟢 [PASO3] Empresa creada', ['empresa_id' => $empresa->id]);
 
             // Actualizar contacto con empresa_id
             $contacto->update([
                 'empresa_id' => $empresa->id,
                 'modified_by' => auth()->id(),
             ]);
-            Log::info('🟢 [PASO3] Contacto actualizado con empresa_id', ['contacto_id' => $contacto->id]);
 
             // Actualizar responsables con empresa_id
             $tiposResponsabilidad = [3, 4, 5];
@@ -106,47 +98,43 @@ class Paso3EmpresaController extends Controller
                         'empresa_id' => $empresa->id,
                         'modified_by' => auth()->id(),
                     ]);
-                    Log::info('🟢 [PASO3] Responsable actualizado', [
-                        'tipo' => $tipo,
-                        'responsable_id' => $responsableId
-                    ]);
                 }
             }
 
-            // Actualizar presupuesto
-            $presupuesto->update([
-                'estado_id' => 3, 
-                'modified' => now(),
-                'modified_by' => auth()->id(),
-            ]);
-            Log::info('🟢 [PASO3] Presupuesto actualizado', [
-                'presupuesto_id' => $presupuesto->id,
-                'nuevo_estado' => 3
-            ]);
+            // Actualizar presupuesto solo si existe
+            if ($presupuesto) {
+                $presupuesto->update([
+                    'estado_id' => 3, 
+                    'modified' => now(),
+                    'modified_by' => auth()->id(),
+                ]);
+            }
 
             DB::commit();
             Log::info('✅ [PASO3] Transacción confirmada');
             
             session()->forget(['contacto_id', 'responsable_3_id', 'responsable_4_id', 'responsable_5_id']);
-            Log::info('🟢 [PASO3] Sesión limpiada');
-
-            // 🔥 Redirigir a la página de creación de contrato con Inertia
-            return redirect()->route('comercial.contratos.create', ['presupuestoId' => $presupuesto->id])
-                ->with('success', 'Empresa creada exitosamente. Complete los datos del contrato.')
-                ->with('lead_id', $lead->id)
-                ->with('empresa_id', $empresa->id);
+            
+            // 🔥 Devolver JSON con los IDs para redirección en frontend
+            return response()->json([
+                'success' => true,
+                'message' => 'Empresa creada exitosamente',
+                'empresa_id' => $empresa->id,
+                'lead_id' => $lead->id,
+                'presupuesto_id' => $request->presupuesto_id
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('❌ [PASO3] Error:', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id(),
-                'request_data' => $request->all()
+                'trace' => $e->getTraceAsString()
             ]);
             
-            // 🔥 Devolver respuesta Inertia con error
-            return redirect()->back()->withErrors(['error' => 'Error al crear empresa: ' . $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al crear empresa: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -176,24 +164,26 @@ class Paso3EmpresaController extends Controller
                 'nombre_flota' => 'required|string|max:200',
             ]);
 
-            // Buscar la empresa
             $empresa = Empresa::findOrFail($empresaId);
-            
-            // Actualizar la empresa
             $empresa->update($validated);
             
-            // 🔥 Redirigir de vuelta con mensaje de éxito
-            return redirect()->back()->with('success', 'Datos de empresa actualizados correctamente');
+            // 🔥 Devolver JSON
+            return response()->json([
+                'success' => true,
+                'message' => 'Datos de empresa actualizados correctamente',
+                'empresa_id' => $empresa->id
+            ]);
             
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return redirect()->back()->withErrors($e->errors());
         } catch (\Exception $e) {
             Log::error('Error actualizando empresa:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
             
-            return redirect()->back()->withErrors(['error' => 'Error al actualizar empresa: ' . $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al actualizar empresa: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

@@ -1,6 +1,7 @@
 // resources/js/components/empresa/pasos/Paso1DatosLead.tsx
-import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, MapPin, Briefcase, Loader, AlertCircle } from 'lucide-react';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Phone, Mail, MapPin, Briefcase, Loader, AlertCircle, Search, X } from 'lucide-react';
 import { Origen, Rubro, Provincia, Localidad } from '@/types/leads';
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
     onChange: (field: string, value: any) => void;
     errores: Record<string, string>;
     localidadInicial?: string;
-    provinciaInicial?: string | number; // ← Cambiado para aceptar string o number
+    provinciaInicial?: string | number;
 }
 
 export default function Paso1DatosLead({
@@ -29,12 +30,40 @@ export default function Paso1DatosLead({
     const [showDropdown, setShowDropdown] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const [selectedProvinciaId, setSelectedProvinciaId] = useState<string>(provinciaInicial ? String(provinciaInicial) : '');
+    const [hasSearched, setHasSearched] = useState(false);
+    const [hasSelected, setHasSelected] = useState(!!data.localidad_id); // ← Nuevo estado para saber si ya seleccionó
+    
+    // Ref para el dropdown
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Actualizar hasSelected cuando cambia localidad_id
+    useEffect(() => {
+        setHasSelected(!!data.localidad_id);
+    }, [data.localidad_id]);
+
+    // Cerrar dropdown al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Buscar localidades cuando cambia el texto
     useEffect(() => {
         const searchLocalidades = async () => {
+            // No buscar si ya hay una localidad seleccionada
+            if (hasSelected) {
+                return;
+            }
+            
             if (localidadSearch.length >= 3) {
                 setIsSearching(true);
+                setHasSearched(true);
                 try {
                     const params = new URLSearchParams();
                     params.append('search', localidadSearch);
@@ -42,14 +71,39 @@ export default function Paso1DatosLead({
                         params.append('provincia_id', selectedProvinciaId);
                     }
                     const response = await fetch(`/comercial/localidades/buscar?${params.toString()}`);
-                    const results = await response.json();
-                    setLocalidadesResult(results);
-                    setShowDropdown(true);
+                    const result = await response.json();
+                    
+                    // Manejar diferentes formatos de respuesta
+                    let localidades = [];
+                    if (result.success && result.data) {
+                        localidades = result.data;
+                    } else if (Array.isArray(result)) {
+                        localidades = result;
+                    }
+                    
+                    // Transformar al formato esperado
+                    const localidadesTransformadas = localidades.map((item: any) => ({
+                        id: item.id,
+                        nombre: item.nombre || item.localidad || '',
+                        provincia: item.provincia || '',
+                        codigo_postal: item.codigo_postal || '',
+                        provincia_id: item.provincia_id,
+                    }));
+                    
+                    setLocalidadesResult(localidadesTransformadas);
+                    setShowDropdown(localidadesTransformadas.length > 0);
                 } catch (error) {
                     console.error('Error buscando localidades:', error);
+                    setLocalidadesResult([]);
+                    setShowDropdown(false);
                 } finally {
                     setIsSearching(false);
                 }
+            } else if (localidadSearch.length === 0) {
+                // Si se borró el texto, limpiar resultados
+                setLocalidadesResult([]);
+                setShowDropdown(false);
+                setHasSearched(false);
             } else {
                 setLocalidadesResult([]);
                 setShowDropdown(false);
@@ -61,7 +115,7 @@ export default function Paso1DatosLead({
         }, 300);
 
         return () => clearTimeout(delayDebounce);
-    }, [localidadSearch, selectedProvinciaId]);
+    }, [localidadSearch, selectedProvinciaId, hasSelected]);
 
     const handleProvinciaChange = (value: string) => {
         setSelectedProvinciaId(value);
@@ -70,11 +124,46 @@ export default function Paso1DatosLead({
         setLocalidadSearch('');
         setLocalidadesResult([]);
         setShowDropdown(false);
+        setHasSearched(false);
+        setHasSelected(false);
+        // Enfocar el input de localidad después de seleccionar provincia
+        setTimeout(() => {
+            inputRef.current?.focus();
+        }, 100);
+    };
+
+    const handleLocalidadSelect = (localidad: Localidad) => {
+        onChange('localidad_id', localidad.id);
+        setLocalidadSearch(localidad.nombre);
+        setShowDropdown(false);
+        setLocalidadesResult([]);
+        setHasSearched(false);  // ← Limpiar estado de búsqueda
+        setHasSelected(true);    // ← Marcar como seleccionado
+    };
+
+    const handleClearLocalidad = () => {
+        onChange('localidad_id', '');
+        setLocalidadSearch('');
+        setLocalidadesResult([]);
+        setShowDropdown(false);
+        setHasSearched(false);
+        setHasSelected(false);
+        inputRef.current?.focus();
     };
 
     const getError = (field: string): string | undefined => {
         return errores[`lead.${field}`];
     };
+
+    // Determinar si mostrar mensaje de "no encontrado"
+    const showNoResults = hasSearched && 
+                          !isSearching && 
+                          !hasSelected && 
+                          localidadSearch.length >= 3 && 
+                          localidadesResult.length === 0;
+
+    // Determinar si mostrar sugerencia de provincia
+    const showProvinciaSuggestion = localidadSearch.length >= 3 && !selectedProvinciaId;
 
     return (
         <div className="space-y-6">
@@ -183,7 +272,7 @@ export default function Paso1DatosLead({
                 {/* Provincia */}
                 <div className="space-y-2">
                     <label htmlFor="provincia_id" className="block text-sm font-medium text-gray-700">
-                        Provincia
+                        Provincia <span className="text-red-500">*</span>
                     </label>
                     <select
                         id="provincia_id"
@@ -191,7 +280,7 @@ export default function Paso1DatosLead({
                         onChange={(e) => handleProvinciaChange(e.target.value)}
                         className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     >
-                        <option value="">Todas las provincias</option>
+                        <option value="">Seleccionar provincia</option>
                         {provincias.map((prov) => (
                             <option key={prov.id} value={String(prov.id)}>
                                 {prov.nombre}
@@ -200,14 +289,15 @@ export default function Paso1DatosLead({
                     </select>
                 </div>
 
-                {/* Localidad */}
-                <div className="space-y-2">
+                {/* Localidad con buscador mejorado */}
+                <div className="space-y-2 relative" ref={dropdownRef}>
                     <label htmlFor="localidad" className="block text-sm font-medium text-gray-700">
                         Localidad <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                         <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <input
+                            ref={inputRef}
                             type="text"
                             id="localidad"
                             value={localidadSearch}
@@ -215,11 +305,23 @@ export default function Paso1DatosLead({
                                 setLocalidadSearch(e.target.value);
                                 if (e.target.value === '') {
                                     onChange('localidad_id', '');
+                                    setHasSelected(false);
                                 }
                             }}
-                            className={`pl-10 w-full border ${getError('localidad_id') ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
+                            className={`pl-10 pr-8 w-full border ${getError('localidad_id') ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                             placeholder="Escriba al menos 3 letras..."
+                            autoComplete="off"
+                            disabled={hasSelected && !!data.localidad_id} // ← Deshabilitar si ya hay selección
                         />
+                        {localidadSearch && !hasSelected && (
+                            <button
+                                type="button"
+                                onClick={handleClearLocalidad}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        )}
                         {isSearching && (
                             <Loader className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
                         )}
@@ -230,27 +332,46 @@ export default function Paso1DatosLead({
                             {getError('localidad_id')}
                         </p>
                     )}
+                    
+                    {/* Dropdown de localidades */}
                     {showDropdown && localidadesResult.length > 0 && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto" style={{ top: '100%' }}>
                             {localidadesResult.map((loc) => (
                                 <button
                                     key={loc.id}
                                     type="button"
-                                    onClick={() => {
-                                        onChange('localidad_id', loc.id);
-                                        setLocalidadSearch(loc.nombre);
-                                        setShowDropdown(false);
-                                    }}
-                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 border-b border-gray-100 last:border-b-0"
+                                    onClick={() => handleLocalidadSelect(loc)}
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 border-b border-gray-100 last:border-b-0 transition-colors"
                                 >
-                                    <div className="font-medium">{loc.nombre}</div>
-                                    <div className="text-xs text-gray-500">{loc.provincia} (CP: {loc.codigo_postal})</div>
+                                    <div className="font-medium text-sm">{loc.nombre}</div>
+                                    <div className="text-xs text-gray-500">
+                                        {loc.provincia} {loc.codigo_postal ? `(CP: ${loc.codigo_postal})` : ''}
+                                    </div>
                                 </button>
                             ))}
                         </div>
                     )}
+                    
+                    {/* Mensaje cuando no hay resultados */}
+                    {showNoResults && (
+                        <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            No se encontraron localidades con ese nombre.
+                        </p>
+                    )}
+                    
+                    {/* Sugerencia de provincia */}
+                    {showProvinciaSuggestion && (
+                        <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            Seleccione una provincia para obtener mejores resultados.
+                        </p>
+                    )}
+                    
                     <p className="text-xs text-gray-500">
-                        Escriba al menos 3 letras para buscar localidades
+                        {selectedProvinciaId 
+                            ? 'Escriba al menos 3 letras para buscar localidades' 
+                            : 'Primero seleccione una provincia'}
                     </p>
                 </div>
 

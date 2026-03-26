@@ -23,8 +23,7 @@ export default function ResponsablesSection({
     const [showForm, setShowForm] = useState(false);
     const [nuevoResponsable, setNuevoResponsable] = useState({
         tipo_responsabilidad_id: '',
-        nombre_completo: '',  // ← Cambiado de nombre/apellido a nombre_completo
-        cargo: '',
+        nombre_completo: '',  
         telefono: '',
         email: ''
     });
@@ -120,7 +119,6 @@ export default function ResponsablesSection({
             empresa_id: empresaId,
             tipo_responsabilidad_id: nuevoResponsable.tipo_responsabilidad_id,
             nombre_completo: nuevoResponsable.nombre_completo,  // ← Cambiado
-            cargo: nuevoResponsable.cargo,
             telefono: nuevoResponsable.telefono || null,
             email: nuevoResponsable.email || null
         }, {
@@ -138,7 +136,6 @@ export default function ResponsablesSection({
                         setNuevoResponsable({
                             tipo_responsabilidad_id: '',
                             nombre_completo: '',
-                            cargo: '',
                             telefono: '',
                             email: ''
                         });
@@ -179,7 +176,6 @@ export default function ResponsablesSection({
         setNuevoResponsable({
             tipo_responsabilidad_id: '',
             nombre_completo: '',
-            cargo: '',
             telefono: '',
             email: ''
         });
@@ -318,12 +314,6 @@ export default function ResponsablesSection({
                                         <p className="text-xs text-gray-500">Nombre completo</p>
                                         <p className="text-sm font-medium">{resp.nombre_completo}</p>
                                     </div>
-                                    {resp.cargo && (
-                                        <div className="col-span-2">
-                                            <p className="text-xs text-gray-500">Cargo</p>
-                                            <p className="text-sm">{resp.cargo}</p>
-                                        </div>
-                                    )}
                                     {resp.telefono && (
                                         <div>
                                             <p className="text-xs text-gray-500">Teléfono</p>
