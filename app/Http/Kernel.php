@@ -13,6 +13,8 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
+        // 🔥 AGREGAR AQUÍ EL MIDDLEWARE NOCACHE
+        \App\Http\Middleware\NoCache::class,
     ];
 
     protected $middlewareGroups = [
@@ -45,9 +47,8 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         
-    
         'usuario.activo' => \App\Http\Middleware\CheckUsuarioActivo::class,
-        'permiso' => \App\Http\Middleware\PermisoMiddleware::class,  // ← ESTA LÍNEA ES LA CLAVE
+        'permiso' => \App\Http\Middleware\PermisoMiddleware::class,
         'usuario_especifico' => \App\Http\Middleware\UsuarioEspecificoMiddleware::class,
     ];
 }

@@ -79,17 +79,24 @@ public function index(Request $request)
                 ->where('id', $comercial->prefijo_id)
                 ->first();
                  
-            $prefijoUsuario = [
-                'id' => (string) $comercial->prefijo->id,
-                'codigo' => $comercial->prefijo->codigo,
-                'descripcion' => $comercial->prefijo->descripcion,
-                'comercial_nombre' => $comercial->personal?->nombre_completo,
-                'display_text' => $comercial->prefijo->codigo . ' - ' . ($comercial->personal?->nombre_completo ?? 'Sin comercial')
-            ];
+            if ($prefijo) {
+                $nombreComercial = null;
+                if ($comercial->personal) {
+                    $nombreComercial = trim($comercial->personal->nombre . ' ' . $comercial->personal->apellido);
+                }
+                
+                $prefijoUsuario = [
+                    'id' => (string) $prefijo->id,
+                    'codigo' => $prefijo->codigo,
+                    'descripcion' => $prefijo->descripcion,
+                    'comercial_nombre' => $nombreComercial,
+                    'display_text' => "[{$prefijo->codigo}] " . ($nombreComercial ?? $prefijo->descripcion)
+                ];
+            }
         }
     }
 
-    //  Función para obtener prefijos permitidos
+    // Función para obtener prefijos permitidos
     $getPrefijosPermitidosFunc = function() use ($user, $prefijosUsuario) {
         if (!empty($prefijosUsuario)) {
             return $prefijosUsuario;
@@ -103,20 +110,17 @@ public function index(Request $request)
     
     $prefijosPermitidos = $getPrefijosPermitidosFunc();
 
-    //  Aplicar filtro por prefijo (tanto por presupuesto como por empresa)
+    // Aplicar filtro por prefijo
     if (!empty($prefijosPermitidos)) {
         $query->where(function($q) use ($prefijosPermitidos) {
-            // Contratos con presupuesto (filtro por prefijo del presupuesto)
             $q->whereHas('presupuesto', function($subq) use ($prefijosPermitidos) {
                 $subq->whereIn('prefijo_id', $prefijosPermitidos);
             })
-            // O contratos sin presupuesto (filtro por prefijo de la empresa)
             ->orWhereHas('empresa', function($subq) use ($prefijosPermitidos) {
                 $subq->whereIn('prefijo_id', $prefijosPermitidos);
             });
         });
     } elseif ($request->filled('prefijo_id') && !$usuarioEsComercial) {
-        // Filtro manual por prefijo
         $prefijoId = $request->prefijo_id;
         $query->where(function($q) use ($prefijoId) {
             $q->whereHas('presupuesto', function($subq) use ($prefijoId) {
@@ -127,7 +131,6 @@ public function index(Request $request)
             });
         });
     } elseif (!$user->ve_todas_cuentas && empty($prefijosPermitidos)) {
-        // No tiene permisos para ver nada
         $query->whereRaw('1 = 0');
     }
 
@@ -157,20 +160,31 @@ public function index(Request $request)
 
     $contratos = $query->paginate(15);
 
-    // Obtener datos para filtros (solo para no comerciales)
+    // 🔥 Obtener datos para filtros (solo para no comerciales)
     $prefijosFiltro = [];
     if (!$usuarioEsComercial) {
-        $prefijosFiltro = \App\Models\Prefijo::with('comercial.personal')
-            ->where('activo', true)
+        $prefijosFiltro = \App\Models\Prefijo::where('activo', true)
             ->get()
             ->map(function($prefijo) {
-                $comercial = $prefijo->comercial->first();
+                // Buscar el comercial asociado a este prefijo
+                $comercial = \App\Models\Comercial::with('personal')
+                    ->where('prefijo_id', $prefijo->id)
+                    ->where('activo', 1)
+                    ->first();
+                
+                $nombreComercial = null;
+                if ($comercial && $comercial->personal) {
+                    $nombreComercial = trim($comercial->personal->nombre . ' ' . $comercial->personal->apellido);
+                }
+                
                 return [
                     'id' => (string) $prefijo->id,
                     'codigo' => $prefijo->codigo,
                     'descripcion' => $prefijo->descripcion,
-                    'comercial_nombre' => $comercial?->personal?->nombre_completo,
-                    'display_text' => $prefijo->codigo . ' - ' . ($comercial?->personal?->nombre_completo ?? 'Sin comercial')
+                    'comercial_nombre' => $nombreComercial,
+                    'display_text' => $nombreComercial 
+                        ? "[{$prefijo->codigo}] {$nombreComercial}"
+                        : "[{$prefijo->codigo}] {$prefijo->descripcion}"
                 ];
             })->toArray();
     }

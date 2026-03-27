@@ -30,39 +30,64 @@ export default function Paso3WhatsApp({
     const telefonoComercial = comercial?.telefono || '';
     const primerNombreComercial = comercial?.nombre.split(' ')[0] || '';
     
-    const generarMensajeVistaPrevia = () => {
-        if (!comercial) return '';
+const generarMensajeVistaPrevia = () => {
+    if (!comercial) return '';
+    
+    let mensaje = `Hola ${primerNombreComercial}, nuevo lead:\n\n`;
+    mensaje += `👤 ${leadData.nombre_completo}\n`;
+    
+    if (leadData.telefono) {
+        mensaje += `📱 ${leadData.telefono}\n`;
+    }
+    
+    if (leadData.email) {
+        mensaje += `📧 ${leadData.email}\n`;
+    }
+    
+    if (leadData.telefono && leadId) {
+        const primerNombreLead = leadData.nombre_completo.split(' ')[0];
+        const nombreCompania = (window as any).compania?.nombre || 'la empresa';
+        const mensajeLead = `Hola ${primerNombreLead}, soy ${comercial.nombre} de ${nombreCompania}.`;
         
-        let mensaje = `Hola ${primerNombreComercial}, nuevo lead:\n\n`;
-        mensaje += `👤 ${leadData.nombre_completo}\n`;
+        const telefonoLead = leadData.telefono.replace(/\D/g, '');
+        const telefonoLeadFormateado = telefonoLead.startsWith('54') ? telefonoLead : `54${telefonoLead}`;
         
-        if (leadData.telefono) {
-            mensaje += `📱 ${leadData.telefono}\n`;
-        }
+        // 🔥 ENLACE QUE NO REGISTRA EN PREVISUALIZACIÓN
+        const urlContactar = `${window.location.origin}/lead/${leadId}/contactar?phone=${telefonoLeadFormateado}&msg=${encodeURIComponent(mensajeLead)}`;
         
-        if (leadData.email) {
-            mensaje += `📧 ${leadData.email}\n`;
-        }
+        // Enlace de previsualización (para que WhatsApp muestre algo bonito)
+        const urlPreview = `${window.location.origin}/lead/${leadId}/info`;
         
-        if (leadData.telefono && leadId) {
-            const primerNombreLead = leadData.nombre_completo.split(' ')[0];
-            
-            const nombreCompania = (window as any).compania?.nombre || 'la empresa';
-            
-            const mensajeLead = `Hola ${primerNombreLead}, soy ${comercial.nombre} de ${nombreCompania}.`;
-            
-            const telefonoLead = leadData.telefono.replace(/\D/g, '');
-            const telefonoLeadFormateado = telefonoLead.startsWith('54') ? telefonoLead : `54${telefonoLead}`;
-            
-            // 🔥 URL CORREGIDA
-            mensaje += `\n📲 Link para contactar al lead (CLICK AQUÍ):\n`;
-            mensaje += `${window.location.origin}/comercial/lead/${leadId}/contactar-whatsapp?phone=${telefonoLeadFormateado}&msg=${encodeURIComponent(mensajeLead)}\n`;
-        }
-        
-        mensaje += `\nEste link registrará automáticamente el contacto en el sistema.`;
-        
-        return mensaje;
-    };
+        mensaje += `\n📲 Link para contactar al lead:\n`;
+        mensaje += `${urlContactar}\n\n`;
+        mensaje += `ℹ️ Vista previa: ${urlPreview}\n`;
+    }
+    
+    mensaje += `\n⚠️ IMPORTANTE: Al hacer clic en el enlace se abrirá WhatsApp y se registrará automáticamente el contacto.`;
+    
+    return mensaje;
+};
+
+// Función para manejar el envío
+const handleSendWhatsApp = () => {
+    if (!comercial || !telefonoComercial || !leadData.telefono) return;
+    
+    const primerNombreLead = leadData.nombre_completo.split(' ')[0];
+    const nombreCompania = (window as any).compania?.nombre || 'la empresa';
+    const mensajeLead = `Hola ${primerNombreLead}, soy ${comercial.nombre} de ${nombreCompania}.`;
+    
+    const telefonoLead = leadData.telefono.replace(/\D/g, '');
+    const telefonoLeadFormateado = telefonoLead.startsWith('54') ? telefonoLead : `54${telefonoLead}`;
+    
+    // Construir URL pública que registrará el contacto
+    const urlRegistro = `${window.location.origin}/comercial/lead/${leadId}/contactar-whatsapp?phone=${telefonoLeadFormateado}&msg=${encodeURIComponent(mensajeLead)}`;
+    
+    // Abrir en nueva pestaña/ventana
+    window.open(urlRegistro, '_blank');
+    
+    // Llamar al callback para cerrar el modal
+    onConfirm(true);
+};
 
     return (
         <div className="space-y-6">
@@ -98,8 +123,22 @@ export default function Paso3WhatsApp({
                     
                     <div className="text-sm bg-white p-3 rounded border border-gray-200">
                         <p className="font-medium text-gray-700 mb-2">Vista previa del mensaje:</p>
-                        <div className="whitespace-pre-line text-gray-600 font-mono text-xs">
-                            {generarMensajeVistaPrevia()}
+                        <div className="text-gray-600 text-xs space-y-1 max-h-60 overflow-y-auto bg-gray-50 p-3 rounded">
+                            {generarMensajeVistaPrevia().split('\n').map((line, i) => {
+                                // Detectar si la línea contiene un enlace
+                                if (line.includes('/comercial/lead/')) {
+                                    return (
+                                        <div key={i} className="text-blue-600 font-mono text-xs break-all my-1 p-1 bg-blue-50 rounded">
+                                            🔗 {line}
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div key={i} className="break-words">
+                                        {line || <br />}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -114,16 +153,6 @@ export default function Paso3WhatsApp({
             )}
 
             <div className="flex justify-between gap-3 pt-6 border-t border-gray-200">
-                <button
-                    type="button"
-                    onClick={onBack}
-                    disabled={isSubmitting}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Volver
-                </button>
-                
                 <div className="flex gap-3">
                     <button
                         type="button"
@@ -144,9 +173,8 @@ export default function Paso3WhatsApp({
                         }`}
                     >
                         {isSubmitting ? 'Enviando...' : (
-                            <>
-                                <Send className="h-4 w-4" />
-                                Enviar WhatsApp
+                            <> 
+                                WhatsApp
                             </>
                         )}
                     </button>

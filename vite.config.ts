@@ -1,3 +1,4 @@
+// vite.config.ts
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
@@ -11,8 +12,10 @@ export default defineConfig({
                 'resources/js/app.tsx'
             ],
             refresh: true,
+            // 🔥 Agregar build directory explícito
+            buildDirectory: 'build',
         }),
-        react(), // Sin la configuración experimental de babel
+        react(),
         tailwindcss(),
     ],
     resolve: {
@@ -25,4 +28,15 @@ export default defineConfig({
             host: 'localhost',
         },
     },
+    build: {
+        // 🔥 Configuración para mejor cache busting
+        manifest: true,
+        rollupOptions: {
+            output: {
+                entryFileNames: 'assets/[name].[hash].js',
+                chunkFileNames: 'assets/[name].[hash].js',
+                assetFileNames: 'assets/[name].[hash].[ext]'
+            }
+        }
+    }
 });

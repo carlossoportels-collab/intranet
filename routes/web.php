@@ -110,6 +110,14 @@ Route::prefix('cuentas')->name('cuentas.')->middleware(['throttle:10,1'])->group
 Route::get('/comercial/lead/{lead}/contactar-whatsapp', [LeadContactController::class, 'contactarWhatsApp'])
     ->name('lead.contactar-whatsapp');
 
+// Nueva ruta para previsualización (NO registra)
+Route::get('/lead/{lead}/info', [LeadContactController::class, 'previewInfo'])
+    ->name('lead.preview-info');
+
+// Nueva ruta para contacto real (registra SOLO con click=1)
+Route::get('/lead/{lead}/contactar', [LeadContactController::class, 'contactarLead'])
+    ->name('lead.contactar');
+
     
 // ============================================
 // RUTAS TEMPORALES (PDFs)

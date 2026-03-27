@@ -1,4 +1,5 @@
 <?php
+// app/Providers/AppServiceProvider.php
 
 namespace App\Providers;
 
@@ -13,7 +14,7 @@ use App\Services\Lead\LeadPresupuestoLegacyService;
 use App\Services\Lead\LeadDetailsService;
 use App\Services\PermisoService;
 use App\Services\Presupuesto\PresupuestoNotificationService;
-use App\Services\Error\ErrorNotificationService; // 🔥 NUEVO: Importar el servicio de errores
+use App\Services\Error\ErrorNotificationService;
 use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
@@ -31,7 +32,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(LeadDetailsService::class);
         $this->app->singleton(PermisoService::class);
         
-        // 🔥 NUEVO: Registrar el servicio de notificaciones de error
+        // Registrar el servicio de notificaciones de error
         $this->app->singleton(ErrorNotificationService::class);
         
         // Registrar paquetes de desarrollo SOLO en local
@@ -46,11 +47,21 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if (app()->environment('production')) {
-            URL::forceScheme('http');
+            URL::forceScheme('https');
+            
+            // 🔥 Deshabilitar QueryDetector en producción
+            if (class_exists(\BeyondCode\QueryDetector\QueryDetectorServiceProvider::class)) {
+                // No hacer nada, solo asegurar que no está activo
+            }
         }
         
         // Llamar a configureDefaults() en boot
         $this->configureDefaults();
+        
+        // 🔥 Si quieres mantener la detección en desarrollo pero no mostrar warnings en producción
+        if (!$this->app->environment('production')) {
+            $this->configureQueryDetector();
+        }
     }
 
     /**
@@ -88,6 +99,19 @@ class AppServiceProvider extends ServiceProvider
             if (class_exists($provider)) {
                 $this->app->register($provider);
             }
+        }
+    }
+    
+    /**
+     * Configure QueryDetector for development
+     */
+    protected function configureQueryDetector(): void
+    {
+        // Configuración opcional para QueryDetector
+        // Puedes personalizarlo aquí si lo deseas
+        if (config('querydetector.enabled', false)) {
+            // Configurar para que no muestre warnings en la consola
+            config(['querydetector.log_enabled' => true]);
         }
     }
 }

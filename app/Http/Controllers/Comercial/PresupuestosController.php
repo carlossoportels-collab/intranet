@@ -37,100 +37,111 @@ class PresupuestosController extends Controller
         $this->initializeAuthorization(); //INICIALIZAR
     }
 
-    public function index(Request $request)
-    {
-        //VERIFICAR PERMISO
-        $this->authorizePermiso(config('permisos.VER_PRESUPUESTOS'));
-        
-        $usuario = auth()->user();
-        
-        $query = Presupuesto::with(['lead', 'prefijo', 'estado', 'promocion']);
-        
-        if ($request->filled('estado_id')) {
-            $query->where('estado_id', $request->estado_id);
+public function index(Request $request)
+{
+    //VERIFICAR PERMISO
+    $this->authorizePermiso(config('permisos.VER_PRESUPUESTOS'));
+    
+    $usuario = auth()->user();
+    
+    $query = Presupuesto::with(['lead', 'prefijo', 'estado', 'promocion']);
+    
+    if ($request->filled('estado_id')) {
+        $query->where('estado_id', $request->estado_id);
+    }
+    
+    if ($request->filled('prefijo_id')) {
+        $query->where('prefijo_id', $request->prefijo_id);
+    }
+    
+    if ($request->filled('promocion_id')) {
+        if ($request->promocion_id === '0' || $request->promocion_id === 'sin_promocion') {
+            $query->where(function($q) {
+                $q->whereNull('promocion_id')
+                ->orWhere('promocion_id', 0);
+            });
+        } else {
+            $query->where('promocion_id', $request->promocion_id);
         }
-        
-        if ($request->filled('prefijo_id')) {
-            $query->where('prefijo_id', $request->prefijo_id);
-        }
-        
-        if ($request->filled('promocion_id')) {
-            if ($request->promocion_id === '0' || $request->promocion_id === 'sin_promocion') {
-                $query->where(function($q) {
-                    $q->whereNull('promocion_id')
-                    ->orWhere('promocion_id', 0);
-                });
-            } else {
-                $query->where('promocion_id', $request->promocion_id);
-            }
-        }
-        
-        if ($request->filled('fecha_inicio')) {
-            $query->whereDate('created', '>=', $request->fecha_inicio);
-        }
-        
-        if ($request->filled('fecha_fin')) {
-            $query->whereDate('created', '<=', $request->fecha_fin);
-        }
-        
-        //APLICAR FILTRO DE PREFIJOS usando el trait
-        $this->applyPrefijoFilter($query, $usuario);
-        
-        $presupuestos = $query->orderBy('created', 'desc')->paginate(5);
+    }
+    
+    if ($request->filled('fecha_inicio')) {
+        $query->whereDate('created', '>=', $request->fecha_inicio);
+    }
+    
+    if ($request->filled('fecha_fin')) {
+        $query->whereDate('created', '<=', $request->fecha_fin);
+    }
+    
+    //APLICAR FILTRO DE PREFIJOS usando el trait
+    $this->applyPrefijoFilter($query, $usuario);
+    
+    $presupuestos = $query->orderBy('created', 'desc')->paginate(5);
 
-        $presupuestos->through(function ($presupuesto) {
-            $presupuesto->referencia = sprintf('LS-%s-%s', date('Y', strtotime($presupuesto->created)), $presupuesto->id);
-            $presupuesto->total_presupuesto = (float) $presupuesto->total_presupuesto; 
-            return $presupuesto;
-        });
+    $presupuestos->through(function ($presupuesto) {
+        $presupuesto->referencia = sprintf('LS-%s-%s', date('Y', strtotime($presupuesto->created)), $presupuesto->id);
+        $presupuesto->total_presupuesto = (float) $presupuesto->total_presupuesto; 
+        return $presupuesto;
+    });
 
-        //ESTADÍSTICAS con filtro de prefijos
-        $estadisticasQuery = Presupuesto::query();
-        $this->applyPrefijoFilter($estadisticasQuery, $usuario);
-        
-        $estadisticas = [
-            'total' => (clone $estadisticasQuery)->count(),
-            'activos' => (clone $estadisticasQuery)->where('estado_id', 1)->count(),
-            'vencidos' => (clone $estadisticasQuery)->where('estado_id', 2)->count(),
-            'aprobados' => (clone $estadisticasQuery)->where('estado_id', 3)->count(),
-            'rechazados' => (clone $estadisticasQuery)->where('estado_id', 4)->count(),
-        ];
+    //ESTADÍSTICAS con filtro de prefijos
+    $estadisticasQuery = Presupuesto::query();
+    $this->applyPrefijoFilter($estadisticasQuery, $usuario);
+    
+    $estadisticas = [
+        'total' => (clone $estadisticasQuery)->count(),
+        'activos' => (clone $estadisticasQuery)->where('estado_id', 1)->count(),
+        'vencidos' => (clone $estadisticasQuery)->where('estado_id', 2)->count(),
+        'aprobados' => (clone $estadisticasQuery)->where('estado_id', 3)->count(),
+        'rechazados' => (clone $estadisticasQuery)->where('estado_id', 4)->count(),
+    ];
 
-        //OBTENER PREFIJOS PERMITIDOS usando el trait
-        $prefijosPermitidos = $this->getPrefijosPermitidos();
-        
-        // Obtener prefijo del usuario si es comercial
-        $prefijoUsuario = null;
-        if ($usuario->rol_id == 5) {
-            $comercial = \App\Models\Comercial::with('personal')
-                ->where('personal_id', $usuario->personal_id)
-                ->where('activo', 1)
-                ->first();
-                
-            if ($comercial) {
-                $prefijo = \App\Models\Prefijo::find($comercial->prefijo_id);
-                if ($prefijo) {
-                    $nombreComercial = $comercial->personal->nombre . ' ' . $comercial->personal->apellido;
-                    $prefijoUsuario = [
-                        'id' => (string) $prefijo->id,
-                        'codigo' => $prefijo->codigo,
-                        'descripcion' => $prefijo->descripcion,
-                        'comercial_nombre' => $nombreComercial,
-                        'display_text' => "[{$prefijo->codigo}] {$nombreComercial}"
-                    ];
-                }
-            }
-        }
-        
-        // Obtener todos los prefijos para el filtro
-        $prefijosFiltro = \App\Models\Prefijo::with('comercial.personal')
+    //OBTENER PREFIJOS PERMITIDOS usando el trait
+    $prefijosPermitidos = $this->getPrefijosPermitidos();
+    
+    // 🔥 Obtener prefijo del usuario si es comercial (con valor por defecto null)
+    $prefijoUsuario = null;
+    if ($usuario->rol_id == 5) {
+        $comercial = \App\Models\Comercial::with('personal')
+            ->where('personal_id', $usuario->personal_id)
             ->where('activo', 1)
+            ->first();
+            
+        if ($comercial) {
+            $prefijo = \App\Models\Prefijo::find($comercial->prefijo_id);
+            if ($prefijo) {
+                $nombreComercial = null;
+                if ($comercial->personal) {
+                    $nombreComercial = trim($comercial->personal->nombre . ' ' . $comercial->personal->apellido);
+                }
+                
+                $prefijoUsuario = [
+                    'id' => (string) $prefijo->id,
+                    'codigo' => $prefijo->codigo,
+                    'descripcion' => $prefijo->descripcion,
+                    'comercial_nombre' => $nombreComercial,
+                    'display_text' => "[{$prefijo->codigo}] " . ($nombreComercial ?? $prefijo->descripcion)
+                ];
+            }
+        }
+    }
+    
+    // 🔥 Obtener todos los prefijos para el filtro (solo para usuarios NO comerciales)
+    $prefijosFiltro = [];
+    if ($usuario->rol_id != 5) {
+        $prefijosFiltro = \App\Models\Prefijo::where('activo', 1)
             ->get()
             ->map(function($prefijo) {
-                $comercial = $prefijo->comercial->first();
-                $nombreComercial = $comercial && $comercial->personal 
-                    ? $comercial->personal->nombre . ' ' . $comercial->personal->apellido
-                    : null;
+                // Buscar el comercial asociado a este prefijo
+                $comercial = \App\Models\Comercial::with('personal')
+                    ->where('prefijo_id', $prefijo->id)
+                    ->where('activo', 1)
+                    ->first();
+                
+                $nombreComercial = null;
+                if ($comercial && $comercial->personal) {
+                    $nombreComercial = trim($comercial->personal->nombre . ' ' . $comercial->personal->apellido);
+                }
                 
                 return [
                     'id' => (string) $prefijo->id,
@@ -138,32 +149,33 @@ class PresupuestosController extends Controller
                     'descripcion' => $prefijo->descripcion,
                     'comercial_nombre' => $nombreComercial,
                     'display_text' => $nombreComercial 
-                        ? "[{$prefijo->codigo}] {$nombreComercial} "
+                        ? "[{$prefijo->codigo}] {$nombreComercial}"
                         : "[{$prefijo->codigo}] {$prefijo->descripcion}"
                 ];
             })
             ->toArray();
-
-        $estados = \App\Models\EstadoEntidad::all(['id', 'nombre']);
-        $promociones = \App\Models\Promocion::where('activo', 1)->get(['id', 'nombre']);
-
-        return Inertia::render('Comercial/Presupuestos/Index', [
-            'presupuestos' => $presupuestos,
-            'estadisticas' => $estadisticas,
-            'usuario' => [
-                've_todas_cuentas' => $usuario->ve_todas_cuentas,
-                'rol_id' => $usuario->rol_id,
-                'nombre_completo' => $usuario->personal ? 
-                    $usuario->personal->nombre . ' ' . $usuario->personal->apellido : 
-                    $usuario->nombre_usuario,
-                'prefijos_asignados' => $usuario->ve_todas_cuentas ? null : $prefijosPermitidos
-            ],
-            'prefijosFiltro' => $prefijosFiltro,
-            'prefijoUsuario' => $prefijoUsuario,
-            'estados' => $estados,
-            'promociones' => $promociones
-        ]);
     }
+
+    $estados = \App\Models\EstadoEntidad::all(['id', 'nombre']);
+    $promociones = \App\Models\Promocion::where('activo', 1)->get(['id', 'nombre']);
+
+    return Inertia::render('Comercial/Presupuestos/Index', [
+        'presupuestos' => $presupuestos,
+        'estadisticas' => $estadisticas,
+        'usuario' => [
+            've_todas_cuentas' => $usuario->ve_todas_cuentas,
+            'rol_id' => $usuario->rol_id,
+            'nombre_completo' => $usuario->personal ? 
+                $usuario->personal->nombre_completo : 
+                $usuario->nombre_usuario,
+            'prefijos_asignados' => $usuario->ve_todas_cuentas ? null : $prefijosPermitidos
+        ],
+        'prefijosFiltro' => $prefijosFiltro,
+        'prefijoUsuario' => $prefijoUsuario,
+        'estados' => $estados,
+        'promociones' => $promociones
+    ]);
+}
 
     public function create(Request $request)
     {
