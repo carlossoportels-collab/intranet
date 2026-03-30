@@ -118,20 +118,23 @@ export default function ContratosIndex({
     };
 
     // Función para obtener el badge del tipo de operación
-    const getTipoOperacionBadge = (tipo?: string) => {
-        switch(tipo) {
-            case 'venta_cliente':
-                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
-            case 'alta_nueva':
-                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
-            case 'cambio_titularidad':
-                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
-            case 'cambio_razon_social':
-                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
-            default:
-                return null;
-        }
-    };
+const getTipoOperacionBadge = (tipo?: string) => {
+    switch(tipo) {
+        case 'venta_cliente':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
+        case 'alta_nueva':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
+        case 'cambio_titularidad':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
+        case 'cambio_razon_social':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
+        // Nuevo Badge SmartSat
+        case 'cambio_smartsat':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">Cambio SmartSat</span>;
+        default:
+            return null;
+    }
+};
 
     const handlePageChange = (page: number) => {
         router.get('/comercial/contratos', { 
@@ -199,7 +202,7 @@ export default function ContratosIndex({
 
     return (
         <AppLayout title="Contratos">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+            <div className="max-w-[95%] mx-auto px-4 sm:px-6 py-4 sm:py-6">
                 {/* Header */}
                 <div className="mb-4 sm:mb-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

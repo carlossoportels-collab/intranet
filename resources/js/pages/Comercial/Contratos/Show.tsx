@@ -112,22 +112,25 @@ export default function ContratoShow({ contrato }: Props) {
         }));
     };
 
-    const getTipoOperacionBadge = () => {
-        const tipo = contrato?.tipo_operacion;
-        
-        switch(tipo) {
-            case 'venta_cliente':
-                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
-            case 'alta_nueva':
-                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
-            case 'cambio_titularidad':
-                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
-            case 'cambio_razon_social':
-                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
-            default:
-                return null;
-        }
-    };
+const getTipoOperacionBadge = () => {
+    const tipo = contrato?.tipo_operacion;
+    
+    switch(tipo) {
+        case 'venta_cliente':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
+        case 'alta_nueva':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
+        case 'cambio_titularidad':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
+        case 'cambio_razon_social':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
+        // Nuevo Badge SmartSat
+        case 'cambio_smartsat':
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">Cambio SmartSat</span>;
+        default:
+            return null;
+    }
+};
 
     return (
         <AppLayout title={`Contrato #${contrato.numero_contrato}`}>

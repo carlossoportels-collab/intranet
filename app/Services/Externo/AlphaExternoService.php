@@ -26,6 +26,48 @@ class AlphaExternoService
     }
 
     /**
+     * Obtener prefijo de una patente desde la base de datos
+     */
+    private function obtenerPrefijoPorPatente(string $patente): ?string
+    {
+        try {
+            $vehiculo = \App\Models\AdminVehiculo::where('avl_patente', $patente)
+                ->orWhere('avl_patente', 'LIKE', "%{$patente}%")
+                ->first();
+            
+            if ($vehiculo && !empty($vehiculo->prefijo_codigo)) {
+                Log::info('Prefijo encontrado para patente', [
+                    'patente' => $patente,
+                    'prefijo_codigo' => $vehiculo->prefijo_codigo
+                ]);
+                return $vehiculo->prefijo_codigo;
+            }
+            
+            Log::info('No se encontró prefijo para patente', ['patente' => $patente]);
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Error obteniendo prefijo por patente', [
+                'patente' => $patente,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Obtener logo según prefijo
+     */
+    public function obtenerLogoPorPrefijo(?string $prefijo): string
+    {
+        // Si el prefijo es SS (SMARTSAT), usar logosmart.png
+        if ($prefijo === 'SS') {
+            return 'images/logos/logosmart.png';
+        }
+        // Por defecto, usar logo.png (LOCALSAT)
+        return 'images/logos/logo.png';
+    }
+
+    /**
      * PASO 1: Consultar moviles por tipo
      * tipo 3 = flota, tipo 4 = alias
      */
@@ -123,7 +165,6 @@ XML;
 
     /**
      * Parsear respuesta de moviles
-     * Respuesta esperada: varios nodos <ns:return> con <ax21:movilId>, <ax21:identificador>, <ax21:patente>
      */
     protected function parsearMoviles(string $xml): array
     {
@@ -137,15 +178,12 @@ XML;
             $xpath->registerNamespace('ax21', 'http://response.bean.ws.wc.web.com.ar/xsd');
             $xpath->registerNamespace('ns', 'http://ws.wc.web.com.ar');
             
-            // Buscar todos los nodos return (con namespace ns)
             $returnNodes = $xpath->query('//ns:return');
             
-            // Si no encuentra con ns, buscar sin namespace
             if ($returnNodes->length == 0) {
                 $returnNodes = $xpath->query('//return');
             }
             
-            // También buscar directamente con el namespace ax21 en el nodo raíz
             if ($returnNodes->length == 0) {
                 $returnNodes = $xpath->query('//*[local-name()="return"]');
             }
@@ -153,12 +191,10 @@ XML;
             Log::info('AlphaExternoService - Nodos return encontrados', ['cantidad' => $returnNodes->length]);
             
             foreach ($returnNodes as $node) {
-                // Buscar movilId, identificador, patente dentro del nodo return
                 $movilId = $xpath->query('.//ax21:movilId', $node)->item(0);
                 $identificador = $xpath->query('.//ax21:identificador', $node)->item(0);
                 $patente = $xpath->query('.//ax21:patente', $node)->item(0);
                 
-                // Si no encontró con namespace, buscar sin namespace
                 if (!$movilId) {
                     $movilId = $xpath->query('.//movilId', $node)->item(0);
                 }
@@ -170,10 +206,16 @@ XML;
                 }
                 
                 if ($movilId && $identificador) {
+                    $patenteValue = $patente ? trim($patente->nodeValue) : null;
+                    
+                    // 🔥 OBTENER PREFIJO DESDE LA BASE DE DATOS
+                    $prefijo = $patenteValue ? $this->obtenerPrefijoPorPatente($patenteValue) : null;
+                    
                     $moviles[] = [
                         'movilId' => trim($movilId->nodeValue),
                         'identificador' => trim($identificador->nodeValue),
-                        'patente' => $patente ? trim($patente->nodeValue) : null,
+                        'patente' => $patenteValue,
+                        'prefijo' => $prefijo, // 🔥 Agregar prefijo
                     ];
                 }
             }
@@ -192,7 +234,6 @@ XML;
 
     /**
      * Parsear respuesta de posiciones
-     * Respuesta esperada: múltiples <ns:return> con datos de posición
      */
     protected function parsearPosiciones(string $xml): array
     {
@@ -206,7 +247,6 @@ XML;
             $xpath->registerNamespace('ax21', 'http://response.bean.ws.wc.web.com.ar/xsd');
             $xpath->registerNamespace('ns', 'http://ws.wc.web.com.ar');
             
-            // Buscar todos los nodos return
             $returnNodes = $xpath->query('//ns:return');
             
             if ($returnNodes->length == 0) {
@@ -223,7 +263,6 @@ XML;
                 $aproximacion = $xpath->query('.//ax21:aproximacion', $node)->item(0);
                 $velocidad = $xpath->query('.//ax21:velocidad', $node)->item(0);
                 
-                // Si no encontró con namespace, buscar sin namespace
                 if (!$movilId) {
                     $movilId = $xpath->query('.//movilId', $node)->item(0);
                 }
@@ -272,7 +311,6 @@ XML;
         $vehiculos = [];
         
         foreach ($moviles as $movil) {
-            // Buscar en nuestra base de datos local
             $patente = $movil['patente'] ?? null;
             $patenteLimpia = $patente ? preg_replace('/[^A-Z0-9]/', '', strtoupper($patente)) : null;
             
@@ -293,11 +331,15 @@ XML;
                 ];
             }
             
+            // 🔥 Usar el prefijo obtenido de la DB o el que vino en el movil
+            $prefijo = $movil['prefijo'] ?? ($vehiculoDB->prefijo_codigo ?? null);
+            
             $vehiculos[] = [
                 'id' => $movil['movilId'],
                 'movilId' => $movil['movilId'],
                 'identificador' => $movil['identificador'],
                 'patente' => $movil['patente'],
+                'prefijo' => $prefijo,
                 'empresa' => $empresaLocal,
             ];
         }
@@ -340,6 +382,7 @@ XML;
             'patente' => $vehiculoData['patente'] ?? null,
             'identificador' => $vehiculoData['identificador'] ?? null,
             'movilId' => $posicion['movilId'] ?? $vehiculoData['movilId'] ?? null,
+            'prefijo' => $vehiculoData['prefijo'] ?? null,
             'fecha' => $fecha,
             'latitud' => $latitud,
             'longitud' => $longitud,

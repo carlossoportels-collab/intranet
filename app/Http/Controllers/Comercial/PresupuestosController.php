@@ -350,72 +350,80 @@ public function index(Request $request)
         }
     }
 
-public function show(Presupuesto $presupuesto)
-{
-    //VERIFICAR ACCESO AL PRESUPUESTO (por prefijo)
-    $this->authorizeLeadAccess($presupuesto);
-    
-    // Cargar todas las relaciones necesarias
-    $presupuesto->load([
-        'lead', 
-        'prefijo.comercial.personal',
-        'prefijo.comercial.compania', 
-        'tasa', 
-        'abono',
-        'promocion.productos',
-        'agregados.productoServicio.tipo',
-        'estado'
-    ]);
-
-    // Obtener el comercial correctamente
-    $comercial = null;
-    $comercialEmail = '';
-    $companiaNombre = 'LOCALSAT';
-    $companiaId = 1;
-
-    if ($presupuesto->prefijo) {
-        $comercial = $presupuesto->prefijo->comercial;
+    public function show(Presupuesto $presupuesto)
+    {
+        //VERIFICAR ACCESO AL PRESUPUESTO (por prefijo)
+        $this->authorizeLeadAccess($presupuesto);
         
-        if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
-            $comercial = $comercial->first();
-        }
+        // Cargar todas las relaciones necesarias
+        $presupuesto->load([
+            'lead', 
+            'prefijo.comercial.personal',
+            'prefijo.comercial.compania', 
+            'tasa', 
+            'abono',
+            'promocion.productos',
+            'agregados.productoServicio.tipo',
+            'estado'
+        ]);
+
+        // 🔥 GENERAR LA REFERENCIA CON EL PREFIJO CORRECTO
+        $codigoPrefijo = $presupuesto->prefijo?->codigo ?? 'LS';
+        $anio = date('Y', strtotime($presupuesto->created));
+        $referencia = sprintf('%s-%s-%s', $codigoPrefijo, $anio, $presupuesto->id);
         
-        if ($comercial) {
-            if ($comercial->personal) {
-                $comercialEmail = $comercial->personal->email ?? '';
+        // 🔥 AGREGAR LA REFERENCIA AL OBJETO PRESUPUESTO
+        $presupuesto->referencia = $referencia;
+
+        // Obtener el comercial correctamente
+        $comercial = null;
+        $comercialEmail = '';
+        $companiaNombre = 'LOCALSAT';
+        $companiaId = 1;
+
+        if ($presupuesto->prefijo) {
+            $comercial = $presupuesto->prefijo->comercial;
+            
+            if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
+                $comercial = $comercial->first();
             }
             
-            $companiaId = $comercial->compania_id ?? 1;
-            
-            if ($comercial->compania) {
-                $companiaNombre = $comercial->compania->nombre ?? 'LOCALSAT';
+            if ($comercial) {
+                if ($comercial->personal) {
+                    $comercialEmail = $comercial->personal->email ?? '';
+                }
+                
+                $companiaId = $comercial->compania_id ?? 1;
+                
+                if ($comercial->compania) {
+                    $companiaNombre = $comercial->compania->nombre ?? 'LOCALSAT';
+                }
             }
         }
+
+        $presupuesto->comercial_email = $comercialEmail;
+        $presupuesto->compania_nombre = $companiaNombre;
+        $presupuesto->compania_id = $companiaId;
+        $presupuesto->nombre_comercial = $presupuesto->nombre_comercial;
+        $presupuesto->compania = (object) [
+            'id' => $companiaId,
+            'nombre' => $companiaNombre
+        ];
+        
+        // Obtener datos para los selects del modal de alta empresa
+        $origenes = \App\Models\OrigenContacto::where('activo', true)->get();
+        $rubros = \App\Models\Rubro::where('activo', true)->get();
+        $provincias = \App\Models\Provincia::where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+        
+        return Inertia::render('Comercial/Presupuestos/Show', [
+            'presupuesto' => $presupuesto,
+            'origenes' => $origenes,
+            'rubros' => $rubros,
+            'provincias' => $provincias
+        ]);
     }
-
-    $presupuesto->comercial_email = $comercialEmail;
-    $presupuesto->compania_nombre = $companiaNombre;
-    $presupuesto->compania_id = $companiaId;
-    $presupuesto->nombre_comercial = $presupuesto->nombre_comercial;
-    $presupuesto->compania = (object) [
-        'id' => $companiaId,
-        'nombre' => $companiaNombre
-    ];
-    
-    // 🔥 OBTENER DATOS PARA LOS SELECTS DEL MODAL DE ALTA EMPRESA
-    $origenes = \App\Models\OrigenContacto::where('activo', true)->get();
-    $rubros = \App\Models\Rubro::where('activo', true)->get();
-    $provincias = \App\Models\Provincia::where('activo', true)
-        ->orderBy('nombre')
-        ->get(['id', 'nombre']);
-    
-    return Inertia::render('Comercial/Presupuestos/Show', [
-        'presupuesto' => $presupuesto,
-        'origenes' => $origenes,    // ← Agregar
-        'rubros' => $rubros,        // ← Agregar
-        'provincias' => $provincias // ← Agregar
-    ]);
-}
 
     public function edit(Presupuesto $presupuesto)
     {
@@ -559,47 +567,93 @@ public function show(Presupuesto $presupuesto)
         $this->authorizeLeadAccess($presupuesto);
         
         // Recargar el presupuesto con todas las relaciones necesarias
-        $presupuesto = Presupuesto::with([
+        $presupuestoConRelaciones = Presupuesto::with([
             'lead',
             'tasa',
             'abono',
             'promocion.productos',
-            'prefijo.comercial.personal'
+            'prefijo.comercial.personal',
+            'lead.empresaContacto.empresa'
         ])->find($presupuesto->id);
 
-        // Cargar los agregados por separado con sus relaciones
+        if (!$presupuestoConRelaciones) {
+            $presupuestoConRelaciones = $presupuesto;
+        }
+
+        // Cargar los agregados
         $agregados = \App\Models\PresupuestoAgregado::with(['productoServicio.tipo'])
-            ->where('presupuesto_id', $presupuesto->id)
+            ->where('presupuesto_id', $presupuestoConRelaciones->id)
             ->get();
 
-        $presupuesto->setRelation('agregados', $agregados);
+        $presupuestoConRelaciones->setRelation('agregados', $agregados);
 
-        $codigoPrefijo = $presupuesto->prefijo?->codigo ?? 'LS';
-        $anio = date('Y', strtotime($presupuesto->created));
-        $referencia = sprintf('%s-%s-%s', $codigoPrefijo, $anio, $presupuesto->id);
-        $presupuesto->referencia = $referencia;
+        // Generar referencia
+        $codigoPrefijo = $presupuestoConRelaciones->prefijo?->codigo ?? 'LS';
+        $anio = date('Y', strtotime($presupuestoConRelaciones->created));
+        $referencia = sprintf('%s-%s-%s', $codigoPrefijo, $anio, $presupuestoConRelaciones->id);
+        $presupuestoConRelaciones->referencia = $referencia;
 
-        $fechaCreacion = \Carbon\Carbon::parse($presupuesto->created)->startOfDay();
-        $fechaValidez = \Carbon\Carbon::parse($presupuesto->validez)->startOfDay();
-        $presupuesto->dias_validez = (int) $fechaCreacion->diffInDays($fechaValidez);
+        $fechaCreacion = \Carbon\Carbon::parse($presupuestoConRelaciones->created)->startOfDay();
+        $fechaValidez = \Carbon\Carbon::parse($presupuestoConRelaciones->validez)->startOfDay();
+        $presupuestoConRelaciones->dias_validez = (int) $fechaCreacion->diffInDays($fechaValidez);
 
-        if (empty($presupuesto->lead->empresa)) {
-            $presupuesto->lead->empresa = $presupuesto->lead->nombre_completo;
+        // 🔥 OBTENER LA EMPRESA ASOCIADA Y GENERAR NOMBRE CORTO
+        $empresaTexto = '';
+        $tieneEmpresa = false;
+        $nombreCliente = '';
+        
+        $contacto = \App\Models\EmpresaContacto::with('empresa')
+            ->where('lead_id', $presupuestoConRelaciones->lead->id)
+            ->where('es_activo', true)
+            ->first();
+        
+        if ($contacto && $contacto->empresa) {
+            $tieneEmpresa = true;
+            $empresaTexto = $contacto->empresa->razon_social ?: $contacto->empresa->nombre_fantasia;
+            
+            // 🔥 LIMPIAR NOMBRE DE EMPRESA (quitar caracteres especiales, acentos, etc.)
+            $nombreCliente = preg_replace('/[^a-zA-Z0-9áéíóúñÑ\s]/', '', $empresaTexto);
+            $nombreCliente = str_replace(' ', '_', $nombreCliente);
+            
+            // 🔥 SI ES MUY LARGO, TOMAR SOLO LAS PRIMERAS 3 PALABRAS O 30 CARACTERES
+            $palabras = explode('_', $nombreCliente);
+            if (count($palabras) > 3) {
+                $nombreCliente = implode('_', array_slice($palabras, 0, 3));
+            }
+            if (strlen($nombreCliente) > 35) {
+                $nombreCliente = substr($nombreCliente, 0, 32) . '...';
+            }
+        } else {
+            // Nombre del contacto
+            $nombreCliente = preg_replace('/[^a-zA-Z0-9áéíóúñÑ\s]/', '', $presupuestoConRelaciones->lead->nombre_completo ?? 'Cliente');
+            $nombreCliente = str_replace(' ', '_', $nombreCliente);
+            
+            // Si es muy largo, acortar
+            if (strlen($nombreCliente) > 30) {
+                $nombreCliente = substr($nombreCliente, 0, 27) . '...';
+            }
+        }
+
+        // 🔥 NOMBRE DEL ARCHIVO
+        $nombreArchivo = $nombreCliente . '_' . $referencia;
+
+        // Datos para la vista
+        if ($tieneEmpresa && !empty($empresaTexto)) {
+            $presupuestoConRelaciones->lead->empresa = $empresaTexto;
+        } else {
+            $presupuestoConRelaciones->lead->empresa = $presupuestoConRelaciones->lead->nombre_completo;
         }
         
-        if (empty($presupuesto->lead->contacto)) {
-            $presupuesto->lead->contacto = $presupuesto->lead->nombre_completo;
-        }
+        $presupuestoConRelaciones->lead->contacto = $presupuestoConRelaciones->lead->nombre_completo;
+        $presupuestoConRelaciones->lead->tiene_empresa = $tieneEmpresa;
 
-        $compania = $this->getCompaniaData($presupuesto);
+        $compania = $this->getCompaniaData($presupuestoConRelaciones);
 
         $servicios_clasificados = [];
         $accesorios_clasificados = [];
 
         foreach ($agregados as $item) {
-            if (!$item->productoServicio) {
-                continue;
-            }
+            if (!$item->productoServicio) continue;
             
             $tipoId = $item->productoServicio->tipo_id;
             
@@ -613,7 +667,7 @@ public function show(Presupuesto $presupuesto)
         $download = $request->has('download') && $request->download == 1;
 
         $pdf = Pdf::loadView('pdf.presupuesto', [
-            'presupuesto' => $presupuesto,
+            'presupuesto' => $presupuestoConRelaciones,
             'compania' => $compania,
             'servicios_clasificados' => $servicios_clasificados,
             'accesorios_clasificados' => $accesorios_clasificados
@@ -627,58 +681,99 @@ public function show(Presupuesto $presupuesto)
         ]);
 
         if ($download) {
-            return $pdf->download('Presupuesto_' . $referencia . '.pdf');
+            return $pdf->download($nombreArchivo . '.pdf');
         } else {
-            return $pdf->stream('Presupuesto_' . $referencia . '.pdf');
+            return $pdf->stream($nombreArchivo . '.pdf');
         }
     }
     
     public function generarPdfTemp(Request $request, Presupuesto $presupuesto)
     {
-        //VERIFICAR ACCESO AL PRESUPUESTO
         $this->authorizeLeadAccess($presupuesto);
         
-        
         try {
-            $presupuesto->load([
+            $presupuestoConRelaciones = Presupuesto::with([
                 'lead',
                 'tasa',
                 'abono',
                 'promocion.productos',
                 'agregados.productoServicio',
-                'prefijo.comercial.personal'
-            ]);
+                'prefijo.comercial.personal',
+                'lead.empresaContacto.empresa'
+            ])->find($presupuesto->id);
 
-            foreach ($presupuesto->agregados as $agregado) {
+            if (!$presupuestoConRelaciones) {
+                throw new \Exception('Presupuesto no encontrado');
+            }
+
+            foreach ($presupuestoConRelaciones->agregados as $agregado) {
                 if ($agregado->productoServicio) {
                     $agregado->productoServicio->load('tipo');
                 }
             }
 
-            $codigoPrefijo = $presupuesto->prefijo?->codigo ?? 'LS';
-            $anio = date('Y', strtotime($presupuesto->created));
-            $referencia = sprintf('%s-%s-%s', $codigoPrefijo, $anio, $presupuesto->id);
-            $presupuesto->referencia = $referencia;
+            // Generar referencia
+            $codigoPrefijo = $presupuestoConRelaciones->prefijo?->codigo ?? 'LS';
+            $anio = date('Y', strtotime($presupuestoConRelaciones->created));
+            $referencia = sprintf('%s-%s-%s', $codigoPrefijo, $anio, $presupuestoConRelaciones->id);
+            $presupuestoConRelaciones->referencia = $referencia;
 
-            $fechaCreacion = \Carbon\Carbon::parse($presupuesto->created)->startOfDay();
-            $fechaValidez = \Carbon\Carbon::parse($presupuesto->validez)->startOfDay();
-            $presupuesto->dias_validez = (int) $fechaCreacion->diffInDays($fechaValidez);
+            // 🔥 OBTENER NOMBRE CORTO DEL CLIENTE
+            $empresaTexto = '';
+            $tieneEmpresa = false;
+            $nombreCliente = '';
+            
+            $contacto = \App\Models\EmpresaContacto::with('empresa')
+                ->where('lead_id', $presupuestoConRelaciones->lead->id)
+                ->where('es_activo', true)
+                ->first();
+            
+            if ($contacto && $contacto->empresa) {
+                $tieneEmpresa = true;
+                $empresaTexto = $contacto->empresa->razon_social ?: $contacto->empresa->nombre_fantasia;
+                
+                $nombreCliente = preg_replace('/[^a-zA-Z0-9áéíóúñÑ\s]/', '', $empresaTexto);
+                $nombreCliente = str_replace(' ', '_', $nombreCliente);
+                
+                $palabras = explode('_', $nombreCliente);
+                if (count($palabras) > 3) {
+                    $nombreCliente = implode('_', array_slice($palabras, 0, 3));
+                }
+                if (strlen($nombreCliente) > 35) {
+                    $nombreCliente = substr($nombreCliente, 0, 32) . '...';
+                }
+            } else {
+                $nombreCliente = preg_replace('/[^a-zA-Z0-9áéíóúñÑ\s]/', '', $presupuestoConRelaciones->lead->nombre_completo ?? 'Cliente');
+                $nombreCliente = str_replace(' ', '_', $nombreCliente);
+                
+                if (strlen($nombreCliente) > 30) {
+                    $nombreCliente = substr($nombreCliente, 0, 27) . '...';
+                }
+            }
 
-            if (empty($presupuesto->lead->empresa)) {
-                $presupuesto->lead->empresa = $presupuesto->lead->nombre_completo;
+            $nombreArchivo = $nombreCliente . '_' . $referencia;
+
+            $fechaCreacion = \Carbon\Carbon::parse($presupuestoConRelaciones->created)->startOfDay();
+            $fechaValidez = \Carbon\Carbon::parse($presupuestoConRelaciones->validez)->startOfDay();
+            $presupuestoConRelaciones->dias_validez = (int) $fechaCreacion->diffInDays($fechaValidez);
+
+            // Datos para la vista
+            if ($tieneEmpresa && !empty($empresaTexto)) {
+                $presupuestoConRelaciones->lead->empresa = $empresaTexto;
+            } else {
+                $presupuestoConRelaciones->lead->empresa = $presupuestoConRelaciones->lead->nombre_completo;
             }
             
-            if (empty($presupuesto->lead->contacto)) {
-                $presupuesto->lead->contacto = $presupuesto->lead->nombre_completo;
-            }
+            $presupuestoConRelaciones->lead->contacto = $presupuestoConRelaciones->lead->nombre_completo;
+            $presupuestoConRelaciones->lead->tiene_empresa = $tieneEmpresa;
 
-            $compania = $this->getCompaniaData($presupuesto);
+            $compania = $this->getCompaniaData($presupuestoConRelaciones);
 
             $servicios_clasificados = [];
             $accesorios_clasificados = [];
 
-            if ($presupuesto->agregados && $presupuesto->agregados->count() > 0) {
-                foreach ($presupuesto->agregados as $item) {
+            if ($presupuestoConRelaciones->agregados && $presupuestoConRelaciones->agregados->count() > 0) {
+                foreach ($presupuestoConRelaciones->agregados as $item) {
                     if ($item->productoServicio) {
                         $tipoId = $item->productoServicio->tipo_id;
                         
@@ -692,7 +787,7 @@ public function show(Presupuesto $presupuesto)
             }
             
             $pdf = Pdf::loadView('pdf.presupuesto', [
-                'presupuesto' => $presupuesto,
+                'presupuesto' => $presupuestoConRelaciones,
                 'compania' => $compania,
                 'servicios_clasificados' => $servicios_clasificados,
                 'accesorios_clasificados' => $accesorios_clasificados
@@ -705,7 +800,7 @@ public function show(Presupuesto $presupuesto)
                 'chroot' => public_path(),
             ]);
         
-            $filename = "presupuesto-{$presupuesto->id}-" . time() . ".pdf";
+            $filename = "presupuesto-{$presupuestoConRelaciones->id}-" . time() . ".pdf";
             $path = storage_path("app/temp/{$filename}");
             
             if (!file_exists(storage_path('app/temp'))) {
@@ -718,8 +813,8 @@ public function show(Presupuesto $presupuesto)
         
             return redirect()->back()->with('pdfData', [
                 'success' => true,
-                'url' => "/temp/presupuesto/{$presupuesto->id}?v=" . time(),
-                'filename' => "Presupuesto_{$referencia}.pdf"
+                'url' => "/temp/presupuesto/{$presupuestoConRelaciones->id}?v=" . time(),
+                'filename' => $nombreArchivo . '.pdf'
             ]);
         
         } catch (\Exception $e) {

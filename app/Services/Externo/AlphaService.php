@@ -21,14 +21,51 @@ class AlphaService
         ]);
     }
 
-    /**
-     * Consultar última posición por patente usando HTTP POST con XML
-     */
-    public function consultarUltimaPosicionPatente(string $patente, string $codigoAlfa)
-    {
-        try {
-            // Construir el XML SOAP manualmente
-            $xml = <<<XML
+
+/**
+ * Obtener prefijo de una patente desde la base de datos
+ */
+private function obtenerPrefijoPorPatente(string $patente): ?string
+{
+    try {
+        $vehiculo = \App\Models\AdminVehiculo::where('avl_patente', $patente)
+            ->orWhere('avl_patente', 'LIKE', "%{$patente}%")
+            ->first();
+        
+        if ($vehiculo && !empty($vehiculo->prefijo_codigo)) {
+            return $vehiculo->prefijo_codigo;
+        }
+        return null;
+    } catch (\Exception $e) {
+        Log::error('Error obteniendo prefijo por patente', [
+            'patente' => $patente,
+            'error' => $e->getMessage()
+        ]);
+        return null;
+    }
+}
+
+/**
+ * Obtener logo según prefijo
+ */
+public function obtenerLogoPorPrefijo(?string $prefijo): string
+{
+    if ($prefijo === 'SS') {
+        return 'images/logos/logosmart.png';
+    }
+    return 'images/logos/logo.png';
+}
+
+/**
+ * Consultar última posición por patente usando HTTP POST con XML
+ */
+public function consultarUltimaPosicionPatente(string $patente, string $codigoAlfa)
+{
+    try {
+        // 🔥 Obtener prefijo de la patente
+        $prefijo = $this->obtenerPrefijoPorPatente($patente);
+        
+        $xml = <<<XML
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.wc.web.com.ar">
    <soapenv:Header/>
    <soapenv:Body>
@@ -41,51 +78,58 @@ class AlphaService
    </soapenv:Body>
 </soapenv:Envelope>
 XML;
-            
-            Log::info('AlphaService - Enviando petición SOAP', [
-                'patente' => $patente,
-                'codigoAlfa' => $codigoAlfa,
-                'xml_length' => strlen($xml)
+        
+        Log::info('AlphaService - Enviando petición SOAP', [
+            'patente' => $patente,
+            'codigoAlfa' => $codigoAlfa,
+            'prefijo' => $prefijo,
+            'xml_length' => strlen($xml)
+        ]);
+        
+        $response = Http::timeout(15)
+            ->withHeaders([
+                'Content-Type' => 'text/xml; charset=utf-8',
+                'SOAPAction' => ''
+            ])
+            ->send('POST', $this->wsdl, [
+                'body' => $xml
             ]);
-            
-            $response = Http::timeout(15)
-                ->withHeaders([
-                    'Content-Type' => 'text/xml; charset=utf-8',
-                    'SOAPAction' => ''
-                ])
-                ->send('POST', $this->wsdl, [
-                    'body' => $xml
-                ]);
-            
-            Log::info('AlphaService - Respuesta recibida', [
-                'status' => $response->status(),
-                'body_preview' => substr($response->body(), 0, 500)
-            ]);
-            
-            if ($response->successful()) {
-                return $this->parsearRespuestaXML($response->body());
+        
+        Log::info('AlphaService - Respuesta recibida', [
+            'status' => $response->status(),
+            'body_preview' => substr($response->body(), 0, 500)
+        ]);
+        
+        if ($response->successful()) {
+            $resultado = $this->parsearRespuestaXML($response->body());
+            if ($resultado) {
+                $resultado['prefijo'] = $prefijo; // 🔥 Agregar prefijo al resultado
             }
-            
-            Log::error('AlphaService - Error en respuesta', [
-                'status' => $response->status(),
-                'body' => $response->body()
-            ]);
-            
-            return null;
-            
-        } catch (\Exception $e) {
-            Log::error('AlphaService - Error general', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return null;
+            return $resultado;
         }
+        
+        Log::error('AlphaService - Error en respuesta', [
+            'status' => $response->status(),
+            'body' => $response->body()
+        ]);
+        
+        return null;
+        
+    } catch (\Exception $e) {
+        Log::error('AlphaService - Error general', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        return null;
     }
-    
-/**
+}
+
+    /**
  * Parsear respuesta XML a formato estándar
  */
-protected function parsearRespuestaXML(string $xml): ?array
+
+
+    protected function parsearRespuestaXML(string $xml): ?array
 {
     try {
         // Cargar XML
@@ -405,47 +449,49 @@ protected function parsearMoviles(string $xml): array
     return $moviles;
 }
 
-/**
- * Parsear respuesta de posiciones
- */
-protected function parsearPosiciones(string $xml): array
-{
-    $posiciones = [];
-    
-    try {
-        $dom = new \DOMDocument();
-        $dom->loadXML($xml);
+    /**
+     * Parsear respuesta de posiciones
+     */
+    protected function parsearPosiciones(string $xml): array
+    {
+        $posiciones = [];
         
-        $xpath = new \DOMXPath($dom);
-        $xpath->registerNamespace('ax21', 'http://response.bean.ws.wc.web.com.ar/xsd');
-        
-        $posicionNodes = $xpath->query('//ax21:posicion');
-        
-        foreach ($posicionNodes as $node) {
-            $movilId = $xpath->query('.//ax21:movilId', $node)->item(0);
-            $fecha = $xpath->query('.//ax21:fechaMensaje', $node)->item(0);
-            $latitud = $xpath->query('.//ax21:latitud', $node)->item(0);
-            $longitud = $xpath->query('.//ax21:longitud', $node)->item(0);
-            $aproximacion = $xpath->query('.//ax21:aproximacion', $node)->item(0);
-            $velocidad = $xpath->query('.//ax21:velocidad', $node)->item(0);
+        try {
+            $dom = new \DOMDocument();
+            $dom->loadXML($xml);
             
-            $posiciones[] = [
-                'movilId' => $movilId ? $movilId->nodeValue : null,
-                'fecha' => $fecha ? $fecha->nodeValue : null,
-                'latitud' => $latitud ? $latitud->nodeValue : null,
-                'longitud' => $longitud ? $longitud->nodeValue : null,
-                'direccion' => $aproximacion ? $aproximacion->nodeValue : null,
-                'velocidad' => $velocidad ? $velocidad->nodeValue : null,
-            ];
+            $xpath = new \DOMXPath($dom);
+            $xpath->registerNamespace('ax21', 'http://response.bean.ws.wc.web.com.ar/xsd');
+            
+            $posicionNodes = $xpath->query('//ax21:posicion');
+            
+            foreach ($posicionNodes as $node) {
+                $movilId = $xpath->query('.//ax21:movilId', $node)->item(0);
+                $fecha = $xpath->query('.//ax21:fechaMensaje', $node)->item(0);
+                $latitud = $xpath->query('.//ax21:latitud', $node)->item(0);
+                $longitud = $xpath->query('.//ax21:longitud', $node)->item(0);
+                $aproximacion = $xpath->query('.//ax21:aproximacion', $node)->item(0);
+                $velocidad = $xpath->query('.//ax21:velocidad', $node)->item(0);
+                
+                $posiciones[] = [
+                    'movilId' => $movilId ? $movilId->nodeValue : null,
+                    'fecha' => $fecha ? $fecha->nodeValue : null,
+                    'latitud' => $latitud ? $latitud->nodeValue : null,
+                    'longitud' => $longitud ? $longitud->nodeValue : null,
+                    'direccion' => $aproximacion ? $aproximacion->nodeValue : null,
+                    'velocidad' => $velocidad ? $velocidad->nodeValue : null,
+                ];
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('AlphaService - Error parseando posiciones', [
+                'error' => $e->getMessage()
+            ]);
         }
         
-    } catch (\Exception $e) {
-        Log::error('AlphaService - Error parseando posiciones', [
-            'error' => $e->getMessage()
-        ]);
+        return $posiciones;
     }
-    
-    return $posiciones;
-}
+
+
 
 }

@@ -186,10 +186,7 @@ export default function DocumentoSelector({
             // Buscar el archivo en todos los contenidos cargados
             for (const content of Object.values(folderContents)) {
                 const file = content.files.find(f => f.path === path);
-                if (file) {
-                    console.log('Archivo encontrado:', file);
-                    return file;
-                }
+
             }
             return null;
         })

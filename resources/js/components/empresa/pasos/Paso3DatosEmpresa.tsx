@@ -1,6 +1,6 @@
 // resources/js/components/empresa/pasos/Paso3DatosEmpresa.tsx
 
-import { Building, Hash, MapPin, Phone, Mail, Briefcase, Tag, Truck, Search, Loader, User } from 'lucide-react';
+import { Building, Hash, MapPin, Phone, Mail, Briefcase, Tag, Truck, Search, Loader } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { DatosEmpresaForm, CategoriaFiscal, Plataforma } from '@/types/empresa';
@@ -34,9 +34,8 @@ export default function Paso3DatosEmpresa({
     const [searching, setSearching] = useState(false);
     const [localidadesResult, setLocalidadesResult] = useState<Localidad[]>([]);
     const [provinciaId, setProvinciaId] = useState<string>(provinciaInicial ? String(provinciaInicial) : '');
-    const [tipoDocumento, setTipoDocumento] = useState<'cuit' | 'dni'>('cuit'); // ← Nuevo estado
+    const [tipoDocumento, setTipoDocumento] = useState<'cuit' | 'dni'>('cuit');
 
-    // Actualizar cuando cambian las props iniciales
     useEffect(() => {
         if (provinciaInicial) {
             setProvinciaId(String(provinciaInicial));
@@ -99,7 +98,6 @@ export default function Paso3DatosEmpresa({
         setShowLocalidadesDropdown(false);
     };
 
-    // 🔥 Formatear CUIT/DNI automáticamente
     const formatCuit = (value: string) => {
         const numeros = value.replace(/\D/g, '');
         if (numeros.length <= 2) return numeros;
@@ -142,8 +140,8 @@ export default function Paso3DatosEmpresa({
                 </div>
             </div>
 
+            {/* Primera fila: Nombre de Fantasía y Razón Social */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Nombre de Fantasía */}
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                         Nombre de Fantasía <span className="text-red-500">*</span>
@@ -164,7 +162,6 @@ export default function Paso3DatosEmpresa({
                     )}
                 </div>
 
-                {/* Razón Social */}
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                         Razón Social <span className="text-red-500">*</span>
@@ -184,8 +181,10 @@ export default function Paso3DatosEmpresa({
                         <p className="text-xs text-red-600">{errores['empresa.razon_social']}</p>
                     )}
                 </div>
+            </div>
 
-                {/* Tipo de Documento y Número */}
+            {/* Segunda fila: Tipo de Documento y Número */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                         Tipo de Documento <span className="text-red-500">*</span>
@@ -222,7 +221,6 @@ export default function Paso3DatosEmpresa({
                     </div>
                 </div>
 
-                {/* Número de Documento */}
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                         {tipoDocumento === 'cuit' ? 'CUIT' : 'DNI'} <span className="text-red-500">*</span>
@@ -245,11 +243,13 @@ export default function Paso3DatosEmpresa({
                         <p className="text-xs text-red-600">{errores['empresa.cuit']}</p>
                     )}
                 </div>
+            </div>
 
-                {/* Teléfono Fiscal */}
+            {/* Tercera fila: Teléfono y Email */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
-                        Teléfono Fiscal <span className="text-red-500">*</span>
+                        Teléfono <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                         <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -275,10 +275,9 @@ export default function Paso3DatosEmpresa({
                     )}
                 </div>
 
-                {/* Email Fiscal */}
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
-                        Email Fiscal <span className="text-red-500">*</span>
+                        Email <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                         <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -298,11 +297,36 @@ export default function Paso3DatosEmpresa({
                         <p className="text-xs text-red-600">{errores['empresa.email_fiscal']}</p>
                     )}
                 </div>
+            </div>
 
-                {/* Código Postal Fiscal */}
+            {/* Cuarta fila: Dirección y Código Postal */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
-                        Código Postal Fiscal <span className="text-red-500">*</span>
+                        Dirección <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                            type="text"
+                            value={data.direccion_fiscal}
+                            onChange={(e) => onChange('direccion_fiscal', e.target.value)}
+                            maxLength={255}
+                            className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
+                                errores['empresa.direccion_fiscal'] ? 'border-red-300' : 'border-gray-300'
+                            }`}
+                            placeholder="Ej: Av. Corrientes 1234"
+                            required
+                        />
+                    </div>
+                    {errores['empresa.direccion_fiscal'] && (
+                        <p className="text-xs text-red-600">{errores['empresa.direccion_fiscal']}</p>
+                    )}
+                </div>
+
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Código Postal <span className="text-red-500">*</span>
                     </label>
                     <input
                         type="text"
@@ -326,95 +350,75 @@ export default function Paso3DatosEmpresa({
                 </div>
             </div>
 
-            {/* Dirección Fiscal */}
-            <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                    Dirección Fiscal <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <input
-                        type="text"
-                        value={data.direccion_fiscal}
-                        onChange={(e) => onChange('direccion_fiscal', e.target.value)}
-                        maxLength={255}
-                        className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                            errores['empresa.direccion_fiscal'] ? 'border-red-300' : 'border-gray-300'
+            {/* Quinta fila: Provincia y Localidad */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Provincia <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                        value={provinciaId}
+                        onChange={(e) => handleProvinciaChange(e.target.value)}
+                        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
+                            errores['empresa.provincia_id'] ? 'border-red-300' : 'border-gray-300'
                         }`}
-                        placeholder="Ej: Av. Corrientes 1234, Piso 5"
-                        required
-                    />
-                </div>
-                {errores['empresa.direccion_fiscal'] && (
-                    <p className="text-xs text-red-600">{errores['empresa.direccion_fiscal']}</p>
-                )}
-            </div>
-
-            {/* Provincia */}
-            <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                    Provincia <span className="text-red-500">*</span>
-                </label>
-                <select
-                    value={provinciaId}
-                    onChange={(e) => handleProvinciaChange(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                        errores['empresa.provincia_id'] ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                >
-                    <option value="">Seleccionar provincia</option>
-                    {provincias.map((provincia) => (
-                        <option key={provincia.id} value={String(provincia.id)}>
-                            {provincia.nombre}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            {/* Localidad Fiscal con buscador */}
-            <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                    Localidad Fiscal <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                        type="text"
-                        value={searchLocalidad}
-                        onChange={(e) => handleSearchLocalidad(e.target.value)}
-                        className={`w-full pl-10 pr-10 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                            errores['empresa.localidad_fiscal_id'] ? 'border-red-300' : 'border-gray-300'
-                        }`}
-                        placeholder="Escriba al menos 3 letras para buscar..."
-                        required
-                    />
-                    {searching && (
-                        <Loader className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
-                    )}
-                    
-                    {showLocalidadesDropdown && localidadesResult.length > 0 && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                            {localidadesResult.map((localidad) => (
-                                <button
-                                    key={localidad.id}
-                                    type="button"
-                                    onClick={() => handleSelectLocalidad(localidad)}
-                                    className="w-full text-left px-4 py-2 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 border-b border-gray-100 last:border-b-0"
-                                >
-                                    <div className="font-medium">{localidad.nombre}</div>
-                                    <div className="text-sm text-gray-600">{localidad.provincia}</div>
-                                </button>
-                            ))}
-                        </div>
+                    >
+                        <option value="">Seleccionar provincia</option>
+                        {provincias.map((provincia) => (
+                            <option key={provincia.id} value={String(provincia.id)}>
+                                {provincia.nombre}
+                            </option>
+                        ))}
+                    </select>
+                    {errores['empresa.provincia_id'] && (
+                        <p className="text-xs text-red-600">{errores['empresa.provincia_id']}</p>
                     )}
                 </div>
-                {errores['empresa.localidad_fiscal_id'] && (
-                    <p className="text-xs text-red-600">{errores['empresa.localidad_fiscal_id']}</p>
-                )}
+
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Localidad <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                            type="text"
+                            value={searchLocalidad}
+                            onChange={(e) => handleSearchLocalidad(e.target.value)}
+                            className={`w-full pl-10 pr-10 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
+                                errores['empresa.localidad_fiscal_id'] ? 'border-red-300' : 'border-gray-300'
+                            }`}
+                            placeholder="Escriba al menos 3 letras para buscar..."
+                            required
+                        />
+                        {searching && (
+                            <Loader className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                        )}
+                        
+                        {showLocalidadesDropdown && localidadesResult.length > 0 && (
+                            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                {localidadesResult.map((localidad) => (
+                                    <button
+                                        key={localidad.id}
+                                        type="button"
+                                        onClick={() => handleSelectLocalidad(localidad)}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 border-b border-gray-100 last:border-b-0"
+                                    >
+                                        <div className="font-medium">{localidad.nombre}</div>
+                                        <div className="text-sm text-gray-600">{localidad.provincia}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    {errores['empresa.localidad_fiscal_id'] && (
+                        <p className="text-xs text-red-600">{errores['empresa.localidad_fiscal_id']}</p>
+                    )}
+                </div>
             </div>
 
+            {/* Sexta fila: Rubro, Categoría Fiscal y Plataforma */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Rubro */}
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                         Rubro <span className="text-red-500">*</span>
@@ -441,7 +445,6 @@ export default function Paso3DatosEmpresa({
                     )}
                 </div>
 
-                {/* Categoría Fiscal */}
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                         Categoría Fiscal <span className="text-red-500">*</span>
@@ -468,7 +471,6 @@ export default function Paso3DatosEmpresa({
                     )}
                 </div>
 
-                {/* Plataforma */}
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                         Plataforma <span className="text-red-500">*</span>

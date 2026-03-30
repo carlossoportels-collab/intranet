@@ -1,6 +1,7 @@
 // components/leads/LeadTableRow.tsx
+
 import { Link } from '@inertiajs/react';
-import { Eye, Edit, MessageSquare, FileText, Clock } from 'lucide-react';
+import { Eye, Edit, MessageSquare, FileText, Clock, User } from 'lucide-react';
 import React from 'react';
 
 import { BadgeEstado, BadgeOrigen } from '@/components/ui';
@@ -16,6 +17,7 @@ interface LeadTableRowProps {
   onNuevoComentario: (lead: Lead) => void;
   onVerNota: (lead: Lead) => void;
   onTiemposEstados: (lead: Lead) => void;
+  mostrarColumnaComercial?: boolean; // ← Nueva prop
 }
 
 const LeadTableRow: React.FC<LeadTableRowProps> = ({
@@ -27,11 +29,17 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
   usuario,
   onNuevoComentario,
   onVerNota,
-  onTiemposEstados
+  onTiemposEstados,
+  mostrarColumnaComercial = false // ← Por defecto false
 }) => {
   const origen = origenes.find(o => o.id === lead.origen_id!);
   const estado = estadosLead.find(e => e.id === lead.estado_lead_id);
   const tieneNotas = lead.notas && Array.isArray(lead.notas) && lead.notas.length > 0;
+  
+  // Obtener nombre del comercial
+  const nombreComercial = lead.prefijo?.codigo 
+    ? `${lead.prefijo.codigo}${lead.prefijo.descripcion ? ` - ${lead.prefijo.descripcion}` : ''}`
+    : lead.asignado_nombre || 'Sin asignar';
   
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -67,15 +75,25 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
         {estado && <BadgeEstado estado={estado} />}
       </td>
       
-      {/* PRESUPUESTOS - Solo número, sin fondo */}
-      <td className="px-4 py-3 text-sm text-gray-700">
+      {/* PRESUPUESTOS - Solo número */}
+      <td className="px-4 py-3 text-sm text-gray-700 text-center">
         {presupuestosCount}
       </td>
       
-      {/* COMENTARIOS - Solo número, sin fondo */}
-      <td className="px-4 py-3 text-sm text-gray-700">
+      {/* COMENTARIOS - Solo número */}
+      <td className="px-4 py-3 text-sm text-gray-700 text-center">
         {comentariosCount}
       </td>
+      
+      {/* COMERCIAL - Solo visible para admins/supervisores */}
+      {mostrarColumnaComercial && (
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-1">
+            <User className="h-3 w-3 text-gray-400" />
+            <span className="text-sm text-gray-700">{nombreComercial}</span>
+          </div>
+        </td>
+      )}
       
       {/* Registro */}
       <td className="px-4 py-3 text-sm text-gray-500">

@@ -193,12 +193,7 @@ const handleAccionPrincipal = useCallback(async (presupuestoId: number) => {
                     window.location.href = `/comercial/contratos/create-from-lead/${presupuestoId}`;
                 }, 500);
             } else {
-                // 🔥 LOG PARA DEPURACIÓN
-                console.log('Datos recibidos del backend:', {
-                    empresa: data.empresa,
-                    contacto: data.contacto
-                });
-                
+
                 // Pasar los datos existentes al modal
                 setDatosExistentes({
                     empresa: data.empresa || undefined,
@@ -498,8 +493,6 @@ const handleAccionPrincipal = useCallback(async (presupuestoId: number) => {
                 origenes={origenes}
                 rubros={rubros}
                 provincias={provincias}
-                pasoInicial={pasoInicialModal}
-                esCliente={lead.es_cliente}
                 modoCompletar={modoCompletar}
                 datosExistentes={datosExistentes}
             />

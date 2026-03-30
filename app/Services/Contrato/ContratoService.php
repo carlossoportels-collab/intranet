@@ -8,6 +8,7 @@ use App\Models\Presupuesto;
 use App\Models\Empresa;
 use App\Models\EmpresaContacto;
 use App\Models\EmpresaResponsable;
+use App\Models\HistorialTransferencia;
 use App\Models\CambioTitularidad; 
 use App\Models\CambioRazonSocial;
 use App\Models\DebitoCbu;
@@ -83,22 +84,38 @@ class ContratoService
     /**
      * Determinar tipo de operación
      */
-    public function determinarTipoOperacion(int $empresaId, $lead, bool $esCliente): string
-    {
-        $cambioTitularidad = CambioTitularidad::where('empresa_destino_id', $empresaId)
-            ->orderBy('fecha_cambio', 'desc')
-            ->first();
+public function determinarTipoOperacion(int $empresaId, $lead, bool $esCliente): string
+{
+    // 1. PRIORIDAD ABSOLUTA: Verificar si existe una transferencia a SmartSat (ID 9)
+    $transferenciaSS = HistorialTransferencia::where('entidad_id', $empresaId)
+        ->where('tipo_entidad', 'cliente')
+        ->where('prefijo_destino_id', 9)
+        ->orderBy('created_at', 'desc')
+        ->first();
 
-        $cambioRazonSocial = CambioRazonSocial::where('empresa_id', $empresaId)
-            ->orderBy('fecha_cambio', 'desc')
-            ->first();
-
-        if ($cambioTitularidad) return 'cambio_titularidad';
-        if ($cambioRazonSocial) return 'cambio_razon_social';
-        if ($esCliente) return 'venta_cliente';
-        
-        return 'alta_nueva';
+    if ($transferenciaSS) {
+        return 'cambio_smartsat';
     }
+
+    // 2. Verificar Cambio de Titularidad
+    $cambioTitularidad = CambioTitularidad::where('empresa_destino_id', $empresaId)
+        ->orderBy('fecha_cambio', 'desc')
+        ->first();
+    if ($cambioTitularidad) return 'cambio_titularidad';
+
+    // 3. Verificar Cambio de Razón Social
+    $cambioRazonSocial = CambioRazonSocial::where('empresa_id', $empresaId)
+        ->orderBy('fecha_cambio', 'desc')
+        ->first();
+    if ($cambioRazonSocial) return 'cambio_razon_social';
+
+    // 4. Si no hay registros de cambios especiales, verificar si ya es cliente
+    if ($esCliente) {
+        return 'venta_cliente';
+    }
+    
+    return 'alta_nueva';
+}
 
     /**
      * Obtener datos de compañía para PDF

@@ -1,5 +1,5 @@
 // resources/js/components/contratos/sections/MetodoPagoSection.tsx
-import { CreditCard, Landmark, XCircle } from 'lucide-react';
+import { CreditCard, Landmark, XCircle, AlertCircle, CheckCircle } from 'lucide-react';
 import React from 'react';
 
 interface Props {
@@ -55,14 +55,11 @@ export default function MetodoPagoSection({
     
     const handleMetodoClick = (metodo: 'cbu' | 'tarjeta') => {
         if (metodoPago === metodo) {
-            // Si ya está seleccionado, lo deseleccionamos y reseteamos los datos
             setMetodoPago(null);
             setDatosCbu(INITIAL_CBU);
             setDatosTarjeta(INITIAL_TARJETA);
         } else {
-            // Seleccionamos el nuevo método
             setMetodoPago(metodo);
-            // Opcional: resetear el otro método para mantener limpieza
             if (metodo === 'cbu') {
                 setDatosTarjeta(INITIAL_TARJETA);
             } else {
@@ -70,6 +67,11 @@ export default function MetodoPagoSection({
             }
         }
     };
+
+    // Validar que el CBU tenga exactamente 22 dígitos
+    const cbuEsValido = datosCbu.cbu.length === 22;
+    const cbuSoloNumeros = datosCbu.cbu.replace(/\D/g, '');
+    const cbuValido = cbuSoloNumeros.length === 22;
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -152,7 +154,6 @@ export default function MetodoPagoSection({
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">
-                            {/* ... resto del formulario CBU igual ... */}
                             <div className="col-span-2">
                                 <label className="block text-xs text-gray-600 mb-1">
                                     Banco <span className="text-red-500">*</span>
@@ -182,10 +183,27 @@ export default function MetodoPagoSection({
                                         }
                                     }}
                                     maxLength={22}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                                    className={`w-full px-2 py-1.5 text-sm border rounded focus:ring-1 focus:ring-green-500 focus:border-green-500 ${
+                                        datosCbu.cbu.length > 0 && datosCbu.cbu.length !== 22 && datosCbu.cbu.length < 22
+                                            ? 'border-yellow-500 bg-yellow-50'
+                                            : 'border-gray-300'
+                                    }`}
                                     placeholder="00000000000000000000"
                                     required
                                 />
+                                {/* 🔥 Validación CBU */}
+                                {datosCbu.cbu.length > 0 && datosCbu.cbu.length !== 22 && (
+                                    <div className="flex items-center gap-1 mt-1 text-xs text-yellow-600">
+                                        <AlertCircle className="h-3 w-3" />
+                                        <span>El CBU debe tener exactamente 22 dígitos. Actualmente tiene {datosCbu.cbu.length} dígito(s).</span>
+                                    </div>
+                                )}
+                                {datosCbu.cbu.length === 22 && (
+                                    <div className="flex items-center gap-1 mt-1 text-xs text-green-600">
+                                        <CheckCircle className="h-3 w-3" />
+                                        <span>CBU válido</span>
+                                    </div>
+                                )}
                             </div>
                             
                             <div className="col-span-2">
@@ -232,6 +250,18 @@ export default function MetodoPagoSection({
                                 </select>
                             </div>
                         </div>
+                        
+                        {/* Mensaje de resumen de validación */}
+                        {datosCbu.cbu.length > 0 && datosCbu.cbu.length !== 22 && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-2">
+                                <div className="flex items-center gap-2 text-yellow-700">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <p className="text-xs">
+                                        <strong>CBU incompleto:</strong> Debe ingresar los 22 dígitos completos del CBU.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -254,7 +284,6 @@ export default function MetodoPagoSection({
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">
-                            {/* ... resto del formulario Tarjeta igual ... */}
                             <div className="col-span-2">
                                 <label className="block text-xs text-gray-600 mb-1">
                                     Banco emisor <span className="text-red-500">*</span>

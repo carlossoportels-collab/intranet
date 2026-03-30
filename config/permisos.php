@@ -25,6 +25,7 @@ return [
     'VER_CERTIFICADOS_FLOTA' => 'ver_certificados_flota',
     'GESTIONAR_CAMBIO_TITULARIDAD' => 'gestionar_cambio_titularidad',
     'GESTIONAR_CAMBIO_RAZON_SOCIAL' => 'gestionar_cambio_razon_social',
+    'GESTIONAR_TRANSFERENCIAS' => 'gestionar_transferencias',
     'VER_CONTRATOS' => 'ver_contratos',
     'GESTIONAR_CONTRATOS' => 'gestionar_contratos',
     'VER_PRESUPUESTOS' => 'ver_presupuestos',

@@ -1,10 +1,9 @@
 import { Link } from '@inertiajs/react';
-import { Eye, Edit, MessageSquare, FileText, Clock } from 'lucide-react';
+import { Eye, Edit, MessageSquare, FileText, Clock, User } from 'lucide-react';
 import React from 'react';
 
 import { BadgeEstado, BadgeOrigen } from '@/components/ui';
 import { Lead, Origen, EstadoLead, NotaLead } from '@/types/leads';
-
 
 interface LeadCardMobileProps {
   lead: Lead;
@@ -33,6 +32,14 @@ const LeadCardMobile: React.FC<LeadCardMobileProps> = ({
   const estado = estadosLead.find(e => e.id === lead.estado_lead_id);
   
   const tieneNotas = lead.notas && Array.isArray(lead.notas) && lead.notas.length > 0;
+  
+  // Determinar si mostrar comercial (admin o ve_todas_cuentas)
+  const mostrarComercial = usuario.ve_todas_cuentas || usuario.rol_id !== 5;
+  
+  // Obtener nombre del comercial
+  const nombreComercial = lead.prefijo?.codigo 
+    ? `${lead.prefijo.codigo}${lead.prefijo.descripcion ? ` - ${lead.prefijo.descripcion}` : ''}`
+    : lead.asignado_nombre || 'Sin asignar';
   
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -77,6 +84,17 @@ const LeadCardMobile: React.FC<LeadCardMobileProps> = ({
           <BadgeOrigen origen={origen} />
         )}
       </div>
+
+      {/* Comercial - solo visible para admins/supervisores */}
+      {mostrarComercial && (
+        <div className="mb-3 p-2 bg-gray-50 border border-gray-200 rounded text-xs">
+          <div className="flex items-center gap-2">
+            <User className="w-3 h-3 text-gray-500" />
+            <span className="text-gray-600 font-medium">Comercial:</span>
+            <span className="text-gray-800">{nombreComercial}</span>
+          </div>
+        </div>
+      )}
 
       {/* Presupuestos */}
       {presupuestosCount > 0 && (

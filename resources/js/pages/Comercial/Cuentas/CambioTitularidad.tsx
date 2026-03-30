@@ -1,6 +1,7 @@
 // resources/js/Pages/Comercial/Cuentas/CambioTitularidad.tsx
+
 import React, { useState, useMemo } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 
 import AppLayout from '@/layouts/app-layout';
@@ -87,7 +88,8 @@ interface Props {
         rol_id: number;
         comercial?: {
             prefijo_id?: number;
-        };
+            es_comercial?: boolean;
+        } | null;
     };
 }
 
@@ -109,6 +111,14 @@ export default function CambioTitularidad({
     usuario,
 }: Props) {
     const toast = useToast();
+    const { auth } = usePage().props;
+    const usuarioParaModal = useMemo(() => ({
+        id: null,
+        nombre_completo: null,
+        rol_id: usuario?.rol_id ?? 0,
+        comercial: usuario?.comercial ?? null,
+    }), [usuario]);
+    
     const [tipoOperacion, setTipoOperacion] = useState<TipoOperacion>(null);
     const [pasoActual, setPasoActual] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -245,20 +255,36 @@ export default function CambioTitularidad({
         }
     };
 
-    // 🔥 Handler para cuando se cierra el modal con éxito
-    const handleModalClose = (empresaGuardada?: boolean, irAContrato?: boolean) => {
-        setShowAltaEmpresaModal(false);
+const handleModalClose = (empresaGuardada?: boolean, irAContrato?: boolean, empresaCreada?: any) => {
+    setShowAltaEmpresaModal(false);
+    
+    
+    if (empresaGuardada && empresaCreada && tipoOperacion === 'nueva_empresa') {
+        setLoading(true);
         
-        if (empresaGuardada) {
-            // Recargar las empresas para obtener la nueva
-            router.reload({
-                only: ['empresas'],
-                onSuccess: () => {
-                    toast.success('Empresa creada correctamente');
-                }
-            });
-        }
-    };
+        // 🔥 CREAR EL CAMBIO DE TITULARIDAD USANDO LA EMPRESA YA CREADA
+        const datosEnvio = {
+            tipo_operacion: 'nueva_empresa',
+            empresa_origen_id: empresaOrigen?.id,
+            vehiculos: vehiculosSeleccionados.map(v => v.id),
+            empresa_destino_id: empresaCreada.empresa_id, // ← USAR LA EMPRESA YA CREADA
+        };
+        
+        
+        router.post('/comercial/cuentas/cambio-titularidad', datosEnvio, {
+            onSuccess: () => {
+                toast.success('Empresa creada y cambio de titularidad registrado');
+                setLoading(false);
+                handleCancelar();
+                router.reload({ only: ['historial'] });
+            },
+            onError: (errors) => {
+                toast.error('Error al registrar el cambio de titularidad');
+                setLoading(false);
+            },
+        });
+    }
+};
 
     // Validaciones
     const validarPaso = (): boolean => {
@@ -324,19 +350,23 @@ export default function CambioTitularidad({
             empresa_origen_id: empresaOrigen?.id,
             vehiculos: vehiculosSeleccionados.map(v => v.id),
         };
-
+        
         if (tipoOperacion === 'entre_empresas') {
             datosEnvio.empresa_destino_id = empresaDestino?.id;
         } else {
             datosEnvio.empresa_destino_id = empresaDestino?.id;
+            if (empresaDestino) {
+                datosEnvio.nombre_fantasia = empresaDestino.nombre_fantasia;
+                datosEnvio.razon_social = empresaDestino.razon_social;
+                datosEnvio.cuit = empresaDestino.cuit;
+            }
         }
-
+        
         router.post('/comercial/cuentas/cambio-titularidad', datosEnvio, {
             onSuccess: () => {
                 toast.success('Cambio de titularidad registrado');
                 setLoading(false);
                 handleCancelar();
-                // Recargar historial
                 router.reload({ only: ['historial'] });
             },
             onError: (errors) => {
@@ -412,7 +442,6 @@ export default function CambioTitularidad({
                 {/* PASOS 2-4: FLUJO PRINCIPAL */}
                 {pasoActual > 1 && (
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-visible mb-8">
-                        {/* Header */}
                         <div className="bg-gradient-to-r from-indigo-50 to-violet-50 px-6 py-4 border-b border-indigo-100">
                             <h2 className="text-lg font-semibold text-indigo-900">
                                 {tipoOperacion === 'entre_empresas' ? 'Cambio entre empresas existentes' : 'Alta de nueva empresa'}
@@ -431,7 +460,6 @@ export default function CambioTitularidad({
                             {pasoActual === 2 && (
                                 <div className="space-y-4">
                                     <h2 className="text-lg font-semibold text-gray-900">Seleccionar Empresa Origen</h2>
-                                    
                                     <div className="relative">
                                         <input
                                             type="text"
@@ -601,7 +629,6 @@ export default function CambioTitularidad({
                                     </h2>
                                     
                                     {tipoOperacion === 'entre_empresas' ? (
-                                        // SELECCIÓN DE EMPRESA EXISTENTE
                                         <>
                                             <div className="relative">
                                                 <input
@@ -658,7 +685,6 @@ export default function CambioTitularidad({
                                             )}
                                         </>
                                     ) : (
-                                        // NUEVA EMPRESA: Mostrar solo botón para abrir modal
                                         <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                                             <Building className="h-12 w-12 text-gray-400 mb-3" />
                                             <p className="text-gray-600 text-center mb-4">
@@ -774,13 +800,26 @@ export default function CambioTitularidad({
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-600">{cambio.usuario}</td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => verDetalle(cambio.id)}
-                                                className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center gap-1"
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                                Ver
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => verDetalle(cambio.id)}
+                                                    className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center gap-1"
+                                                >
+                                                    <Eye className="h-4 w-4" />
+                                                    Ver
+                                                </button>
+                                                {!cambio.contrato_id && (
+                                                    <button
+                                                        onClick={() => {
+                                                            router.visit(`/comercial/contratos/desde-empresa/${cambio.empresa_destino.id}`);
+                                                        }}
+                                                        className="text-green-600 hover:text-green-800 text-sm font-medium flex items-center gap-1"
+                                                    >
+                                                        <FileText className="h-4 w-4" />
+                                                        Generar Contrato
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -820,9 +859,10 @@ export default function CambioTitularidad({
                 origenes={origenes}
                 rubros={rubros}
                 provincias={provincias}
-                usuario={usuario}
+                usuario={usuarioParaModal}                
                 comerciales={comerciales} 
-                hayComerciales={comerciales.length > 0}  
+                hayComerciales={comerciales.length > 0} 
+                redirectTo="empresa" 
             />
 
             {/* MODAL DE DETALLE */}

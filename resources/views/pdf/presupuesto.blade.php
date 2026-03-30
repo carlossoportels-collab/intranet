@@ -200,7 +200,7 @@
         
         .terms {
             margin-top: 25px;
-            font-size: 7.5px;
+            font-size: 9px;
             color: #666;
             border-top: 1px solid #ddd;
             padding-top: 10px;
@@ -208,159 +208,175 @@
         
         .terms-title {
             font-weight: bold;
-            font-size: 9px;
+            font-size: 11px;
             color: #3b3b3d;
             margin-bottom: 8px;
         }
         
         .terms p {
-            margin: 3px 0;
+            margin: 4px 0;
             line-height: 1.4;
+            font-size: 9px;
         }
     </style>
 </head>
 <body>
-    @php
-        $formatMoney = function($value) {
-            if ($value === null || $value === '') return '-';
-            if (!is_numeric($value)) return '-';
-            $num = floatval($value);
-            return '$ ' . number_format($num, 2, ',', '.');
-        };
+   @php
+    $formatMoney = function($value) {
+        if ($value === null || $value === '') return '-';
+        if (!is_numeric($value)) return '-';
+        $num = floatval($value);
+        return '$ ' . number_format($num, 2, ',', '.');
+    };
 
-        $getTextoPromocion = function($productoId) use ($presupuesto) {
-            if (!$presupuesto->promocion || !$presupuesto->promocion->productos) return null;
-            
-            $productoEnPromo = collect($presupuesto->promocion->productos)->firstWhere('producto_servicio_id', $productoId);
-            
-            if (!$productoEnPromo) return null;
-            
-            if ($productoEnPromo->tipo_promocion === '2x1') return '2x1';
-            if ($productoEnPromo->tipo_promocion === '3x2') return '3x2';
-            return $productoEnPromo->bonificacion . '%';
-        };
-
-        $getTextoDescuento = function($productoId, $bonificacion) use ($presupuesto, $getTextoPromocion) {
-            $textoPromo = $getTextoPromocion($productoId);
-            if ($textoPromo) return $textoPromo;
-            
-            if ($bonificacion > 0) {
-                if ($productoId === ($presupuesto->abono->id ?? null)) {
-                    return $bonificacion . '% (Débito Automático)';
-                }
-                return $bonificacion . '% OFF';
-            }
-            return '-';
-        };
-
-        // Obtener texto de empresa
-        $empresaTexto = '';
-        if (isset($presupuesto->lead->empresa)) {
-            if (is_object($presupuesto->lead->empresa) || is_array($presupuesto->lead->empresa)) {
-                $empresaData = is_array($presupuesto->lead->empresa) 
-                    ? $presupuesto->lead->empresa 
-                    : (array) $presupuesto->lead->empresa;
-                $empresaTexto = $empresaData['razon_social'] ?? $empresaData['nombre_fantasia'] ?? '';
-            } else {
-                $empresaTexto = $presupuesto->lead->empresa;
-            }
-        }
+    $getTextoPromocion = function($productoId) use ($presupuesto) {
+        if (!$presupuesto->promocion || !$presupuesto->promocion->productos) return null;
         
-        if (empty($empresaTexto)) {
-            $empresaTexto = $presupuesto->lead->nombre_completo ?? 'N/A';
+        $productoEnPromo = collect($presupuesto->promocion->productos)->firstWhere('producto_servicio_id', $productoId);
+        
+        if (!$productoEnPromo) return null;
+        
+        if ($productoEnPromo->tipo_promocion === '2x1') return '2x1';
+        if ($productoEnPromo->tipo_promocion === '3x2') return '3x2';
+        return $productoEnPromo->bonificacion . '%';
+    };
+
+    $getTextoDescuento = function($productoId, $bonificacion) use ($presupuesto, $getTextoPromocion) {
+        $textoPromo = $getTextoPromocion($productoId);
+        if ($textoPromo) return $textoPromo;
+        
+        if ($bonificacion > 0) {
+            if ($productoId === ($presupuesto->abono->id ?? null)) {
+                return $bonificacion . '% (Débito Automático)';
+            }
+            return $bonificacion . '% OFF';
         }
+        return '-';
+    };
 
-        $contactoTexto = $presupuesto->lead->contacto ?? $presupuesto->lead->nombre_completo ?? 'N/A';
-
-        // Calcular totales
-        $totalServicios = 0;
-        $totalAccesorios = 0;
-
-        $subtotalTasa = floatval($presupuesto->subtotal_tasa ?? 0);
-        $subtotalAbono = floatval($presupuesto->subtotal_abono ?? 0);
-
-        foreach ($servicios_clasificados ?? [] as $item) {
-            $totalServicios += floatval($item->subtotal ?? 0);
+    // 🔥 OBTENER LA EMPRESA CORRECTAMENTE
+    $esCliente = $presupuesto->lead->es_cliente ?? false;
+    $tieneEmpresa = false;
+    $empresaTexto = '';
+    $contactoTexto = $presupuesto->lead->nombre_completo ?? 'N/A';
+    
+    // Buscar la empresa a través de empresaContacto
+    if ($presupuesto->lead && $presupuesto->lead->empresaContacto && $presupuesto->lead->empresaContacto->empresa) {
+        $empresa = $presupuesto->lead->empresaContacto->empresa;
+        if (!empty($empresa->razon_social)) {
+            $tieneEmpresa = true;
+            $empresaTexto = $empresa->razon_social;
+        } elseif (!empty($empresa->nombre_fantasia)) {
+            $tieneEmpresa = true;
+            $empresaTexto = $empresa->nombre_fantasia;
         }
-
-        foreach ($accesorios_clasificados ?? [] as $item) {
-            $totalAccesorios += floatval($item->subtotal ?? 0);
+    }
+    
+    // Si no se encontró empresa, intentar con el accessor getEmpresaAttribute
+    if (!$tieneEmpresa && $presupuesto->lead->empresa) {
+        $empresaData = $presupuesto->lead->empresa;
+        if (is_array($empresaData) && !empty($empresaData['razon_social'])) {
+            $tieneEmpresa = true;
+            $empresaTexto = $empresaData['razon_social'];
+        } elseif (is_string($empresaData) && !empty($empresaData)) {
+            $tieneEmpresa = true;
+            $empresaTexto = $empresaData;
         }
+    }
+    
+    $mostrarEmpresa = $tieneEmpresa && $esCliente;
+    
+    // Calcular totales
+    $totalServicios = 0;
+    $totalAccesorios = 0;
 
-        $inversionInicial = $subtotalTasa + $totalAccesorios;
-        $costoMensual = $subtotalAbono + $totalServicios;
-        $totalPrimerMes = $inversionInicial + $costoMensual;
-    @endphp
+    $subtotalTasa = floatval($presupuesto->subtotal_tasa ?? 0);
+    $subtotalAbono = floatval($presupuesto->subtotal_abono ?? 0);
 
-    <!-- HEADER -->
-    <table class="header-table">
-        <tr>
-            <td class="logo-cell">
-                @if(!empty($compania['logo']) && file_exists($compania['logo']))
-                    <img src="{{ $compania['logo'] }}" alt="{{ $compania['nombre'] }}">
-                @endif
-            </td>
-            <td class="title-cell">
-                <div class="title">PRESUPUESTO COMERCIAL</div>
-                <div class="reference">Ref: #{{ $presupuesto->referencia ?? 'N/A' }}</div>
-            </td>
-        </tr>
-    </table>
+    foreach ($servicios_clasificados ?? [] as $item) {
+        $totalServicios += floatval($item->subtotal ?? 0);
+    }
 
-    <!-- PROMOCIÓN -->
-    @if($presupuesto->promocion)
-        <div class="promo-banner">
-            PROMOCIÓN VIGENTE: {{ $presupuesto->promocion->nombre }}
-        </div>
-    @endif
+    foreach ($accesorios_clasificados ?? [] as $item) {
+        $totalAccesorios += floatval($item->subtotal ?? 0);
+    }
 
-    <!-- DOS COLUMNAS: CLIENTE y DETALLES -->
-    <table class="info-table">
-        <tr>
-            <td>
-                <div class="info-title">CLIENTE</div>
+    $inversionInicial = $subtotalTasa + $totalAccesorios;
+    $costoMensual = $subtotalAbono + $totalServicios;
+    $totalPrimerMes = $inversionInicial + $costoMensual;
+@endphp
+
+<!-- HEADER (igual) -->
+<table class="header-table">
+     <tr>
+        <td class="logo-cell">
+            @if(!empty($compania['logo']) && file_exists($compania['logo']))
+                <img src="{{ $compania['logo'] }}" alt="{{ $compania['nombre'] }}">
+            @endif
+        </td>
+        <td class="title-cell">
+            <div class="title">PRESUPUESTO COMERCIAL</div>
+            <div class="reference">Ref: #{{ $presupuesto->referencia ?? 'N/A' }}</div>
+        </td>
+    </tr>
+</table>
+
+<!-- PROMOCIÓN -->
+@if($presupuesto->promocion)
+    <div class="promo-banner">
+        PROMOCIÓN VIGENTE: {{ $presupuesto->promocion->nombre }}
+    </div>
+@endif
+
+<!-- DOS COLUMNAS: CLIENTE y DETALLES -->
+<table class="info-table">
+    <tr>
+        <td>
+            <div class="info-title">CLIENTE</div>
+            @if($mostrarEmpresa)
                 <div class="info-row">
                     <span class="info-label">Empresa:</span>
                     <span class="info-value">{{ $empresaTexto }}</span>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Contacto:</span>
-                    <span class="info-value">{{ $contactoTexto }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Email:</span>
-                    <span class="info-value">{{ $presupuesto->lead->email ?? 'N/A' }}</span>
-                </div>
-                @if($presupuesto->lead->telefono)
-                <div class="info-row">
-                    <span class="info-label">Teléfono:</span>
-                    <span class="info-value">{{ $presupuesto->lead->telefono }}</span>
-                </div>
-                @endif
-            </td>
-            <td>
-                <div class="info-title">DETALLES</div>
-                <div class="info-row">
-                    <span class="info-label">Fecha:</span>
-                    <span class="info-value">{{ \Carbon\Carbon::parse($presupuesto->created)->format('d/m/Y') }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Validez:</span>
-                    <span class="info-value">{{ \Carbon\Carbon::parse($presupuesto->validez)->format('d/m/Y') }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Asesor:</span>
-                    <span class="info-value">{{ $presupuesto->nombre_comercial ?? 'No asignado' }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Unidades:</span>
-                    <span class="info-value">{{ $presupuesto->cantidad_vehiculos ?? 1 }} Vehículo(s)</span>
-                </div>
-            </td>
-        </tr>
-    </table>
+            @endif
+            <div class="info-row">
+                <span class="info-label">Contacto:</span>
+                <span class="info-value">{{ $contactoTexto }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span class="info-value">{{ $presupuesto->lead->email ?? 'N/A' }}</span>
+            </div>
+            @if($presupuesto->lead->telefono)
+            <div class="info-row">
+                <span class="info-label">Teléfono:</span>
+                <span class="info-value">{{ $presupuesto->lead->telefono }}</span>
+            </div>
+            @endif
+        </td>
+        <td>
+            <div class="info-title">DETALLES</div>
+            <div class="info-row">
+                <span class="info-label">Fecha:</span>
+                <span class="info-value">{{ \Carbon\Carbon::parse($presupuesto->created)->format('d/m/Y') }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Validez:</span>
+                <span class="info-value">{{ \Carbon\Carbon::parse($presupuesto->validez)->format('d/m/Y') }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Asesor:</span>
+                <span class="info-value">{{ $presupuesto->nombre_comercial ?? 'No asignado' }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Unidades:</span>
+                <span class="info-value">{{ $presupuesto->cantidad_vehiculos ?? 1 }} Vehículo(s)</span>
+            </div>
+        </td>
+    </tr>
+</table>
 
-    <!-- TABLA DE SERVICIOS -->
+    <!-- TABLA DE SERVICIOS (igual que antes) -->
     <table class="services-table">
         <thead>
             <tr>
@@ -385,7 +401,7 @@
                 </tr>
             @endif
 
-                        @if(count($accesorios_clasificados ?? []) > 0)
+            @if(count($accesorios_clasificados ?? []) > 0)
                 <tr class="category-row">
                     <td colspan="5">ACCESORIOS</td>
                 </tr>
@@ -427,8 +443,6 @@
                     </tr>
                 @endforeach
             @endif
-
-
         </tbody>
     </table>
 
@@ -443,16 +457,9 @@
             <span class="total-value">{{ $formatMoney($costoMensual) }}</span>
         </div>
         <div class="divider"></div>
-         <!--  <div class="total-line grand-total">
-            <span class="total-label">TOTAL PRIMER MES:</span>
-            <span class="total-value">{{ $formatMoney($totalPrimerMes) }}</span>
-        </div>
-        <div class="note">
-            * Costo mensual desde el 2° mes: {{ $formatMoney($costoMensual) }}
-        </div> -->
     </div>
 
-    <!-- TÉRMINOS Y CONDICIONES -->
+    <!-- TÉRMINOS Y CONDICIONES (con letra más grande) -->
     <div class="terms">
         <div class="terms-title">TÉRMINOS Y CONDICIONES</div>
         

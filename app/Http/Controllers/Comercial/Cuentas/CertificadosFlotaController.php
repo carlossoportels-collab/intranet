@@ -25,6 +25,45 @@ class CertificadosFlotaController extends Controller
         $this->initializeAuthorization();
     }
 
+    /**
+     * Obtener logo según prefijo
+     */
+    private function obtenerLogoPorPrefijo(?string $prefijo): string
+    {
+        if ($prefijo === 'SS') {
+            return 'images/logos/logosmart.png';
+        }
+        return 'images/logos/logo.png';
+    }
+
+    /**
+     * Obtener prefijo de una patente desde la base de datos
+     */
+    private function obtenerPrefijoPorPatente(string $patente): ?string
+    {
+        try {
+            $vehiculo = AdminVehiculo::where('avl_patente', $patente)
+                ->orWhere('avl_patente', 'LIKE', "%{$patente}%")
+                ->first();
+            
+            if ($vehiculo && !empty($vehiculo->prefijo_codigo)) {
+                Log::info('Prefijo encontrado para patente', [
+                    'patente' => $patente,
+                    'prefijo_codigo' => $vehiculo->prefijo_codigo
+                ]);
+                return $vehiculo->prefijo_codigo;
+            }
+            
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Error obteniendo prefijo por patente', [
+                'patente' => $patente,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
     public function index(Request $request)
     {
         $this->authorizePermiso(config('permisos.VER_CERTIFICADOS_FLOTA'));
@@ -117,6 +156,7 @@ class CertificadosFlotaController extends Controller
                             'id' => $vehiculo->id,
                             'codigo_alfa' => $vehiculo->codigoalfa,
                             'patente' => $vehiculo->avl_patente,
+                            'prefijo_codigo' => $vehiculo->prefijo_codigo ?? null, //  Incluir prefijo
                             'marca' => $vehiculo->avl_marca,
                             'modelo' => $vehiculo->avl_modelo,
                             'anio' => $vehiculo->avl_anio,
@@ -162,7 +202,6 @@ class CertificadosFlotaController extends Controller
     public function generarCertificadoFlota(Request $request, $empresaId)
     {
         try {
-            // Aumentar límites de memoria y tiempo
             ini_set('memory_limit', '256M');
             ini_set('max_execution_time', 300);
             
@@ -175,7 +214,7 @@ class CertificadosFlotaController extends Controller
             $preview = $request->has('preview') && $request->preview == 1;
             $debug = $request->has('debug') && $request->debug == 1;
             
-            Log::info('Iniciando generación de certificado', [
+            Log::info('Iniciando generación de certificado flota', [
                 'empresa_id' => $empresaId,
                 'usuario_id' => $usuario->id,
                 'preview' => $preview,
@@ -207,9 +246,17 @@ class CertificadosFlotaController extends Controller
             // Verificar permisos
             $this->verificarAccesoEmpresa($empresa, $usuario);
             
-            // Obtener vehículos
+            // Obtener vehículos con sus prefijos
             $vehiculos = [];
+            $prefijoEmpresa = null;
+            
             if ($empresa->adminEmpresa && $empresa->adminEmpresa->vehiculosImportados) {
+                // Obtener el prefijo del primer vehículo (para el logo)
+                $primerVehiculo = $empresa->adminEmpresa->vehiculosImportados->first();
+                if ($primerVehiculo && !empty($primerVehiculo->prefijo_codigo)) {
+                    $prefijoEmpresa = $primerVehiculo->prefijo_codigo;
+                }
+                
                 $vehiculos = $empresa->adminEmpresa->vehiculosImportados
                     ->filter(function($v) {
                         return !empty($v->avl_patente);
@@ -217,6 +264,7 @@ class CertificadosFlotaController extends Controller
                     ->map(function($v) {
                         return [
                             'patente' => $v->avl_patente,
+                            'prefijo_codigo' => $v->prefijo_codigo ?? null,
                         ];
                     })
                     ->sortBy('patente')
@@ -224,7 +272,15 @@ class CertificadosFlotaController extends Controller
                     ->toArray();
             }
             
-            Log::info('Vehículos obtenidos', ['cantidad' => count($vehiculos)]);
+            //  Obtener logo según prefijo de la empresa o del primer vehículo
+            $logoPath = $this->obtenerLogoPorPrefijo($prefijoEmpresa);
+            $datosContacto = $this->obtenerDatosContactoPorPrefijo($prefijoEmpresa);
+
+            Log::info('Vehículos obtenidos', [
+                'cantidad' => count($vehiculos),
+                'prefijo_empresa' => $prefijoEmpresa,
+                'logo_path' => $logoPath
+            ]);
             
             // Formatear fecha
             $fecha = now()->format('d \d\e F \d\e Y');
@@ -238,7 +294,10 @@ class CertificadosFlotaController extends Controller
             $viewData = [
                 'empresa' => $empresa->toArray(),
                 'vehiculos' => $vehiculos,
-                'fecha' => $fecha
+                'fecha' => $fecha,
+                'logo_path' => $logoPath, //  Logo dinámico
+                'prefijo' => $prefijoEmpresa, //  Prefijo para referencia
+                'datos_contacto' => $datosContacto,
             ];
             
             // MODO DEBUG: devolver HTML
@@ -314,6 +373,7 @@ class CertificadosFlotaController extends Controller
         
         return true;
     }
+    
     /**
      * Generar certificado individual para un vehículo
      */
@@ -343,10 +403,15 @@ class CertificadosFlotaController extends Controller
             ])->where('id', $vehiculoId)
             ->firstOrFail();
             
+            //  Obtener prefijo del vehículo
+            $prefijoVehiculo = $vehiculo->prefijo_codigo ?? null;
+            $datosContacto = $this->obtenerDatosContactoPorPrefijo($prefijoVehiculo);
+
             Log::info('Vehículo encontrado', [
                 'id' => $vehiculo->id,
                 'patente' => $vehiculo->avl_patente,
                 'codigo' => $vehiculo->codigoalfa,
+                'prefijo_codigo' => $prefijoVehiculo,
                 'cantidad_abonos' => $vehiculo->abonos->count()
             ]);
             
@@ -364,6 +429,9 @@ class CertificadosFlotaController extends Controller
             if ($empresa) {
                 $this->verificarAccesoEmpresa($empresa, $usuario);
             }
+            
+            //  Obtener logo según prefijo del vehículo
+            $logoPath = $this->obtenerLogoPorPrefijo($prefijoVehiculo);
             
             // Procesar accesorios
             $accesoriosActivos = [];
@@ -394,68 +462,69 @@ class CertificadosFlotaController extends Controller
             // Obtener última ubicación con DeltaService
             $ultimaUbicacion = null;
             $deltaService = app(DeltaService::class);
-$alphaService = app(AlphaService::class);
+            $alphaService = app(AlphaService::class);
 
-if (!empty($vehiculo->avl_patente)) {
-    Log::info('Consultando ubicación para vehículo', [
-        'patente' => $vehiculo->avl_patente,
-        'codigoalfa' => $vehiculo->codigoalfa
-    ]);
-    
-    // Detectar qué plataforma usa el vehículo según sus abonos
-    $plataforma = $deltaService->getPlataformaVehiculo($vehiculo);
-    
-    Log::info('Plataforma detectada', [
-        'plataforma' => $plataforma,
-        'vehiculo_id' => $vehiculo->id,
-        'patente' => $vehiculo->avl_patente,
-        'codigoalfa' => $vehiculo->codigoalfa
-    ]);
-    
-    if ($plataforma === 'delta') {
-        // Usar API Delta
-        $tipoBusqueda = 'patente';
-        $nombreEmpresa = $empresa['razon_social'] ?? $empresa['nombre_fantasia'] ?? '';
-        
-        if (!empty($nombreEmpresa)) {
-            $tipoBusqueda = $deltaService->detectarTipoBusqueda($nombreEmpresa);
-        }
-        
-        if ($tipoBusqueda === 'nombre') {
-            $response = $deltaService->porNombre([$vehiculo->avl_patente], $nombreEmpresa);
-        } else {
-            $response = $deltaService->porPatente([$vehiculo->avl_patente]);
-        }
-        
-        if ($response) {
-            $ultimaUbicacion = $deltaService->formatearUbicacion($response);
-        }
-        
-    } else {
-        // Usar SOAP de Alpha (plataforma por defecto)
-        $codigoAlfa = $vehiculo->codigoalfa;
-        
-        if (empty($codigoAlfa)) {
-            Log::warning('Vehículo sin código alfa para consulta SOAP', [
-                'vehiculo_id' => $vehiculo->id,
-                'patente' => $vehiculo->avl_patente
-            ]);
-        } else {
-            $response = $alphaService->consultarUltimaPosicionPatente($vehiculo->avl_patente, $codigoAlfa);
-            
-            if ($response && !empty($response['latitud']) && !empty($response['longitud'])) {
-                // Formatear respuesta SOAP al mismo formato que DeltaService
-                $ultimaUbicacion = $this->formatearUbicacionAlpha($response);
+            if (!empty($vehiculo->avl_patente)) {
+                Log::info('Consultando ubicación para vehículo', [
+                    'patente' => $vehiculo->avl_patente,
+                    'codigoalfa' => $vehiculo->codigoalfa,
+                    'prefijo' => $prefijoVehiculo
+                ]);
+                
+                // Detectar qué plataforma usa el vehículo según sus abonos
+                $plataforma = $deltaService->getPlataformaVehiculo($vehiculo);
+                
+                Log::info('Plataforma detectada', [
+                    'plataforma' => $plataforma,
+                    'vehiculo_id' => $vehiculo->id,
+                    'patente' => $vehiculo->avl_patente,
+                    'codigoalfa' => $vehiculo->codigoalfa
+                ]);
+                
+                if ($plataforma === 'delta') {
+                    // Usar API Delta
+                    $tipoBusqueda = 'patente';
+                    $nombreEmpresa = $empresa['razon_social'] ?? $empresa['nombre_fantasia'] ?? '';
+                    
+                    if (!empty($nombreEmpresa)) {
+                        $tipoBusqueda = $deltaService->detectarTipoBusqueda($nombreEmpresa);
+                    }
+                    
+                    if ($tipoBusqueda === 'nombre') {
+                        $response = $deltaService->porNombre([$vehiculo->avl_patente], $nombreEmpresa);
+                    } else {
+                        $response = $deltaService->porPatente([$vehiculo->avl_patente]);
+                    }
+                    
+                    if ($response) {
+                        $ultimaUbicacion = $deltaService->formatearUbicacion($response);
+                    }
+                    
+                } else {
+                    // Usar SOAP de Alpha (plataforma por defecto)
+                    $codigoAlfa = $vehiculo->codigoalfa;
+                    
+                    if (empty($codigoAlfa)) {
+                        Log::warning('Vehículo sin código alfa para consulta SOAP', [
+                            'vehiculo_id' => $vehiculo->id,
+                            'patente' => $vehiculo->avl_patente
+                        ]);
+                    } else {
+                        $response = $alphaService->consultarUltimaPosicionPatente($vehiculo->avl_patente, $codigoAlfa);
+                        
+                        if ($response && !empty($response['latitud']) && !empty($response['longitud'])) {
+                            // Formatear respuesta SOAP al mismo formato que DeltaService
+                            $ultimaUbicacion = $this->formatearUbicacionAlpha($response);
+                        }
+                    }
+                }
+                
+                if ($ultimaUbicacion) {
+                    Log::info('Ubicación obtenida', ['data' => $ultimaUbicacion]);
+                } else {
+                    Log::warning('No se pudo obtener ubicación para el vehículo');
+                }
             }
-        }
-    }
-    
-    if ($ultimaUbicacion) {
-        Log::info('Ubicación obtenida', ['data' => $ultimaUbicacion]);
-    } else {
-        Log::warning('No se pudo obtener ubicación para el vehículo');
-    }
-}
             
             // Formatear fecha
             $fecha = now()->format('d \d\e F \d\e Y');
@@ -472,10 +541,15 @@ if (!empty($vehiculo->avl_patente)) {
                 'servicios' => $serviciosActivos,
                 'ultima_ubicacion' => $ultimaUbicacion,
                 'fecha' => $fecha,
+                'logo_path' => $logoPath, //  Logo dinámico
+                'prefijo' => $prefijoVehiculo, //  Prefijo para referencia
+                'datos_contacto' => $datosContacto,
             ];
             
             Log::info('Datos preparados para la vista', [
-                'tiene_ubicacion' => !is_null($ultimaUbicacion)
+                'tiene_ubicacion' => !is_null($ultimaUbicacion),
+                'logo_path' => $logoPath,
+                'prefijo' => $prefijoVehiculo
             ]);
             
             if ($debug) {
@@ -517,45 +591,70 @@ if (!empty($vehiculo->avl_patente)) {
             return back()->withErrors(['error' => 'Error al generar certificado: ' . $e->getMessage()]);
         }
     }
-/**
- * Formatear respuesta de AlphaService al mismo formato que DeltaService
- */
-private function formatearUbicacionAlpha(?array $data): ?array
-{
-    if (!$data) return null;
     
-    // Obtener dirección
-    $direccion = null;
-    $mapaUrl = null;
-    
-    // Primero usar la aproximación que viene del servicio
-    if (!empty($data['aproximacion'])) {
-        $direccion = $data['aproximacion'];
-        Log::info('Usando aproximación como dirección', ['direccion' => $direccion]);
-    }
-    
-    // Si tenemos coordenadas, obtener dirección más precisa y mapa
-    if (!empty($data['latitud']) && !empty($data['longitud'])) {
-        $deltaService = app(DeltaService::class);
+    /**
+     * Formatear respuesta de AlphaService al mismo formato que DeltaService
+     */
+    private function formatearUbicacionAlpha(?array $data): ?array
+    {
+        if (!$data) return null;
         
-        // Solo obtener dirección de Nominatim si no tenemos aproximación
-        if (empty($direccion)) {
-            $direccion = $deltaService->obtenerDireccionDesdeCoordenadas($data['latitud'], $data['longitud']);
+        // Obtener dirección
+        $direccion = null;
+        $mapaUrl = null;
+        
+        // Primero usar la aproximación que viene del servicio
+        if (!empty($data['aproximacion'])) {
+            $direccion = $data['aproximacion'];
+            Log::info('Usando aproximación como dirección', ['direccion' => $direccion]);
         }
         
-        $mapaUrl = $deltaService->generarMapaEstatico($data['latitud'], $data['longitud']);
+        // Si tenemos coordenadas, obtener dirección más precisa y mapa
+        if (!empty($data['latitud']) && !empty($data['longitud'])) {
+            $deltaService = app(DeltaService::class);
+            
+            // Solo obtener dirección de Nominatim si no tenemos aproximación
+            if (empty($direccion)) {
+                $direccion = $deltaService->obtenerDireccionDesdeCoordenadas($data['latitud'], $data['longitud']);
+            }
+            
+            $mapaUrl = $deltaService->generarMapaEstatico($data['latitud'], $data['longitud']);
+        }
+        
+        return [
+            'fecha' => $data['fecha'],
+            'latitud' => $data['latitud'],
+            'longitud' => $data['longitud'],
+            'direccion' => $direccion,
+            'mapa_url' => $mapaUrl,
+            'velocidad' => $data['velocidad'] ?? null,
+            'estado' => $data['estado'] ?? null,
+            'satelites' => $data['satelites'] ?? null,
+            'plataforma' => 'alpha'
+        ];
     }
-    
+
+/**
+ * Obtener datos de contacto según prefijo
+ */
+private function obtenerDatosContactoPorPrefijo(?string $prefijo): array
+{
+    if ($prefijo === 'SS') {
+        return [
+            'telefono' => '11-3354-2174',
+            'email' => 'comercial@smartsat.com.ar',
+            'web' => 'www.smartsat.com.ar',
+            'direccion' => '3 de Caballeria 432, Gualeguaychú, Entre Ríos',
+        ];
+    }
+    // Por defecto LOCALSAT
     return [
-        'fecha' => $data['fecha'],
-        'latitud' => $data['latitud'],
-        'longitud' => $data['longitud'],
-        'direccion' => $direccion,
-        'mapa_url' => $mapaUrl,
-        'velocidad' => $data['velocidad'] ?? null,
-        'estado' => $data['estado'] ?? null,
-        'satelites' => $data['satelites'] ?? null,
-        'plataforma' => 'alpha'
+        'telefono' => '0810-888-8205',
+        'email' => 'info@localsat.com.ar',
+        'web' => 'www.localsat.com.ar',
+        'direccion' => '3 de Caballeria 432, Gualeguaychú, Entre Ríos',
     ];
 }
+
+    
 }

@@ -276,52 +276,59 @@ export default function Prospectos({
                 ))}
               </div>
               
-              {/* Versión desktop */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Prospecto
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Contacto
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Estado
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Presupuestos
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Comentarios
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Registro
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {leadsData.map((lead) => (
-                      <LeadTableRow
-                        key={lead.id}
-                        lead={lead}
-                        origenes={origenes}
-                        estadosLead={estadosLead}
-                        comentariosCount={contarComentariosDeLead(lead.id)}
-                        presupuestosCount={contarPresupuestosDeLead(lead.id)}
-                        usuario={usuario}
-                        onNuevoComentario={(lead) => handleOpenModal('nuevoComentario', lead)}
-                        onVerNota={(lead) => handleOpenModal('verNota', lead)}
-                        onTiemposEstados={(lead) => handleOpenModal('tiemposEstados', lead)}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+         {/* Versión desktop */}
+<div className="hidden md:block overflow-x-auto">
+  <table className="min-w-full divide-y divide-gray-200">
+    <thead className="bg-gray-50">
+      <tr>
+        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Prospecto
+        </th>
+        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Contacto
+        </th>
+        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Estado
+        </th>
+        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Presupuestos
+        </th>
+        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Comentarios
+        </th>
+        {/* Columna Comercial - solo visible para admins/supervisores */}
+        {!usuarioEsComercial && (
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Comercial
+          </th>
+        )}
+        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Registro
+        </th>
+        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Acciones
+        </th>
+      </tr>
+    </thead>
+    <tbody className="bg-white divide-y divide-gray-200">
+      {leadsData.map((lead) => (
+        <LeadTableRow
+          key={lead.id}
+          lead={lead}
+          origenes={origenes}
+          estadosLead={estadosLead}
+          comentariosCount={contarComentariosDeLead(lead.id)}
+          presupuestosCount={contarPresupuestosDeLead(lead.id)}
+          usuario={usuario}
+          onNuevoComentario={(lead) => handleOpenModal('nuevoComentario', lead)}
+          onVerNota={(lead) => handleOpenModal('verNota', lead)}
+          onTiemposEstados={(lead) => handleOpenModal('tiemposEstados', lead)}
+          mostrarColumnaComercial={!usuarioEsComercial} // ← Pasar esta prop
+        />
+      ))}
+    </tbody>
+  </table>
+</div>
               
               {/* Paginación */}
               <div className="mt-6">

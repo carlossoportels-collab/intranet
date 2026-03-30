@@ -23,6 +23,7 @@ use App\Http\Controllers\Comercial\Cuentas\DetallesController;
 use App\Http\Controllers\Comercial\Cuentas\CertificadosFlotaController;
 use App\Http\Controllers\Comercial\Cuentas\CambioTitularidadController;
 use App\Http\Controllers\Comercial\Cuentas\CambioRazonSocialController;
+use App\Http\Controllers\Comercial\Cuentas\TransferenciasController;
 use App\Http\Controllers\Comercial\Cuentas\ExternoController;
 
 // Comercial - Utils
@@ -178,7 +179,7 @@ Route::prefix('temp')->name('temp.')->group(function () {
     
     // ========== GESTIÓN COMERCIAL ==========
     Route::prefix('comercial')->name('comercial.')->group(function () {
-        
+        Route::get('/presupuestos-legacy', [PresupuestoLegacyController::class, 'index'])->name('presupuestos-legacy.index');
         // Rutas simples (sin parámetros)
         Route::get('/actividad', [ActividadController::class, 'index'])->name('actividad')->middleware('permiso:' . config('permisos.VER_ACTIVIDAD'));
         Route::get('/contactos', [ContactosController::class, 'index'])->name('contactos')->middleware('permiso:' . config('permisos.VER_CONTACTOS'));
@@ -220,6 +221,7 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::get('/{presupuesto}/pdf', [PresupuestosController::class, 'generarPdf'])->name('pdf')->middleware('permiso:' . config('permisos.VER_PRESUPUESTOS'));
             Route::post('/{presupuesto}/enviar-email', [PresupuestosController::class, 'enviarEmail'])->name('enviar-email')->middleware('permiso:' . config('permisos.GESTIONAR_PRESUPUESTOS'));
             Route::post('/{presupuesto}/generar-pdf-temp', [PresupuestosController::class, 'generarPdfTemp'])->name('generar-pdf-temp')->middleware('permiso:' . config('permisos.VER_PRESUPUESTOS'));
+            
         });
         
         // ===== CONTRATOS =====
@@ -238,6 +240,7 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::post('/{contrato}/generar-pdf-temp', [ContratoController::class, 'generarPdfTemp'])->name('generar-pdf-temp')->middleware('permiso:' . config('permisos.VER_CONTRATOS'));
             Route::get('/desde-empresa/{empresaId}', [ContratoController::class, 'createFromEmpresa'])->name('desde-empresa')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
             Route::post('/desde-empresa', [ContratoController::class, 'storeFromEmpresa'])->name('store-from-empresa')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
+            Route::post('/guardar-cotizacion', [ContratoController::class, 'guardarCotizacion'])->name('guardar-cotizacion');
         });
         
         // ===== CUENTAS =====
@@ -248,7 +251,9 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::get('/certificados/vehiculo/{vehiculoId}', [CertificadosFlotaController::class, 'generarCertificadoVehiculo'])->name('certificados.vehiculo');
             Route::get('/cambio-titularidad', [CambioTitularidadController::class, 'index'])->name('cambio-titularidad')->middleware('permiso:' . config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
             Route::get('/cambio-razon-social', [CambioRazonSocialController::class, 'index'])->name('cambio-razon-social')->middleware('permiso:' . config('permisos.GESTIONAR_CAMBIO_RAZON_SOCIAL'));
+            Route::get('/transferencias', [TransferenciasController::class, 'index'])->name('transferencias');
             
+
             // API endpoints para cuentas
             Route::get('/cambio-razon-social/empresa/{id}/completa', [CambioRazonSocialController::class, 'getEmpresaDataCompleta'])->name('cambio-razon-social.empresa-completa');
             Route::get('/cambio-razon-social/{id}', [CambioRazonSocialController::class, 'show'])->name('cambio-razon-social.show');
@@ -260,6 +265,7 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::post('/actualizar-contacto', [CambioRazonSocialController::class, 'actualizarContacto'])->name('actualizar-contacto');
             Route::post('/cambio-razon-social/completo', [CambioRazonSocialController::class, 'updateCompleto'])->name('cambio-razon-social.completo');
             Route::post('/cambio-titularidad', [CambioTitularidadController::class, 'store'])->name('cambio-titularidad.store');
+            Route::post('/transferencias/ejecutar', [TransferenciasController::class, 'ejecutarTransferencia'])->name('transferencias.ejecutar');
         });
         
         // ===== LEADS =====
@@ -295,13 +301,14 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::get('/categorias-fiscales/activas', [CategoriaFiscalController::class, 'activas']);
             Route::get('/plataformas/activas', [PlataformaController::class, 'activas']);
             Route::get('/rubros/activos', [RubroController::class, 'activos']);
-            
+            Route::get('/empresa/verificar-datos/{leadId}', [Paso2ContactoController::class, 'verificarDatos']);
+
             Route::post('/empresa/paso1', [Paso1LeadController::class, 'store'])->name('empresa.paso1.store');
             Route::put('/empresa/paso1/{leadId}', [Paso1LeadController::class, 'update'])->name('empresa.paso1.update');
             
             Route::post('/empresa/paso2', [Paso2ContactoController::class, 'store'])->name('empresa.paso2.store');
             Route::put('/empresa/paso2/{contactoId}', [Paso2ContactoController::class, 'update'])->name('empresa.paso2.update');
-            
+
             Route::post('/empresa/paso3', [Paso3EmpresaController::class, 'store'])->name('empresa.paso3.store');
             Route::put('/empresa/paso3/{empresaId}', [Paso3EmpresaController::class, 'update'])->name('empresa.paso3.update');
             
@@ -451,16 +458,35 @@ Route::prefix('temp')->name('temp.')->group(function () {
 
     // ========== RUTAS LEGACY ==========
     Route::prefix('presupuestos-legacy')->name('presupuestos-legacy.')->group(function () {
+        Route::get('/{id}/ver', [PresupuestoLegacyController::class, 'verPdf'])->name('ver');  // ← Agregar esta línea
         Route::get('/{id}/pdf', [PresupuestoLegacyController::class, 'verPdf'])->name('pdf');
         Route::get('/{id}/descargar', [PresupuestoLegacyController::class, 'descargarPdf'])->name('descargar');
     });
-    
+
     Route::prefix('contratos-legacy')->name('contratos-legacy.')->group(function () {
+        Route::get('/{id}/ver', [ContratoLegacyController::class, 'verPdf'])->name('ver');     // ← Agregar esta línea
         Route::get('/{id}/pdf', [ContratoLegacyController::class, 'verPdf'])->name('pdf');
         Route::get('/{id}/descargar', [ContratoLegacyController::class, 'descargarPdf'])->name('descargar');
     });
 });
-
+// ============================================
+// REDIRECCIÓN PARA URLs LEGACY ESTÁTICAS
+// ============================================
+Route::get('/storage/presupuestos_legacy/{filename}', function ($filename) {
+    // Buscar patrón presupuesto_XXX.pdf
+    if (preg_match('/presupuesto_(\d+)\.pdf/', $filename, $matches)) {
+        $id = $matches[1];
+        return redirect("/presupuestos-legacy/{$id}/ver");
+    }
+    
+    // Si no coincide, intentar buscar por ID al final
+    if (preg_match('/\/(\d+)\.pdf$/', $filename, $matches)) {
+        $id = $matches[1];
+        return redirect("/presupuestos-legacy/{$id}/ver");
+    }
+    
+    abort(404, 'Archivo no encontrado');
+})->where('filename', '.*\.pdf$');
 // ============================================
 // ENDPOINTS API (con auth)
 // ============================================
@@ -485,5 +511,6 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
         Route::post('/email/enviar-presupuesto', [App\Http\Controllers\Api\EmailController::class, 'enviarPresupuesto'])->name('email.enviar-presupuesto');
         Route::post('/email/enviar-contrato', [App\Http\Controllers\Api\EmailController::class, 'enviarContrato'])->name('email.enviar-contrato');
        Route::post('/email/vista-previa-bienvenida', [App\Http\Controllers\Api\EmailController::class, 'vistaPreviaBienvenida'])->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+       Route::get('/transferencias/buscar', [TransferenciasController::class, 'buscar'])->name('transferencias.buscar');
 });
 

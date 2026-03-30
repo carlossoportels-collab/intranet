@@ -1,4 +1,5 @@
 <?php
+// app/Models/PresupuestoLegacy.php
 
 namespace App\Models;
 
@@ -9,7 +10,7 @@ class PresupuestoLegacy extends Model
 {
     protected $table = 'presupuestos_legacy';
     
-    public $timestamps = true; // Usa created_at
+    public $timestamps = true;
     
     protected $casts = [
         'metadata' => 'array',
@@ -39,7 +40,7 @@ class PresupuestoLegacy extends Model
     }
     
     /**
-     * Relación con el prefijo (comercial)
+     * Relación con el prefijo (comercial/resolución)
      */
     public function prefijo(): BelongsTo
     {
@@ -71,7 +72,8 @@ class PresupuestoLegacy extends Model
             'total' => $this->total ?? 0,
             'total_formateado' => '$ ' . number_format($this->total ?? 0, 2, ',', '.'),
             'tiene_pdf' => !is_null($this->pdf_path),
-            'prefijo_id' => $this->prefijo_id
+            'prefijo_id' => $this->prefijo_id,
+            'resolucion' => $this->prefijo ? ($this->prefijo->codigo . ($this->prefijo->nombre ? ' - ' . $this->prefijo->nombre : '')) : ''
         ];
     }
 }

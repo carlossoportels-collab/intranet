@@ -23,7 +23,7 @@
             min-height: 100vh;
         }
         
-        /* HEADER - usando tabla como en presupuesto */
+        /* HEADER */
         .header-table {
             width: 100%;
             border-collapse: collapse;
@@ -70,7 +70,7 @@
             letter-spacing: 1px;
         }
         
-        /* CONTENIDO PRINCIPAL - con margen inferior para el footer */
+        /* CONTENIDO PRINCIPAL */
         .main-content {
             width: 100%;
             margin-bottom: 150px;
@@ -117,7 +117,7 @@
             color: #fa6400;
         }
         
-        /* DOMINIOS EN COLUMNAS - 7 columnas, distribución vertical */
+        /* DOMINIOS EN COLUMNAS */
         .dominios-container {
             margin: 15px 0 20px 0;
             width: 100%;
@@ -132,7 +132,7 @@
         
         .dominios-columna {
             float: left;
-            width: 14.285%; /* 100% / 7 = 14.285% */
+            width: 14.285%;
             padding-right: 10px;
         }
         
@@ -208,14 +208,24 @@
     </style>
 </head>
 <body>
+    @php
+        // 🔥 Usar datos de contacto dinámicos o valores por defecto
+        $contacto = $datos_contacto ?? [
+            'telefono' => '0810 888 8205',
+            'email' => 'info@localsat.com.ar',
+            'web' => 'www.localsat.com.ar',
+            'direccion' => 'Mitre 112, Gualeguaychú, Entre Ríos',
+        ];
+    @endphp
+
     <!-- HEADER -->
     <table class="header-table">
         <tr>
             <td class="logo-cell">
-                <img src="{{ public_path('images/logos/logo.png') }}" alt="LOCALSAT">
+                <img src="{{ public_path($logo_path ?? 'images/logos/logo.png') }}" alt="LOCALSAT">
             </td>
             <td class="web-cell">
-                <div class="web-text">www.localsat.com.ar</div>
+                <div class="web-text">{{ $contacto['web'] }}</div>
             </td>
         </tr>
     </table>
@@ -241,17 +251,10 @@
                 $nombreEmpresa = $empresa['razon_social'] ?? $empresa['nombre_fantasia'] ?? 'la empresa';
                 $cantidadVehiculos = count($vehiculos);
                 
-                /**
-                 * Distribuye los vehículos en columnas de forma vertical
-                 * @param array $items Lista de vehículos
-                 * @param int $numColumnas Número de columnas (7)
-                 * @return array Array de columnas con sus items
-                 */
                 function distribuirEnColumnasVertical($items, $numColumnas = 7) {
                     $total = count($items);
                     if ($total == 0) return [];
                     
-                    // Calcular items por columna (distribución equitativa)
                     $itemsPorColumna = ceil($total / $numColumnas);
                     $columnas = [];
                     
@@ -259,7 +262,6 @@
                         $columnas[] = [];
                     }
                     
-                    // Distribuir verticalmente (como en un diccionario)
                     for ($i = 0; $i < $total; $i++) {
                         $columnaIndex = $i % $numColumnas;
                         $columnas[$columnaIndex][] = $items[$i];
@@ -328,13 +330,13 @@
         <div class="footer-content">
             <div class="footer-info clearfix">
                 <div class="footer-telefono">
-                    <span class="datos">TELEFONO:</span> 0810 888 8205
+                    <span class="datos">TELEFONO:</span> {{ $contacto['telefono'] }}
                 </div>
                 <div class="footer-direccion">
-                    <span class="datos">CASA CENTRAL:</span> Mitre 112, Gualeguaychú, Entre Ríos
+                    <span class="datos">CASA CENTRAL:</span> {{ $contacto['direccion'] }}
                 </div>
                 <div class="footer-email">
-                   <span class="datos">EMAIL:</span> info@localsat.com.ar
+                    <span class="datos">EMAIL:</span> {{ $contacto['email'] }}
                 </div>
             </div>
         </div>

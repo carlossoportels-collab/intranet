@@ -1,21 +1,22 @@
 // SidebarNav.tsx - Versión con permisos y filtrado por usuarios
-import { Link } from '@inertiajs/react';
-import { 
-    ChevronDown, ChevronRight, 
-    FileText, Building, 
+import { Link, usePage } from '@inertiajs/react';
+import {
+    ChevronDown, ChevronRight,
+    FileText, Building,
     Settings, Users, Tag,
     Briefcase, FileCheck, Bell, Calendar,
-    CreditCard, Package, 
+    CreditCard, Package,
     UserCog, FileQuestion, Megaphone,
-    Cog, CreditCard as CreditCardIcon, 
+    Cog, CreditCard as CreditCardIcon,
     Lightbulb, Target, Layers,
-    Cake, FileSignature, User, Wrench, 
+    Cake, FileSignature, User, Wrench,
     Briefcase as BriefcaseIcon, Shield,
     Folder, BarChart,
     Eye, Search, Receipt,
-    Phone, Mail
+    Phone, Mail, ArrowRightLeft
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { router } from '@inertiajs/react';
 
 interface SidebarNavProps {
     className?: string;
@@ -42,25 +43,79 @@ interface NavItem {
     icon?: React.ReactNode;
     children?: NavItem[];
     badge?: number;
-    permiso?: string; 
-    visibleForRoles?: string[]; 
-    visibleForUsers?: number[]; 
-    requiereVerTodasCuentas?: boolean; 
+    permiso?: string;
+    visibleForRoles?: string[];
+    visibleForUsers?: number[];
+    requiereVerTodasCuentas?: boolean;
+    parentId?: string | null;
 }
 
 export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
-    const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+    const { url } = usePage();
 
-    const toggleItem = (id: string) => {
-        setExpandedItems(prev => ({
-            ...prev,
-            [id]: !prev[id]
-        }));
+    // Cargar estado expandido desde localStorage al inicializar
+    const loadExpandedFromStorage = (): Record<string, boolean> => {
+        try {
+            const stored = localStorage.getItem('sidebar_expanded_items');
+            return stored ? JSON.parse(stored) : {};
+        } catch {
+            return {};
+        }
+    };
+
+    const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(loadExpandedFromStorage);
+
+    // Guardar en localStorage cuando cambie el estado
+    useEffect(() => {
+        localStorage.setItem('sidebar_expanded_items', JSON.stringify(expandedItems));
+    }, [expandedItems]);
+
+    // Sincronizar expansión con la ruta actual para que el menú "nazca" abierto donde corresponde
+    useEffect(() => {
+        const currentPath = url.split('?')[0]; // Limpiamos query params para comparar
+        
+        const findActivePath = (items: NavItem[]): string[] => {
+            for (const item of items) {
+                if (item.href === currentPath) return [item.id];
+                if (item.children) {
+                    const childPath = findActivePath(item.children);
+                    if (childPath.length > 0) return [item.id, ...childPath];
+                }
+            }
+            return [];
+        };
+
+        const activeIds = findActivePath(navigation);
+        if (activeIds.length > 0) {
+            setExpandedItems(prev => {
+                const newExpanded = { ...prev };
+                activeIds.forEach(id => { newExpanded[id] = true; });
+                return newExpanded;
+            });
+        }
+    }, [url]);
+
+    // Función de Acordeón: Al abrir un nivel 0, cerramos el resto
+    const toggleItem = (id: string, level: number) => {
+        setExpandedItems(prev => {
+            const isOpening = !prev[id];
+            if (!isOpening) return { ...prev, [id]: false };
+
+            const nextState: Record<string, boolean> = { ...prev };
+            
+            // Si es nivel principal, cerramos todos los demás principales
+            if (level === 0) {
+                navigation.forEach(item => {
+                    if (item.id !== id) nextState[item.id] = false;
+                });
+            }
+            nextState[id] = true;
+            return nextState;
+        });
     };
 
     const userData = auth?.user;
     const permisos = userData?.permisos || [];
-    const veTodasCuentas = userData?.ve_todas_cuentas || false;
 
     const tienePermiso = (permisoRequerido?: string): boolean => {
         if (!permisoRequerido) return true;
@@ -85,30 +140,16 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                         { id: 'motivos-baja', name: 'Motivos baja', href: '/config/parametros/motivos-baja', icon: <Lightbulb size={12} />, permiso: 'gestionar_parametros' },
                         { id: 'origen-prospecto', name: 'Origen de prospecto', href: '/config/parametros/origen-prospecto', icon: <Target size={12} />, permiso: 'gestionar_parametros' },
                         { id: 'rubros', name: 'Rubros', href: '/config/parametros/rubros', icon: <Layers size={12} />, permiso: 'gestionar_parametros' },
-                       //   { id: 'terminos-condiciones', name: 'Términos y condiciones', href: '/config/parametros/terminos-condiciones', icon: <FileText size={12} />, permiso: 'gestionar_parametros' },
                     ]
                 },
-                {
-                    id: 'gestion-tarifas',
-                    name: 'Gestión de Tarifas',
-                    icon: <Tag size={14} />,
-                    href: '/config/tarifas',
-                    permiso: 'gestionar_tarifas',
-                },
-                {
-                    id: 'gestion-promociones',
-                    name: 'Gestión de Promociones',
-                    icon: <Tag size={14} />,
-                    href: '/config/promociones',
-                    permiso: 'gestionar_promociones',
-                },
+                { id: 'gestion-tarifas', name: 'Gestión de Tarifas', icon: <Tag size={14} />, href: '/config/tarifas', permiso: 'gestionar_tarifas' },
+                { id: 'gestion-promociones', name: 'Gestión de Promociones', icon: <Tag size={14} />, href: '/config/promociones', permiso: 'gestionar_promociones' },
                 {
                     id: 'gestion-usuarios',
                     name: 'Gestión de Usuarios',
                     icon: <UserCog size={14} />,
                     permiso: 'gestionar_usuarios',
                     children: [
-                      //   { id: 'usuarios-sistema', name: 'Usuarios del sistema', href: '/config/usuarios', icon: <User size={12} />, permiso: 'gestionar_usuarios' },
                         { id: 'roles-permisos', name: 'Roles y permisos', href: '/config/usuarios/roles', icon: <Shield size={12} />, permiso: 'gestionar_roles_permisos' },
                     ]
                 }
@@ -121,15 +162,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             permiso: 'ver_tarifas_consulta',
             children: [
                 { id: 'tarifas-consulta', name: 'Tarifas (consulta)', href: '/comercial/tarifas', icon: <Eye size={14} />, permiso: 'ver_tarifas_consulta' },
-             //   { id: 'convenios-vigentes', name: 'Convenios vigentes', href: '/comercial/convenios', icon: <FileCheck size={14} />, permiso: 'ver_convenios_vigentes' },
-                { 
-                    id: 'documentacion', 
-                    name: 'Documentación', 
-                    href: '/comercial/documentacion', 
-                    icon: <Folder size={14} />,
-                    permiso: 'ver_documentacion'
-                },
-               // { id: 'novedades', name: 'Novedades', href: '/comercial/novedades', icon: <Megaphone size={14} />, permiso: 'ver_novedades' },
+                { id: 'documentacion', name: 'Documentación', href: '/comercial/documentacion', icon: <Folder size={14} />, permiso: 'ver_documentacion' },
                 { id: 'reenvios-activos', name: 'Reenvíos activos', href: '/comercial/reenvios', icon: <Mail size={14} />, permiso: 'ver_reenvios_activos' },
             ]
         },
@@ -139,7 +172,6 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             icon: <Briefcase size={16} />,
             permiso: 'ver_prospectos_leads',
             children: [
-              //   { id: 'actividad', name: 'Actividad', href: '/comercial/actividad', icon: <Bell size={14} />, permiso: 'ver_actividad' },
                 { id: 'contactos', name: 'Clientes', href: '/comercial/contactos', icon: <Users size={14} />, permiso: 'ver_contactos' },
                 {
                     id: 'cuentas',
@@ -148,38 +180,20 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     permiso: 'ver_cuentas',
                     children: [
                         { id: 'detalles', name: 'Detalles', href: '/comercial/cuentas', icon: <Search size={12} />, permiso: 'ver_detalles_cuenta' },
-                        { id: 'certificados-flota', name: 'Certificados flota', href: '/comercial/cuentas/certificados', icon: <FileCheck size={12} />, permiso: 'ver_certificados_flota' },
+                        { id: 'certificados-flota', name: 'Certificados', href: '/comercial/cuentas/certificados', icon: <FileCheck size={12} />, permiso: 'ver_certificados_flota' },
                         { id: 'cambio-titularidad', name: 'Cambio Titularidad', href: '/comercial/cuentas/cambio-titularidad', icon: <User size={12} />, permiso: 'gestionar_cambio_titularidad' },
-                        { id: 'cambio-razon-social', name: 'Cambio Razón Social', href: '/comercial/cuentas/cambio-razon-social', icon: <Building size={12} />, permiso: 'gestionar_cambio_razon_social' },
+                        { id: 'cambio-razon-social', name: 'Cambio RS', href: '/comercial/cuentas/cambio-razon-social', icon: <Building size={12} />, permiso: 'gestionar_cambio_razon_social' },
+                        { id: 'transferencias', name: 'Transferencias', href: '/comercial/cuentas/transferencias', icon: <ArrowRightLeft size={12} />, permiso: 'gestionar_transferencias', visibleForUsers:[14 ]},
                     ]
                 },
                 { id: 'contratos', name: 'Contratos', href: '/comercial/contratos', icon: <FileText size={14} />, permiso: 'ver_contratos' },
                 { id: 'presupuestos', name: 'Presupuestos', href: '/comercial/presupuestos', icon: <FileText size={14} />, permiso: 'ver_presupuestos' },
+                { id: 'presupuestos-legacy', name: 'Presupuestos Anteriores', href: '/comercial/presupuestos-legacy', icon: <FileText size={14} /> },
                 { id: 'recordatorios', name: 'Recordatorios', href: '/notificaciones/programadas', icon: <Calendar size={14} />, permiso: 'ver_recordatorios' },
                 { id: 'prospectos', name: 'Prospectos & Leads', href: '/comercial/prospectos', icon: <Target size={14} />, permiso: 'ver_prospectos_leads' },
                 { id: 'perdidas', name: 'Leads perdidos', href: '/comercial/leads-perdidos', icon: <Receipt size={14} />, permiso: 'ver_leads_perdidos' },
             ]
         },
-        //  {
-        //      id: 'estadisticas',
-            //  name: 'Estadísticas',
-          //    icon: <BarChart size={16} />,
-          //    visibleForUsers: [3, 5],
-         //     children: [
-          //        { 
-           //           id: 'comercial-grupal', 
-           //           name: 'Desempeño Grupal', 
-            //          href: '/estadisticas/comercial-ggrupal', 
-           //           icon: <Users size={14} />,
-         //        },
-       //           { 
-          //            id: 'comercial-individual', 
-         //             name: 'Rendimiento Individual', 
-        //              href: '/estadisticas/comercial-iindividual', 
-           //           icon: <User size={14} />,
-        //          },
-         //     ]
-       //   },
         {
             id: 'rrhh',
             name: 'Recursos Humanos',
@@ -192,7 +206,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     icon: <User size={14} />,
                     permiso: 'ver_datos_personales',
                     children: [
-                        { id: 'datos-personales', name: 'Datos personales', href: '/rrhh/personal/datos', icon: <User size={12} />, permiso: 'ver_datos_personales' },
+                        { id: 'detalles-personales', name: 'Datos personales', href: '/rrhh/personal/datos', icon: <User size={12} />, permiso: 'ver_datos_personales' },
                         { id: 'licencias', name: 'Licencias', href: '/rrhh/personal/licencias', icon: <FileCheck size={12} />, permiso: 'ver_licencias' },
                         { id: 'cumpleanos', name: 'Cumpleaños', href: '/rrhh/personal/cumpleanos', icon: <Cake size={12} />, permiso: 'ver_cumpleanos' },
                     ]
@@ -203,7 +217,6 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     icon: <Users size={14} />,
                     permiso: 'ver_equipos',
                     children: [
-                   //     { id: 'equipo-comercial', name: 'Comercial', href: '/rrhh/equipos/comercial', icon: <BriefcaseIcon size={12} />, permiso: 'gestionar_equipo_comercial' },
                         { id: 'equipo-tecnico', name: 'Técnico', href: '/rrhh/equipos/tecnico', icon: <Wrench size={12} />, permiso: 'gestionar_equipo_tecnico' },
                     ]
                 }
@@ -211,140 +224,100 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
         }
     ];
 
-    // 🔥 FUNCIÓN DE FILTRADO CORREGIDA - respeta visibleForUsers
-    const filterNavItems = (items: NavItem[]): NavItem[] => {
+const filterNavItems = (items: NavItem[]): NavItem[] => {
         return items.filter(item => {
-            // Verificar usuarios específicos
-            if (item.visibleForUsers && !item.visibleForUsers.includes(userData?.id || 0)) {
+            // 1. Lógica específica para el ítem de Transferencias
+            if (item.id === 'transferencias') {
+                const isAdmin = [1, 2, 3].includes(userData?.rol_id || 0); 
+                const isComercial = userData?.rol_id === 5;
+                const prefijoId = userData?.comercial?.prefijo_id;
+
+                // SI ES ADMIN: Siempre ve el ítem.
+                // SI ES COMERCIAL: Solo lo ve si es prefijo 9.
+                if (!isAdmin) {
+                    if (isComercial && prefijoId !== 9) {
+                        return false;
+                    }
+                    // Si no es admin ni comercial autorizado, ocultar
+                    if (!isComercial) return false; 
+                }
+            }
+
+            // 2. Verificar usuarios específicos (visibleForUsers)
+            if (item.id !== 'transferencias' && item.visibleForUsers && !item.visibleForUsers.includes(userData?.id || 0)) {
                 return false;
             }
             
-            // Verificar roles
+            // 3. Verificar roles (visibleForRoles)
             if (item.visibleForRoles && !item.visibleForRoles.includes(userData?.rol_nombre || '')) {
                 return false;
             }
             
-            // Verificar permiso
+            // 4. Verificar permisos generales del sistema
             if (item.permiso && !tienePermiso(item.permiso)) {
                 return false;
             }
             
-            // Filtrar hijos recursivamente
+            // 5. Filtrar hijos recursivamente
             if (item.children) {
-                item.children = filterNavItems(item.children);
-                return item.children.length > 0;
+                const filteredChildren = filterNavItems([...item.children]);
+                if (filteredChildren.length > 0) {
+                    item.children = filteredChildren;
+                    return true;
+                }
+                return false;
             }
             
             return true;
         });
     };
 
-    const filteredNavigation = filterNavItems(navigation);
+    // Determina si un item está activo por URL exacta
+    const isItemActive = (item: NavItem): boolean => {
+        const currentPath = url.split('?')[0];
+        if (item.href) return currentPath === item.href;
+        if (item.children) return item.children.some(child => isItemActive(child));
+        return false;
+    };
 
     const renderNavItem = (item: NavItem, level = 0): React.ReactNode => {
         const hasChildren = item.children && item.children.length > 0;
-        const hasNestedChildren = item.children?.some(child => child.children);
         const isExpanded = expandedItems[item.id];
-        
-        const isTopLevel = level === 0;
-        const isSecondLevel = level === 1;
-        const isThirdLevel = level >= 2;
+        const isActive = isItemActive(item);
 
-        if (hasNestedChildren) {
-            return (
-                <div key={item.id} className="w-full">
-                    <button
-                        onClick={() => toggleItem(item.id)}
-                        className={`flex items-center justify-between w-full px-4 py-3 text-sm transition-all duration-200 group sidebar-item
-                            ${isTopLevel ? 'hover:bg-white/5' : ''}
-                            ${isSecondLevel ? 'pl-8' : ''}
-                            ${isThirdLevel ? 'pl-12' : ''}
-                        `}
-                        style={{ 
-                            borderLeftColor: isExpanded ? 'var(--color-sat)' : 'transparent',
-                            borderLeftWidth: '4px'
-                        }}
-                    >
-                        <div className="flex items-center">
-                            {item.icon && (
-                                <span className={`mr-3 ${isTopLevel ? 'text-sat' : 'text-gray-400 group-hover:text-sat'}`}>
-                                    {item.icon}
-                                </span>
-                            )}
-                            <span className={`${isTopLevel ? 'text-white font-semibold' : isSecondLevel ? 'text-gray-300 font-medium' : 'text-gray-400'}`}>
-                                {item.name}
-                            </span>
-                        </div>
-                        <ChevronRight 
-                            size={14} 
-                            className={`text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
-                        />
-                    </button>
-                    
-                    {isExpanded && (
-                        <div className={`${isSecondLevel ? 'ml-8 border-l border-gray-700' : isThirdLevel ? 'ml-12 border-l border-gray-600' : ''}`}>
-                            <div className="py-2">
-                                {item.children?.map((child) => (
-                                    <div key={child.id}>
-                                        {renderNavItem(child, level + 1)}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        }
+        // Clases de indentación
+        const paddingClass = level === 0 ? 'px-4' : level === 1 ? 'pl-8 pr-4' : 'pl-12 pr-4';
+        
+        // --- LÓGICA DE COLORES DE ICONO SOLICITADA ---
+        // Nivel 0 (level 0) -> Siempre Naranja
+        // Niveles 1 y 2 (level > 0) -> Solo naranja si está seleccionado, sino Gris
+        const iconColor = (level === 0 || isActive) ? 'text-sat' : 'text-gray-400';
+
+        // Lógica de texto
+        const textColor = isActive 
+            ? 'text-sat font-bold' 
+            : (level === 0 ? 'text-white font-semibold' : 'text-gray-300');
 
         if (hasChildren) {
             return (
                 <div key={item.id} className="w-full">
                     <button
-                        onClick={() => toggleItem(item.id)}
-                        className={`flex items-center justify-between w-full px-4 py-3 text-sm transition-all duration-200 group sidebar-item
-                            ${isTopLevel ? 'hover:bg-white/5' : ''}
-                            ${isSecondLevel ? 'pl-8' : ''}
-                            ${isThirdLevel ? 'pl-12' : ''}
-                        `}
-                        style={{ 
-                            borderLeftColor: isExpanded ? 'var(--color-sat)' : 'transparent',
-                            borderLeftWidth: '4px'
-                        }}
+                        onClick={() => toggleItem(item.id, level)}
+                        className={`flex items-center justify-between w-full py-3 text-sm transition-all duration-200 group ${paddingClass}`}
                     >
                         <div className="flex items-center">
-                            {item.icon && (
-                                <span className={`mr-3 ${isTopLevel ? 'text-sat' : 'text-gray-400 group-hover:text-sat'}`}>
-                                    {item.icon}
-                                </span>
-                            )}
-                            <span className={`${isTopLevel ? 'text-white font-semibold' : 'text-gray-300'}`}>
-                                {item.name}
-                            </span>
+                            {item.icon && <span className={`mr-3 transition-colors ${iconColor}`}>{item.icon}</span>}
+                            <span className={`transition-colors ${textColor}`}>{item.name}</span>
                         </div>
-                        <ChevronDown 
-                            size={14} 
-                            className={`text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        <ChevronRight
+                            size={14}
+                            className={`text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
                         />
                     </button>
                     
                     {isExpanded && (
-                        <div className={`${isSecondLevel ? 'ml-8 border-l border-gray-700' : ''}`}>
-                            <div className="py-1">
-                                {item.children!.map((child) => (
-                                    <Link
-                                        key={child.id}
-                                        href={child.href || '#'}
-                                        className="flex items-center px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors sidebar-subitem ml-4"
-                                    >
-                                        {child.icon && (
-                                            <span className="mr-3 text-gray-500">
-                                                {child.icon}
-                                            </span>
-                                        )}
-                                        <span>{child.name}</span>
-                                    </Link>
-                                ))}
-                            </div>
+                        <div className="bg-transparent"> 
+                            {item.children?.map((child) => renderNavItem(child, level + 1))}
                         </div>
                     )}
                 </div>
@@ -355,29 +328,18 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             <Link
                 key={item.id}
                 href={item.href || '#'}
-                className={`flex items-center px-4 py-3 text-sm transition-all duration-200 group sidebar-item
-                    ${isTopLevel ? 'hover:bg-white/5' : ''}
-                    ${isSecondLevel ? 'pl-8' : ''}
-                    ${isThirdLevel ? 'pl-12' : ''}
-                `}
-                style={{ borderLeftWidth: '4px' }}
+                className={`flex items-center py-2.5 text-sm transition-all duration-200 group ${paddingClass}`}
             >
-                {item.icon && (
-                    <span className={`mr-3 ${isTopLevel ? 'text-sat' : 'text-gray-400 group-hover:text-sat'}`}>
-                        {item.icon}
-                    </span>
-                )}
-                <span className={`${isTopLevel ? 'text-white font-semibold' : 'text-gray-300'}`}>
-                    {item.name}
-                </span>
+                {item.icon && <span className={`mr-3 transition-colors ${iconColor}`}>{item.icon}</span>}
+                <span className={`transition-colors ${textColor}`}>{item.name}</span>
             </Link>
         );
     };
 
     return (
-        <nav className={`${className}`}>
+        <nav className={`${className} select-none`}>
             <div className="space-y-0.5">
-                {filteredNavigation.map(item => renderNavItem(item))}
+                {filterNavItems([...navigation]).map(item => renderNavItem(item))}
             </div>
         </nav>
     );

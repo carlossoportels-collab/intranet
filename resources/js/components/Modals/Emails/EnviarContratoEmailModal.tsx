@@ -185,74 +185,93 @@ export default function EnviarContratoEmailModal({
         setArchivosPlataforma(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.to) {
-            toast.error('El destinatario es requerido');
-            return;
+const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.to) {
+        toast.error('El destinatario es requerido');
+        return;
+    }
+
+    setIsSubmitting(true);
+    toast.info('Enviando email...');
+
+    try {
+        const formDataToSend = new FormData();
+        
+        // 🔥 PROCESAR DESTINATARIOS - Convertir a array JSON
+        const toArray = formData.to.split(',').map(email => email.trim()).filter(email => email);
+        formDataToSend.append('to', JSON.stringify(toArray));
+        
+        // CC - múltiples emails
+        if (formData.cc) {
+            const ccArray = formData.cc.split(',').map(email => email.trim()).filter(email => email);
+            formDataToSend.append('cc', JSON.stringify(ccArray));
         }
-
-        setIsSubmitting(true);
-        toast.info('Enviando email...');
-
-        try {
-            const emailData = {
-                to: formData.to,
-                cc: formData.cc ? formData.cc.split(',').map(email => email.trim()) : [],
-                bcc: formData.bcc ? formData.bcc.split(',').map(email => email.trim()) : [],
-                subject: formData.subject,
-                body: formData.body,
-                contratoId: contrato.id,
-                numeroContrato: contrato.numero_contrato,
-                attachPDF: formData.attachPDF,
-                incluirBienvenida: formData.incluirBienvenida,
-                convertirACliente: !leadEsCliente && formData.incluirBienvenida,
-                bienvenidaData: formData.incluirBienvenida ? {
-                    companiaId,
-                    plataforma,
-                    nombreCliente: contrato.cliente_nombre_completo,
-                    nombreFlota: contrato.empresa_nombre_flota || contrato.cliente_nombre_completo,
-                    comercialNombre,
-                    comercialEmail,
-                    comercialTelefono
-                } : null
+        
+        // BCC
+        if (formData.bcc) {
+            const bccArray = formData.bcc.split(',').map(email => email.trim()).filter(email => email);
+            formDataToSend.append('bcc', JSON.stringify(bccArray));
+        }
+        
+        // 🔥 CAMPOS QUE NO DEBEN SER JSON - Enviar como texto plano
+        formDataToSend.append('subject', formData.subject);
+        formDataToSend.append('body', formData.body);  // ← ENVIAR COMO TEXTO PLANO, NO JSON
+        formDataToSend.append('contratoId', String(contrato.id));
+        formDataToSend.append('numeroContrato', contrato.numero_contrato);
+        formDataToSend.append('tipo', 'cliente');
+        
+        // Opciones de bienvenida
+        formDataToSend.append('incluirBienvenida', JSON.stringify(formData.incluirBienvenida));
+        
+        // Datos de bienvenida (si aplica)
+        if (formData.incluirBienvenida && !leadEsCliente) {
+            const bienvenidaData = {
+                companiaId,
+                plataforma,
+                nombreCliente: contrato.cliente_nombre_completo,
+                nombreFlota: contrato.empresa_nombre_flota || contrato.cliente_nombre_completo,
+                comercialNombre,
+                comercialEmail,
+                comercialTelefono
             };
-
-            const formDataToSend = new FormData();
-            Object.keys(emailData).forEach(key => {
-                formDataToSend.append(key, JSON.stringify(emailData[key as keyof typeof emailData]));
-            });
-
-            if (formData.attachPDF && pdfFile) {
-                formDataToSend.append('pdf', pdfFile);
-            }
-
-            archivosLocales.forEach((file, index) => {
-                formDataToSend.append(`documento_local_${index}`, file);
-            });
-
-            archivosPlataforma.forEach((file, index) => {
-                formDataToSend.append(`documento_plataforma_${index}`, file);
-            });
-
-            router.post('/api/email/enviar-contrato', formDataToSend, {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('Email enviado correctamente');
-                    onClose();
-                },
-                onError: (errors: any) => {
-                    toast.error(errors?.error || 'Error al enviar el email');
-                    setIsSubmitting(false);
-                },
-                onFinish: () => setIsSubmitting(false)
-            });
-        } catch (error) {
-            console.error('Error:', error);
-            toast.error('Error al procesar la solicitud');
-            setIsSubmitting(false);
+            formDataToSend.append('bienvenidaData', JSON.stringify(bienvenidaData));
         }
-    };
+        
+        // Adjuntar PDF
+        if (formData.attachPDF && pdfFile) {
+            formDataToSend.append('pdf', pdfFile);
+        }
+        
+        // Documentos locales
+        archivosLocales.forEach((file, index) => {
+            formDataToSend.append(`documento_local_${index}`, file);
+        });
+        
+        // Documentos de plataforma
+        archivosPlataforma.forEach((file, index) => {
+            formDataToSend.append(`documento_plataforma_${index}`, file);
+        });
+
+        router.post('/api/email/enviar-contrato', formDataToSend, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Email enviado correctamente');
+                onClose();
+            },
+            onError: (errors: any) => {
+                console.error('Errores:', errors);
+                toast.error(errors?.error || 'Error al enviar el email');
+                setIsSubmitting(false);
+            },
+            onFinish: () => setIsSubmitting(false)
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        toast.error('Error al procesar la solicitud');
+        setIsSubmitting(false);
+    }
+};
 
     const handleVerVistaPrevia = () => setShowVistaPrevia(true);
 

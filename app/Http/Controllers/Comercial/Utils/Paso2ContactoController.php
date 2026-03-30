@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\EmpresaContacto;
 use App\Models\EmpresaResponsable;
 use Illuminate\Http\Request;
+use App\Models\Lead;
+use App\Models\Empresa;
 use Illuminate\Support\Facades\Log;
 
 class Paso2ContactoController extends Controller
@@ -231,4 +233,86 @@ class Paso2ContactoController extends Controller
             ], 500);
         }
     }
+
+    /**
+ * Verificar si existen datos de contacto y empresa para un lead
+ */
+public function verificarDatos($leadId)
+{
+    try {
+        Log::info('=== VERIFICAR DATOS EXISTENTES ===', [
+            'lead_id' => $leadId,
+            'user_id' => auth()->id()
+        ]);
+        
+        $lead = Lead::findOrFail($leadId);
+        
+        $data = [
+            'contacto' => null,
+            'empresa' => null
+        ];
+        
+        // Buscar contacto activo para este lead
+        $contacto = EmpresaContacto::where('lead_id', $leadId)
+            ->where('es_activo', true)
+            ->first();
+        
+        if ($contacto) {
+            $data['contacto'] = [
+                'id' => $contacto->id,
+                'tipo_responsabilidad_id' => $contacto->tipo_responsabilidad_id,
+                'tipo_documento_id' => $contacto->tipo_documento_id,
+                'nro_documento' => $contacto->nro_documento,
+                'nacionalidad_id' => $contacto->nacionalidad_id,
+                'fecha_nacimiento' => $contacto->fecha_nacimiento,
+                'direccion_personal' => $contacto->direccion_personal,
+                'codigo_postal_personal' => $contacto->codigo_postal_personal,
+            ];
+            
+            // Si hay empresa asociada
+            if ($contacto->empresa_id) {
+                $empresa = Empresa::find($contacto->empresa_id);
+                if ($empresa) {
+                    $data['empresa'] = [
+                        'id' => $empresa->id,
+                        'nombre_fantasia' => $empresa->nombre_fantasia,
+                        'razon_social' => $empresa->razon_social,
+                        'cuit' => $empresa->cuit,
+                        'direccion_fiscal' => $empresa->direccion_fiscal,
+                        'codigo_postal_fiscal' => $empresa->codigo_postal_fiscal,
+                        'localidad_fiscal_id' => $empresa->localidad_fiscal_id,
+                        'telefono_fiscal' => $empresa->telefono_fiscal,
+                        'email_fiscal' => $empresa->email_fiscal,
+                        'rubro_id' => $empresa->rubro_id,
+                        'cat_fiscal_id' => $empresa->cat_fiscal_id,
+                        'plataforma_id' => $empresa->plataforma_id,
+                        'nombre_flota' => $empresa->nombre_flota,
+                    ];
+                }
+            }
+        }
+        
+        Log::info('Datos verificados', [
+            'tiene_contacto' => !is_null($data['contacto']),
+            'tiene_empresa' => !is_null($data['empresa'])
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'data' => $data
+        ]);
+        
+    } catch (\Exception $e) {
+        Log::error('Error verificando datos:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'error' => 'Error al verificar datos: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
 }

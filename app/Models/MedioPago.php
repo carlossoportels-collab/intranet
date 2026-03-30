@@ -54,17 +54,19 @@ class MedioPago extends Model
     }
 
     // Accessors
-    public function getTipoTextoAttribute(): string
-    {
-        return match($this->tipo) {
-            'debito' => 'Débito',
-            'credito' => 'Crédito',
-            'transferencia' => 'Transferencia',
-            'efectivo' => 'Efectivo',
-            'otro' => 'Otro',
-            default => $this->tipo
-        };
-    }
+public function getTipoTextoAttribute(): string
+{
+    $tipos = [
+        'debito' => 'Débito',
+        'credito' => 'Crédito',
+        'transferencia' => 'Transferencia',
+        'efectivo' => 'Efectivo',
+        'cheque' => 'Cheque',
+        'otro' => 'Otro',
+    ];
+    
+    return $tipos[$this->tipo] ?? ($this->tipo ?? 'No especificado');
+}
 
     public function getIconoHtmlAttribute(): string
     {

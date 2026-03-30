@@ -222,14 +222,24 @@
     </style>
 </head>
 <body>
+    @php
+        // 🔥 Usar datos de contacto dinámicos o valores por defecto
+        $contacto = $datos_contacto ?? [
+            'telefono' => '0810 888 8205',
+            'email' => 'info@localsat.com.ar',
+            'web' => 'www.localsat.com.ar',
+            'direccion' => 'Mitre 112, Gualeguaychú, Entre Ríos',
+        ];
+    @endphp
+
     <!-- HEADER -->
     <table class="header-table">
         <tr>
             <td class="logo-cell">
-                <img src="{{ public_path('images/logos/logo.png') }}" alt="LOCALSAT">
+                <img src="{{ public_path($logo_path ?? 'images/logos/logo.png') }}" alt="LOCALSAT">
             </td>
             <td class="web-cell">
-                <div class="web-text">www.localsat.com.ar</div>
+                <div class="web-text">{{ $contacto['web'] }}</div>
             </td>
         </tr>
     </table>
@@ -315,56 +325,51 @@
                 La cobertura del servicio brindado por nuestra empresa es de alcance nacional en todas aquellas
                 zonas donde exista señal de telefonía celular.
             </p>
-                {{-- ///////////////// SECCIÓN DE UBICACIÓN (TABLA - 100% COMPATIBLE) ///////////////// --}}
-@if($ultima_ubicacion && $ultima_ubicacion['fecha'])
-    @php
-        $direccionLimpia = $ultima_ubicacion['direccion'] ?? '';
-        $direccionLimpia = preg_replace('/^\d+,\s*\d+\s*-\s*/', '', $direccionLimpia);
-        $direccionLimpia = preg_replace('/^\d+\s*-\s*/', '', $direccionLimpia);
-        $direccionLimpia = preg_replace('/,\s*,/', ',', $direccionLimpia);
-    @endphp
-
-    <table style="width: 100%; margin-top: 15px; margin-bottom: 15px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; border-collapse: collapse; font-family: Helvetica, Arial, sans-serif;">
-        
-        {{-- Título con línea naranja --}}
-        <tr>
-            <td colspan="2" style="padding: 12px 12px 5px 12px; border-bottom: 1px solid #fa6400;">
-                <span style="font-weight: bold; color: #3b3b3d; font-size: 14px;">Último reporte</span>
-            </td>
-        </tr>
-        
-        {{-- Fila de datos y mapa --}}
-        <tr>
-            {{-- Columna izquierda: Datos --}}
-            <td style="width: 65%; padding: 12px; vertical-align: middle; color: #333;">
-                <p style="margin: 4px 0; font-size: 12px;"><strong>Fecha:</strong> {{ $ultima_ubicacion['fecha'] }}</p>
-                
-                @if(!empty($direccionLimpia))
-                <p style="margin: 4px 0; font-size: 12px; line-height: 1.4;">
-                    <strong>Dirección:</strong> {{ $direccionLimpia }}
-                </p>
-                @endif
-                
-                <p style="margin: 4px 0; font-size: 12px;">
-                    <strong>Coordenadas:</strong> {{ $ultima_ubicacion['latitud'] }}, {{ $ultima_ubicacion['longitud'] }}
-                </p>
-            </td>
             
-            {{-- Columna derecha: Mapa --}}
-            @if(!empty($ultima_ubicacion['mapa_url']))
-            <td style="width: 35%; padding: 12px; text-align: center; vertical-align: middle;">
-                <img src="{{ $ultima_ubicacion['mapa_url'] }}" 
-                    alt="Mapa" 
-                    style="max-width: 100%; max-height: 150px; border-radius: 4px; border: 1px solid #ccc;">
-            </td>
+            {{-- SECCIÓN DE UBICACIÓN --}}
+            @if($ultima_ubicacion && $ultima_ubicacion['fecha'])
+                @php
+                    $direccionLimpia = $ultima_ubicacion['direccion'] ?? '';
+                    $direccionLimpia = preg_replace('/^\d+,\s*\d+\s*-\s*/', '', $direccionLimpia);
+                    $direccionLimpia = preg_replace('/^\d+\s*-\s*/', '', $direccionLimpia);
+                    $direccionLimpia = preg_replace('/,\s*,/', ',', $direccionLimpia);
+                @endphp
+
+                <table style="width: 100%; margin-top: 15px; margin-bottom: 15px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; border-collapse: collapse;">
+                    <tr>
+                        <td colspan="2" style="padding: 12px 12px 5px 12px; border-bottom: 1px solid #fa6400;">
+                            <span style="font-weight: bold; color: #3b3b3d; font-size: 14px;">Último reporte</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="width: 65%; padding: 12px; vertical-align: middle; color: #333;">
+                            <p style="margin: 4px 0; font-size: 12px;"><strong>Fecha:</strong> {{ $ultima_ubicacion['fecha'] }}</p>
+                            
+                            @if(!empty($direccionLimpia))
+                            <p style="margin: 4px 0; font-size: 12px; line-height: 1.4;">
+                                <strong>Dirección:</strong> {{ $direccionLimpia }}
+                            </p>
+                            @endif
+                            
+                            <p style="margin: 4px 0; font-size: 12px;">
+                                <strong>Coordenadas:</strong> {{ $ultima_ubicacion['latitud'] }}, {{ $ultima_ubicacion['longitud'] }}
+                            </p>
+                        </td>
+                        
+                        @if(!empty($ultima_ubicacion['mapa_url']))
+                        <td style="width: 35%; padding: 12px; text-align: center; vertical-align: middle;">
+                            <img src="{{ $ultima_ubicacion['mapa_url'] }}" 
+                                alt="Mapa" 
+                                style="max-width: 100%; max-height: 150px; border-radius: 4px; border: 1px solid #ccc;">
+                        </td>
+                        @endif
+                    </tr>
+                </table>
             @endif
-        </tr>
-    </table>
-@endif
+            
             <p>
                 <strong>Al día de la fecha no se registran facturas impagas ni deuda alguna.</strong>
             </p>
-            
         </div>
     </div>
     
@@ -375,13 +380,13 @@
         <div class="footer-content">
             <div class="footer-info clearfix">
                 <div class="footer-telefono">
-                    <span class="datos">TELEFONO:</span> 0810 888 8205
+                    <span class="datos">TELEFONO:</span> {{ $contacto['telefono'] }}
                 </div>
                 <div class="footer-direccion">
-                    <span class="datos">CASA CENTRAL:</span> Mitre 112, Gualeguaychú, Entre Ríos
+                    <span class="datos">CASA CENTRAL:</span> {{ $contacto['direccion'] }}
                 </div>
                 <div class="footer-email">
-                   <span class="datos">EMAIL:</span> info@localsat.com.ar
+                    <span class="datos">EMAIL:</span> {{ $contacto['email'] }}
                 </div>
             </div>
         </div>

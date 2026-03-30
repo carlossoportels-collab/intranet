@@ -4,15 +4,76 @@
 namespace App\Http\Controllers;
 
 use App\Models\PresupuestoLegacy;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class PresupuestoLegacyController extends Controller
 {
     /**
+     * Listado de presupuestos legacy
+     */
+    public function index(Request $request)
+    {
+        $user = auth()->user();
+        
+        $query = PresupuestoLegacy::with(['lead', 'prefijo']);
+        
+        // Restricción: comerciales solo ven sus propios presupuestos
+        if (!$user->ve_todas_cuentas && $user->es_comercial) {
+            // Obtener el prefijo_id del comercial a través de personal->comercial
+            $prefijoId = null;
+            
+            if ($user->personal && $user->personal->comercial) {
+                $prefijoId = $user->personal->comercial->prefijo_id;
+            }
+            
+            if ($prefijoId) {
+                $query->where('prefijo_id', $prefijoId);
+            } else {
+                // Si el comercial no tiene prefijo asignado, no mostrar nada
+                $query->whereRaw('1 = 0');
+            }
+        }
+        
+        // Ordenar por fecha más reciente primero
+        $presupuestos = $query->orderBy('created_at', 'desc')
+            ->paginate(15)
+            ->through(function($presupuesto) {
+                // Obtener resolución del prefijo (formato: código - nombre)
+                $resolucion = '';
+                if ($presupuesto->prefijo) {
+                    $resolucion = $presupuesto->prefijo->codigo ?? '';
+                    if ($presupuesto->prefijo->nombre) {
+                        $resolucion .= $resolucion ? ' - ' . $presupuesto->prefijo->nombre : $presupuesto->prefijo->nombre;
+                    }
+                }
+                
+                return [
+                    'id' => $presupuesto->id,
+                    'nombre' => $presupuesto->nombre_presupuesto ?? "Presupuesto #{$presupuesto->id}",
+                    'fecha' => $presupuesto->created_at ? $presupuesto->created_at->format('d/m/Y H:i') : 'Sin fecha',
+                    'fecha_original' => $presupuesto->created_at?->toISOString(),
+                    'total' => $presupuesto->total ?? 0,
+                    'cliente' => $presupuesto->lead?->nombre_completo ?? 'Sin cliente',
+                    'cliente_id' => $presupuesto->lead?->id,
+                    'telefono' => $presupuesto->lead?->telefono,
+                    'email' => $presupuesto->lead?->email,
+                    'resolucion' => $resolucion,
+                    'prefijo_id' => $presupuesto->prefijo_id,
+                    'tiene_pdf' => !is_null($presupuesto->pdf_path),
+                    'pdf_url' => $presupuesto->pdf_url,
+                ];
+            });
+        
+        return Inertia::render('Comercial/PresupuestosLegacy/Index', [
+            'presupuestos' => $presupuestos
+        ]);
+    }
+    
+    /**
      * Ver PDF en el navegador
      */
-    public function verPdf($id): BinaryFileResponse
+    public function verPdf($id)
     {
         return $this->getPdfResponse($id, 'inline');
     }
@@ -20,7 +81,7 @@ class PresupuestoLegacyController extends Controller
     /**
      * Descargar PDF
      */
-    public function descargarPdf($id): BinaryFileResponse
+    public function descargarPdf($id)
     {
         return $this->getPdfResponse($id, 'attachment');
     }
@@ -28,34 +89,43 @@ class PresupuestoLegacyController extends Controller
     /**
      * Obtener respuesta del PDF
      */
-    private function getPdfResponse($id, $disposition): BinaryFileResponse
+    private function getPdfResponse($id, $disposition)
     {
-        
-        // Verificar autenticación
         if (!auth()->check()) {
             abort(403, 'No autenticado');
         }
 
-        $presupuesto = PresupuestoLegacy::find($id);
+        $presupuesto = PresupuestoLegacy::with(['lead', 'prefijo'])->find($id);
         
         if (!$presupuesto) {
             abort(404, 'Presupuesto no encontrado');
         }
+        
+        // Verificar permisos: comerciales solo ven sus propios presupuestos
+        $user = auth()->user();
+        if (!$user->ve_todas_cuentas && $user->es_comercial) {
+            // Obtener el prefijo_id del comercial
+            $prefijoId = null;
+            
+            if ($user->personal && $user->personal->comercial) {
+                $prefijoId = $user->personal->comercial->prefijo_id;
+            }
+            
+            // Verificar si el presupuesto pertenece al comercial
+            if (!$prefijoId || $presupuesto->prefijo_id !== $prefijoId) {
+                abort(403, 'No tiene permiso para ver este presupuesto');
+            }
+        }
 
-        // 📌 IMPORTANTE: Buscar el archivo con el nombre correcto (presupuesto_ID.pdf)
+        // Buscar el archivo
         $filename = "presupuesto_{$id}.pdf";
         
-        // Rutas donde buscar
         $paths = [
-            // Ruta principal según storage link
             public_path("storage/presupuestos_legacy/{$filename}"),
-            // Ruta directa en storage
             storage_path("app/public/presupuestos_legacy/{$filename}"),
-            // Ruta alternativa
             storage_path("app/presupuestos_legacy/{$filename}"),
         ];
 
-        // Si hay pdf_path en la BD, también probar esa ruta exacta
         if (!empty($presupuesto->pdf_path)) {
             array_unshift($paths, storage_path("app/public/{$presupuesto->pdf_path}"));
         }
@@ -69,11 +139,6 @@ class PresupuestoLegacyController extends Controller
         }
 
         if (!$filePath) {
-            \Log::error('PDF no encontrado para presupuesto legacy', [
-                'id' => $id,
-                'pdf_path_db' => $presupuesto->pdf_path,
-                'paths_buscadas' => $paths
-            ]);
             abort(404, 'Archivo PDF no encontrado');
         }
 

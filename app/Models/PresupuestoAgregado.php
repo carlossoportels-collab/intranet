@@ -68,4 +68,16 @@ class PresupuestoAgregado extends Model
     {
         return $this->bonificacion > 0 ? $this->bonificacion . '% OFF' : '-';
     }
+
+    // Agregar este método
+public function getTipoIdAttribute()
+{
+    return $this->productoServicio ? $this->productoServicio->tipo_id : null;
+}
+
+// También podrías agregar un accessor para el nombre
+public function getProductoNombreAttribute()
+{
+    return $this->productoServicio ? $this->productoServicio->nombre : null;
+}
 }

@@ -62,16 +62,13 @@ export const PresupuestoActions: React.FC<Props> = ({
     const [showWhatsAppMenu, setShowWhatsAppMenu] = useState(false);
     const [showAccionesMenu, setShowAccionesMenu] = useState(false);
     
-    // Estados para el flujo de alta empresa/contrato
     const [modalAltaEmpresaOpen, setModalAltaEmpresaOpen] = useState(false);
     const [verificandoDatos, setVerificandoDatos] = useState(false);
-    const [pasoInicialModal, setPasoInicialModal] = useState<number>(1);
     const [modoCompletar, setModoCompletar] = useState(false);
     const [datosExistentes, setDatosExistentes] = useState<{ empresa?: any; contacto?: any } | undefined>(undefined);
     
     const toast = useToast();
 
-    // Función para generar PDF temporal (URL)
     const generarPDFTemporal = async (): Promise<string | null> => {
         return new Promise((resolve) => {
             router.post(`/comercial/presupuestos/${presupuestoId}/generar-pdf-temp`, {}, {
@@ -88,8 +85,7 @@ export const PresupuestoActions: React.FC<Props> = ({
                         resolve(null);
                     }
                 },
-                onError: (errors: any) => {
-                    console.error('Error generando PDF:', errors);
+                onError: () => {
                     toast.error('Error al generar el PDF');
                     resolve(null);
                 }
@@ -97,7 +93,6 @@ export const PresupuestoActions: React.FC<Props> = ({
         });
     };
 
-    // Función para generar PDF blob
     const generarPDFBlob = async (): Promise<Blob | null> => {
         try {
             const response = await fetch(`/comercial/presupuestos/${presupuestoId}/pdf?download=1`, {
@@ -113,104 +108,115 @@ export const PresupuestoActions: React.FC<Props> = ({
             }
             
             return await response.blob();
-        } catch (error) {
-            console.error('Error generando PDF:', error);
+        } catch {
             return null;
         }
     };
 
-    const handleDescargarPDF = async () => {
-        setGenerandoPDF(true);
-        toast.info('Generando PDF...');
-        
-        try {
-            const response = await fetch(`/comercial/presupuestos/${presupuestoId}/pdf?download=1`, {
-                method: 'GET',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    'Accept': 'application/pdf'
-                }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Error al generar PDF: ${response.status}`);
+const handleDescargarPDF = async () => {
+    setGenerandoPDF(true);
+    toast.info('Generando PDF...');
+    
+    try {
+        const response = await fetch(`/comercial/presupuestos/${presupuestoId}/pdf?download=1`, {
+            method: 'GET',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'Accept': 'application/pdf'
             }
-            
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Presupuesto_${referencia}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            
-            toast.success('PDF descargado correctamente');
-            
-        } catch (error) {
-            console.error('Error generando PDF:', error);
-            toast.error('Error al generar el PDF');
-        } finally {
-            setGenerandoPDF(false);
+        });
+        
+        if (!response.ok) throw new Error();
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // 🔥 OBTENER EL NOMBRE DEL ARCHIVO DEL HEADER Content-Disposition
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `Presupuesto_${referencia}.pdf`;
+        
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (filenameMatch && filenameMatch[1]) {
+                filename = filenameMatch[1].replace(/['"]/g, '');
+            }
         }
-    };
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        toast.success('PDF descargado correctamente');
+    } catch {
+        toast.error('Error al generar el PDF');
+    } finally {
+        setGenerandoPDF(false);
+    }
+};
 
     const handleVerPDF = () => {
         window.open(`/comercial/presupuestos/${presupuestoId}/pdf`, '_blank');
     };
 
-    // WhatsApp solo texto
     const handleWhatsApp = () => {
-        if (!telefono || !mensajeWhatsApp) {
-            toast.error('No se puede enviar el mensaje');
-            return;
-        }
+        if (!telefono || !mensajeWhatsApp) return;
         setShowWhatsAppMenu(false);
         try {
             sendWhatsApp(telefono, mensajeWhatsApp);
             toast.success('Abriendo WhatsApp...');
-        } catch (error) {
-            console.error('Error:', error);
+        } catch {
             toast.error('No se pudo abrir WhatsApp');
         }
     };
 
-    // WhatsApp con PDF
-    const handleWhatsAppConPDF = async () => {
-        if (!telefono || !mensajeWhatsApp) {
-            toast.error('No se puede enviar el mensaje');
-            return;
-        }
+const handleWhatsAppConPDF = async () => {
+    if (!telefono || !mensajeWhatsApp) return;
 
-        setShowWhatsAppMenu(false);
-        setGenerandoPDF(true);
-        toast.info('Preparando PDF...');
+    setShowWhatsAppMenu(false);
+    setGenerandoPDF(true);
+    toast.info('Preparando PDF...');
+    
+    try {
+        const response = await fetch(`/comercial/presupuestos/${presupuestoId}/pdf?download=1`, {
+            method: 'GET',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'Accept': 'application/pdf'
+            }
+        });
         
-        try {
-            const pdfBlob = await generarPDFBlob();
-            
-            if (!pdfBlob) {
-                throw new Error('No se pudo generar el PDF');
+        if (!response.ok) throw new Error();
+        
+        const pdfBlob = await response.blob();
+        
+        // 🔥 OBTENER EL NOMBRE DEL ARCHIVO DEL HEADER
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `Presupuesto_${referencia}.pdf`;
+        
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (filenameMatch && filenameMatch[1]) {
+                filename = filenameMatch[1].replace(/['"]/g, '');
             }
-            
-            const filename = `Presupuesto_${referencia}.pdf`;
-            
-            const result = await sendWhatsAppWithFile(telefono, mensajeWhatsApp, pdfBlob, filename);
-            
-            if (result.success) {
-                toast.success('PDF preparado y WhatsApp abierto');
-            } else {
-                toast.error(result.error || 'Error al procesar la solicitud');
-            }
-            
-        } catch (error) {
-            console.error('Error:', error);
-            toast.error('Error al procesar la solicitud');
-        } finally {
-            setGenerandoPDF(false);
         }
-    };
+        
+        const result = await sendWhatsAppWithFile(telefono, mensajeWhatsApp, pdfBlob, filename);
+        
+        if (result.success) {
+            toast.success('PDF preparado y WhatsApp abierto');
+        } else {
+            toast.error(result.error || 'Error al procesar la solicitud');
+        }
+    } catch {
+        toast.error('Error al procesar la solicitud');
+    } finally {
+        setGenerandoPDF(false);
+    }
+};
 
     const handleOpenEmailModal = async () => {
         setGenerandoPDF(true);
@@ -218,30 +224,24 @@ export const PresupuestoActions: React.FC<Props> = ({
         
         try {
             const url = await generarPDFTemporal();
-            
             if (url) {
                 setPdfUrl(url);
                 setShowEmailModal(true);
             }
-        } catch (error) {
-            console.error('Error:', error);
+        } catch {
             toast.error('Error al preparar el PDF');
         } finally {
             setGenerandoPDF(false);
         }
     };
 
-    /**
-     * Maneja la acción principal (Alta Empresa o Generar Contrato)
-     */
-    const handleAccionPrincipal = useCallback(async () => {
+    const verificarYabrirModal = useCallback(async () => {
         if (!leadId) {
             toast.error('No se pudo identificar el lead');
             return;
         }
 
         setVerificandoDatos(true);
-        setGenerandoPDF(true);
         
         try {
             const response = await fetch(`/comercial/leads/${leadId}/verificar-datos-contrato`);
@@ -251,52 +251,45 @@ export const PresupuestoActions: React.FC<Props> = ({
                 throw new Error(data.error || 'Error al verificar datos');
             }
             
+            setDatosExistentes({
+                empresa: data.empresa || undefined,
+                contacto: data.contacto || undefined
+            });
+            
+            const tieneAlgunDato = !!data.contacto || !!data.empresa;
+            
             if (data.todosCompletos) {
                 toast.success('Todos los datos están completos. Generando contrato...');
                 setTimeout(() => {
                     window.location.href = `/comercial/contratos/create-from-lead/${presupuestoId}`;
                 }, 500);
             } else {
-                setDatosExistentes({
-                    empresa: data.empresa || undefined,
-                    contacto: data.contacto || undefined
-                });
-                
-                setPasoInicialModal(data.pasoAMostrar || 2);
-                setModoCompletar(true);
+                setModoCompletar(tieneAlgunDato);
                 setModalAltaEmpresaOpen(true);
                 
-                toast.info('Complete los datos faltantes para generar el contrato');
+                if (tieneAlgunDato) {
+                    toast.info('Complete los datos faltantes para continuar');
+                } else {
+                    toast.info('Complete los datos de la nueva empresa');
+                }
             }
-        } catch (error) {
-            console.error('Error verificando datos:', error);
+        } catch {
             toast.error('Error al verificar datos del cliente');
         } finally {
             setVerificandoDatos(false);
-            setGenerandoPDF(false);
         }
     }, [leadId, presupuestoId, toast]);
 
-    /**
-     * Maneja el alta de empresa (para leads que no son clientes)
-     */
-    const handleAltaEmpresa = useCallback(() => {
-        setDatosExistentes(undefined);
-        setModoCompletar(false);
-        setPasoInicialModal(1);
-        setModalAltaEmpresaOpen(true);
-    }, []);
+    const handleAccionPrincipal = useCallback(async () => {
+        await verificarYabrirModal();
+    }, [verificarYabrirModal]);
 
-    /**
-     * Maneja el cierre del modal de alta empresa
-     */
-    const handleModalClose = useCallback((contratoGuardado?: boolean, irAContrato?: boolean) => {
+    const handleModalClose = useCallback((empresaGuardada?: boolean, irAContrato?: boolean) => {
         setModalAltaEmpresaOpen(false);
-        setPasoInicialModal(1);
         setModoCompletar(false);
         setDatosExistentes(undefined);
         
-        if (contratoGuardado) {
+        if (empresaGuardada) {
             toast.success('Datos guardados correctamente');
             router.reload({ only: ['presupuesto', 'lead'] });
         } else if (irAContrato && presupuestoId) {
@@ -304,9 +297,8 @@ export const PresupuestoActions: React.FC<Props> = ({
         }
     }, [presupuestoId, toast]);
 
-    const estaCargandoAccion = verificandoDatos && generandoPDF;
+    const estaCargandoAccion = verificandoDatos;
 
-    // Cerrar menús al hacer clic fuera
     React.useEffect(() => {
         const handleClickOutside = () => {
             setShowWhatsAppMenu(false);
@@ -319,7 +311,6 @@ export const PresupuestoActions: React.FC<Props> = ({
     return (
         <>
             <div className="flex flex-wrap items-center gap-2">
-                {/* Grupo 1: Editar y Generar Contrato/Alta Empresa */}
                 <div className="flex items-center gap-1">
                     <Link
                         href={`/comercial/presupuestos/${presupuestoId}/edit`}
@@ -331,12 +322,12 @@ export const PresupuestoActions: React.FC<Props> = ({
                     
                     {leadId && (
                         <button
-                            onClick={leadEsCliente ? handleAccionPrincipal : handleAltaEmpresa}
+                            onClick={handleAccionPrincipal}
                             disabled={estaCargandoAccion}
-                            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-r-lg transition-colors disabled:opacity-50 ${
+                            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-r-lg transition-colors disabled:opacity-50 -ml-px ${
                                 leadEsCliente
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700 -ml-px'
-                                    : 'bg-green-600 text-white hover:bg-green-700 -ml-px'
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                    : 'bg-green-600 text-white hover:bg-green-700'
                             }`}
                         >
                             {estaCargandoAccion ? (
@@ -359,7 +350,6 @@ export const PresupuestoActions: React.FC<Props> = ({
                     )}
                 </div>
 
-                {/* Grupo 2: WhatsApp (dropdown) */}
                 {tieneTelefono && mensajeWhatsApp && telefono && (
                     <div className="relative">
                         <button
@@ -401,7 +391,6 @@ export const PresupuestoActions: React.FC<Props> = ({
                     </div>
                 )}
 
-                {/* Grupo 3: Email y acciones PDF (dropdown) */}
                 <div className="relative">
                     <button
                         onClick={(e) => {
@@ -449,7 +438,6 @@ export const PresupuestoActions: React.FC<Props> = ({
                 </div>
             </div>
 
-            {/* Modales */}
             {pdfUrl && (
                 <EnviarPresupuestoEmailModal
                     isOpen={showEmailModal}
@@ -478,8 +466,6 @@ export const PresupuestoActions: React.FC<Props> = ({
                 origenes={origenes}
                 rubros={rubros}
                 provincias={provincias}
-                pasoInicial={pasoInicialModal}
-                esCliente={leadEsCliente}
                 modoCompletar={modoCompletar}
                 datosExistentes={datosExistentes}
             />

@@ -7,7 +7,7 @@ php artisan event:clear
 
 npm run build
 
-cd /home/rcassar1/public_html/intranet/ && /opt/php8-2/bin/php artisan optimize:clear >> /home/rcassar1/public_html/intranet/storage/logs/deploy.log 2>&1
 
-
-cd /home/rcassar1/public_html/intranet/ && /opt/php8-2/bin/php artisan optimize:clear >> /home/rcassar1/public_html/intranet/storage/logs/deploy.log 2>&1 && /opt/php8-2/bin/php artisan view:clear >> /home/rcassar1/public_html/intranet/storage/logs/deploy.log 2>&1 && /opt/php8-2/bin/php artisan cache:clear >> /home/rcassar1/public_html/intranet/storage/logs/deploy.log 2>&1 && /opt/php8-2/bin/php artisan config:clear >> /home/rcassar1/public_html/intranet/storage/logs/deploy.log 2>&1 && /opt/php8-2/bin/php artisan route:clear >> /home/rcassar1/public_html/intranet/storage/logs/deploy.log 2>&1 && echo "✅ Deploy completado $(date)" >> /home/rcassar1/public_html/intranet/storage/logs/deploy.log
+cd /home/rcassar1/public_html/intranet/ && /opt/php8-2/bin/php artisan optimize:clear 2>/dev/null
+cd /home/rcassar1/public_html/intranet/ && /opt/php8-2/bin/php artisan config:clear 2>/dev/null
+cd /home/rcassar1/public_html/intranet/ && /opt/php8-2/bin/php artisan config:cache 2>/dev/null

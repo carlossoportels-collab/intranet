@@ -8,22 +8,6 @@
         <meta http-equiv="Pragma" content="no-cache">
         <meta http-equiv="Expires" content="0">
 
-        {{-- 🔥 DEBUG: Mostrar timestamp de compilación --}}
-        <script>
-            console.log('🚀 App compiled at: {{ date('Y-m-d H:i:s') }}');
-            console.log('📦 Build version: {{ config('app.version', date('YmdHis')) }}');
-            console.log('🌍 Environment: {{ app()->environment() }}');
-            
-            // Verificar headers de caché
-            if (performance && performance.getEntriesByType) {
-                const navigation = performance.getEntriesByType('navigation')[0];
-                if (navigation) {
-                    console.log('🔄 Tipo de navegación:', navigation.type);
-                    console.log('⏱️  Tiempo de carga:', navigation.loadEventEnd - navigation.fetchStart, 'ms');
-                }
-            }
-        </script>
-
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
         <script>
             (function() {
