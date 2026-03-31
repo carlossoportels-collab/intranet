@@ -67,7 +67,7 @@
                                                        
                                                     <td align="left">
                                                         <h1 style="font-size: 22px; letter-spacing: 3px; color: #ffffff; text-transform: uppercase; font-weight: 700; margin: 0;">LOCALSAT · DELTA</h1>
-                                                        <p style="font-size: 10px; color: #ff5000; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.8px; margin: 0;">// SISTEMA DE RASTREO SATELITAL PREMIUM //</p>
+                                                        <p style="font-size: 10px; color: #ff5000; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.8px; margin: 0;">// SISTEMA DE RASTREO SATELITAL //</p>
                                                        
                                                    
                                               </table>
@@ -141,22 +141,22 @@
                                 <!-- Info box -->
                                 <div style="background: rgba(255,80,0,0.08); border-left: 4px solid #ff5000; padding: 18px 20px; border: 1px solid rgba(255,80,0,0.4); border-radius: 8px; color: #b8c7e7; font-size: 12px; margin-bottom: 28px;">
                                     <strong style="color: #ff5000; display: block; margin-bottom: 8px;">📱 CONFIGURACIÓN DE LA APP</strong>
-                                    <p style="margin: 0;">Al abrir la app, escribe como servidor: <strong style="color: #ff5000;">"LOCALSAT"</strong>  Luego ingresa con tu usuario y contraseña.</p>
+                                    <p style="margin: 0;">Al abrir la app "OPTIFY", escribe como servidor: <strong style="color: #ff5000;">"LOCALSAT"</strong> </br> Luego ingresa con tu usuario y contraseña.</p>
                                 </div>
                                 
-                               <!-- Commercial card -->
+                                <!-- Commercial card -->
                                 <table width="100%" border="0" cellpadding="20" cellspacing="0" bgcolor="rgba(255,80,0,0.08)" style="background-color: rgba(255,80,0,0.08); border: 1px solid rgba(255,80,0,0.4); border-left: 4px solid #ff5000; border-radius: 12px; margin-bottom: 28px;" class="commercial-table">
                                     <tr>
-                                        <td width="90" align="center" valign="middle" style="padding: 20px 0 20px 20px;" class="commercial-avatar-cell">
-                                            <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #ff5000; display: flex; align-items: center; justify-content: center; margin: 0 auto; box-shadow: 0 0 0 2px rgba(255,80,0,0.3);">
+                                        <td width="110" align="center" valign="middle" style="padding: 20px 0 20px 20px;" class="commercial-avatar-cell">
+                                            <div style="width: 90px; height: 90px; border-radius: 50%; overflow: hidden; background: #ff5000; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
                                                 @if(!empty($fotoComercial) && file_exists(public_path('images/comerciales/' . $fotoComercial)))
                                                     @if(isset($message))
-                                                        <img src="{{ $message->embed(public_path('images/comerciales/' . $fotoComercial)) }}" style="width: 100%; height: 100%; object-fit: cover; object-position: center center;">
+                                                        <img src="{{ $message->embed(public_path('images/comerciales/' . $fotoComercial)) }}" style="width: 90px; height: 90px; object-fit: cover; object-position: center center; margin: 0; padding: 0; display: block;">
                                                     @else
-                                                        <img src="{{ asset('images/comerciales/' . $fotoComercial) }}" style="width: 100%; height: 100%; object-fit: cover; object-position: center center;">
+                                                        <img src="{{ asset('images/comerciales/' . $fotoComercial) }}" style="width: 90px; height: 90px; object-fit: cover; object-position: center center; margin: 0; padding: 0; display: block;">
                                                     @endif
                                                 @else
-                                                    <span style="color: #05070e; font-size: 32px; font-weight: bold;">{{ $inicialesComercial }}</span>
+                                                    <span style="color: #05070e; font-size: 36px; font-weight: bold;">{{ $inicialesComercial }}</span>
                                                 @endif
                                             </div>
                                         </td>
@@ -184,7 +184,7 @@
                                                 <a href="mailto:soporte@localsat.com.ar" style="color: #ff5000; text-decoration: none;">SOPORTE@LOCALSAT.COM.AR</a> · 📞 0810 888 8205
                                             </p>
                                             <p style="font-size: 10px; color: #7a8aaa; margin: 0;">
-                                                <a href="https://www.localsat.com.ar" style="color: #ff5000; text-decoration: none;">WWW.LOCALSAT.COM.AR</a> · RASTREO SATELITAL AVANZADO
+                                                <a href="https://www.localsat.com.ar" style="color: #ff5000; text-decoration: none;">WWW.LOCALSAT.COM.AR</a> · RASTREO SATELITAL
                                             </p>
                                         </td>
                                     </tr>
