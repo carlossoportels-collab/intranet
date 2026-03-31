@@ -126,7 +126,7 @@ class CambioTitularidadController extends Controller
         $historialQuery = CambioTitularidad::with([
                 'empresaOrigen',
                 'empresaDestino',
-                'usuario'
+                'usuario.personal'
             ])
             ->orderBy('fecha_cambio', 'desc');
 
@@ -140,7 +140,7 @@ class CambioTitularidadController extends Controller
             });
         }
 
-        $historial = $historialQuery->paginate(10);
+        $historial = $historialQuery->paginate(5);
 
         $historialTransformado = [
             'current_page' => $historial->currentPage(),
@@ -152,10 +152,15 @@ class CambioTitularidadController extends Controller
                     ? json_decode($cambio->vehiculos, true) 
                     : ($cambio->vehiculos ?? []);
                     
+                $nombreUsuario = 'Sistema';
+                if ($cambio->usuario) {
+                    $nombreUsuario = $cambio->usuario->nombre_completo ?? 'Usuario';
+                }
+                    
                 return [
                     'id' => $cambio->id,
                     'fecha_cambio' => $cambio->fecha_cambio ? Carbon::parse($cambio->fecha_cambio)->format('d/m/Y H:i') : null,
-                    'usuario' => $cambio->usuario ? $cambio->usuario->name : 'Sistema',
+                    'usuario' => $nombreUsuario,
                     'cantidad_vehiculos' => is_array($vehiculos) ? count($vehiculos) : 0,
                     'contrato_id' => $cambio->contrato_id,
                     'empresa_origen' => $cambio->empresaOrigen ? [
@@ -408,7 +413,7 @@ public function store(Request $request)
         $cambio = CambioTitularidad::with([
             'empresaOrigen',
             'empresaDestino',
-            'usuario'
+            'usuario.personal'
         ])->findOrFail($id);
         
         if (!$usuario->ve_todas_cuentas) {
@@ -432,7 +437,7 @@ public function store(Request $request)
         return response()->json([
             'id' => $cambio->id,
             'fecha_cambio' => $cambio->fecha_cambio ? Carbon::parse($cambio->fecha_cambio)->format('d/m/Y H:i') : null,
-            'usuario' => $cambio->usuario ? $cambio->usuario->name : 'Sistema',
+            'usuario' => $cambio->usuario ? ($cambio->usuario->nombre_completo ?? 'Usuario') : 'Sistema',
             'cantidad_vehiculos' => is_array($vehiculos) ? count($vehiculos) : 0,
             'empresa_origen' => $cambio->empresaOrigen ? [
                 'id' => $cambio->empresaOrigen->id,

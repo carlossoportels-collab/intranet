@@ -41,6 +41,41 @@ class ContratoPDFService
     }
 
     /**
+     * Generar nombre del archivo con razón social de la empresa
+     */
+    private function generarNombreArchivo(Contrato $contrato): string
+    {
+        $numeroContrato = str_pad($contrato->id, 8, '0', STR_PAD_LEFT);
+        
+        // Obtener razón social de la empresa
+        $razonSocial = '';
+        if ($contrato->empresa && !empty($contrato->empresa->razon_social)) {
+            $razonSocial = $contrato->empresa->razon_social;
+        }
+        
+        // Si no hay razón social, usar el nombre del cliente como fallback
+        if (empty($razonSocial) && !empty($contrato->cliente_nombre_completo)) {
+            $razonSocial = $contrato->cliente_nombre_completo;
+        }
+        
+        // Si aún está vacío, usar solo el número
+        if (empty($razonSocial)) {
+            return "Contrato_{$numeroContrato}.pdf";
+        }
+        
+        // Limpiar caracteres especiales para el nombre del archivo
+        $nombreLimpio = preg_replace('/[^a-zA-Z0-9áéíóúñÑ\s-]/', '', $razonSocial);
+        $nombreLimpio = str_replace(' ', '_', $nombreLimpio);
+        
+        // Limitar longitud máxima (ej: 50 caracteres para no exceder)
+        if (strlen($nombreLimpio) > 50) {
+            $nombreLimpio = substr($nombreLimpio, 0, 47) . '...';
+        }
+        
+        return $nombreLimpio . '_Contrato_' . $numeroContrato . '.pdf';
+    }
+
+    /**
      * Generar y mostrar PDF (para vista en navegador)
      */
     public function generarPDFParaVista(Contrato $contrato)
@@ -73,11 +108,11 @@ class ContratoPDFService
                 'defaultFont' => 'sans-serif',
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true,
-                'isPhpEnabled' => true,  // 🔥 Esto habilita <script type="text/php">
+                'isPhpEnabled' => true,
                 'chroot' => public_path(),
             ]);
 
-            $filename = 'contrato-' . str_pad($contrato->id, 8, '0', STR_PAD_LEFT) . '.pdf';
+            $filename = $this->generarNombreArchivo($contrato);
             return $pdf->download($filename);
 
         } catch (\Exception $e) {
@@ -107,7 +142,7 @@ class ContratoPDFService
                 'defaultFont' => 'sans-serif',
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true,
-                'isPhpEnabled' => true,  // 🔥 Esto habilita <script type="text/php">
+                'isPhpEnabled' => true,
                 'chroot' => public_path(),
             ]);
 
@@ -122,11 +157,14 @@ class ContratoPDFService
             $this->limpiarArchivosTemporales();
 
             $numeroContrato = str_pad($contrato->id, 8, '0', STR_PAD_LEFT);
+            
+            // Generar el nombre amigable para el email
+            $nombreAmigable = $this->generarNombreArchivo($contrato);
 
             return [
                 'success' => true,
                 'url' => "/temp/contrato/{$contrato->id}?v=" . time(),
-                'filename' => "Contrato_{$numeroContrato}.pdf"
+                'filename' => $nombreAmigable
             ];
 
         } catch (\Exception $e) {

@@ -22,24 +22,7 @@ import React, { useState, useEffect } from 'react';
 
 import { notificacionesApi } from '@/utils/axiosHelper';
 import { useToast } from '@/contexts/ToastContext';
-
-interface Notificacion {
-  id: number;
-  usuario_id: number;
-  titulo: string;
-  mensaje: string;
-  tipo: string;
-  entidad_tipo: 'lead' | 'presupuesto' | 'contrato' | 'comentario' | 'seguimiento_perdida' | 'personal';
-  entidad_id: number | null;
-  leida: boolean;
-  fecha_notificacion: string;
-  prioridad: 'baja' | 'normal' | 'alta' | 'urgente';
-  created: string;
-  lead_nombre?: string;
-  lead_id?: number;
-  personal_id?: number;
-  personal_nombre?: string;
-}
+import { Notificacion } from '@/types/notificaciones';
 
 interface PageProps {
   auth: {
@@ -156,27 +139,29 @@ const NotificacionesDropdown: React.FC = () => {
     if (!notificacion.entidad_tipo || !notificacion.entidad_id) return;
     
     let ruta = '';
-    switch(notificacion.entidad_tipo) {
-      case 'lead':
-        ruta = `/comercial/leads/${notificacion.entidad_id}`;
-        break;
-      case 'presupuesto':
-        ruta = `/comercial/presupuestos/${notificacion.entidad_id}`;
-        break;
-      case 'contrato':
-        ruta = `/comercial/cuentas/${notificacion.entidad_id}`;
-        break;
-      case 'comentario':
-        ruta = `/comercial/leads/${notificacion.entidad_id}`;
-        break;
-      case 'seguimiento_perdida':
-        ruta = `/comercial/leads-perdidos/${notificacion.entidad_id}`;
-        break;
-      case 'personal':
-        ruta = `/rrhh/personal/cumpleanos`;
-        break;
-      default:
-        return;
+    
+    // Para comentarios, usar el lead_id que viene en la notificación
+    if (notificacion.entidad_tipo === 'comentario' && notificacion.lead_id) {
+      ruta = `/comercial/leads/${notificacion.lead_id}`;
+    } else if (notificacion.entidad_tipo === 'seguimiento_perdida' && notificacion.lead_id) {
+      ruta = `/comercial/leads/${notificacion.lead_id}`;
+    } else {
+      switch(notificacion.entidad_tipo) {
+        case 'lead':
+          ruta = `/comercial/leads/${notificacion.entidad_id}`;
+          break;
+        case 'presupuesto':
+          ruta = `/comercial/presupuestos/${notificacion.entidad_id}`;
+          break;
+        case 'contrato':
+          ruta = `/comercial/cuentas/${notificacion.entidad_id}`;
+          break;
+        case 'personal':
+          ruta = `/rrhh/personal/cumpleanos`;
+          break;
+        default:
+          return;
+      }
     }
     
     if (!notificacion.leida) {
@@ -272,7 +257,7 @@ const NotificacionesDropdown: React.FC = () => {
         };
       case 'comentario_recordatorio':
         return { 
-          icon: <CheckCircle className="h-4 w-4 text-indigo-600" />,
+          icon: <MessageCircle className="h-4 w-4 text-indigo-600" />,
           bg: 'bg-indigo-50'
         };
       case 'lead_posible_recontacto':
@@ -401,7 +386,6 @@ const NotificacionesDropdown: React.FC = () => {
       {mostrarDropdown && (
         <>
           <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl overflow-hidden z-50 border border-gray-200 animate-in slide-in-from-top-2 fade-in duration-200">
-            {/* Header compacto */}
             <div className="p-3 border-b bg-gradient-to-r from-orange-400 to-orange-500 text-black">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -438,7 +422,6 @@ const NotificacionesDropdown: React.FC = () => {
               </div>
             </div>
             
-            {/* Lista de notificaciones - sin scroll horizontal */}
             <div className="max-h-96 overflow-y-auto overflow-x-hidden">
               {notificaciones.length === 0 ? (
                 <div className="p-6 text-center">
@@ -468,7 +451,6 @@ const NotificacionesDropdown: React.FC = () => {
                     >
                       <div className="p-3">
                         <div className="flex items-start gap-2">
-                          {/* Icono más pequeño */}
                           <div className={`${icono.bg} p-1.5 rounded-lg flex-shrink-0`}>
                             {icono.icon}
                           </div>
@@ -530,7 +512,6 @@ const NotificacionesDropdown: React.FC = () => {
               )}
             </div>
             
-            {/* Footer compacto */}
             {(notificaciones.length > 0 || sinLeer > 0) && (
               <div className="p-2 border-t bg-gray-50 grid grid-cols-2 gap-1">
                 <a 
@@ -562,7 +543,6 @@ const NotificacionesDropdown: React.FC = () => {
             )}
           </div>
           
-          {/* Backdrop */}
           <div 
             className="fixed inset-0 z-40"
             onClick={() => setMostrarDropdown(false)}

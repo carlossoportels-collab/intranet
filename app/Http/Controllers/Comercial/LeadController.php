@@ -165,6 +165,8 @@ class LeadController extends Controller
     /**
      * Verificar qué datos faltan para generar un contrato
      */
+// app/Http/Controllers/Comercial/LeadController.php
+
 public function verificarDatosContrato($id)
 {
     try {
@@ -175,10 +177,8 @@ public function verificarDatosContrato($id)
             'estadoLead'
         ])->findOrFail($id);
         
-        // 🔥 VERIFICAR ACCESO AL LEAD
         $this->authorizeLeadAccess($lead, config('permisos.VER_PROSPECTOS'));
 
-        // Buscar el contacto a través de empresa_contactos
         $contacto = EmpresaContacto::with([
             'empresa.localidadFiscal.provincia',
             'empresa.rubro',
@@ -192,18 +192,34 @@ public function verificarDatosContrato($id)
         ->where('es_activo', true)
         ->first();
 
-        $datosFaltantes = [];
         $pasoAMostrar = 1;
         $empresaData = null;
         $contactoData = null;
+        
+        // 🔥 DATOS DEL LEAD ACTUALIZADOS
+        $leadData = [
+            'id' => $lead->id,
+            'nombre_completo' => $lead->nombre_completo,
+            'genero' => $lead->genero,
+            'telefono' => $lead->telefono,
+            'email' => $lead->email,
+            'localidad_id' => $lead->localidad_id,
+            'localidad_nombre' => $lead->localidad?->nombre,
+            'provincia_id' => $lead->localidad?->provincia_id,
+            'provincia_nombre' => $lead->localidad?->provincia?->nombre,
+            'rubro_id' => $lead->rubro_id,
+            'origen_id' => $lead->origen_id,
+            'prefijo_id' => $lead->prefijo_id,
+        ];
 
-        // Si no hay contacto, significa que hay que crear la empresa desde cero
+        // Si no hay contacto, paso 1
         if (!$contacto) {
             return response()->json([
                 'todosCompletos' => false,
                 'pasoAMostrar' => 1,
                 'datosFaltantes' => ['empresa', 'contacto'],
                 'message' => 'Debe crear la empresa para este lead',
+                'lead' => $leadData,  // 🔥 DEVOLVER DATOS DEL LEAD
                 'empresa' => null,
                 'contacto' => null
             ]);
@@ -211,7 +227,7 @@ public function verificarDatosContrato($id)
 
         $empresa = $contacto->empresa;
 
-        // PREPARAR DATOS DE EMPRESA EXISTENTES CON ID
+        // Preparar datos de empresa existentes
         if ($empresa) {
             $empresaData = [
                 'id' => $empresa->id,
@@ -227,10 +243,13 @@ public function verificarDatosContrato($id)
                 'cat_fiscal_id' => $empresa->cat_fiscal_id,
                 'plataforma_id' => $empresa->plataforma_id,
                 'nombre_flota' => $empresa->nombre_flota,
+                'localidad_nombre' => $empresa->localidadFiscal?->nombre,
+                'provincia_id' => $empresa->localidadFiscal?->provincia_id,
+                'provincia_nombre' => $empresa->localidadFiscal?->provincia?->nombre,
             ];
         }
 
-        // PREPARAR DATOS DE CONTACTO EXISTENTES CON ID
+        // Preparar datos de contacto existentes
         if ($contacto) {
             $contactoData = [
                 'id' => $contacto->id,
@@ -244,77 +263,82 @@ public function verificarDatosContrato($id)
             ];
         }
 
-        // Verificar datos del lead
+        // Verificar datos del lead (usando los datos reales)
         $camposLead = [
-            'nombre_completo' => 'Nombre completo',
-            'genero' => 'Género',
-            'telefono' => 'Teléfono',
-            'email' => 'Email',
-            'localidad_id' => 'Localidad',
-            'rubro_id' => 'Rubro',
-            'origen_id' => 'Origen'
+            'nombre_completo' => $lead->nombre_completo,
+            'telefono' => $lead->telefono,
+            'email' => $lead->email,
+            'localidad_id' => $lead->localidad_id,
+            'rubro_id' => $lead->rubro_id,
+            'origen_id' => $lead->origen_id,
         ];
 
         $leadCompleto = true;
-        foreach ($camposLead as $campo => $label) {
-            if (empty($lead->$campo)) {
+        foreach ($camposLead as $campo => $valor) {
+            if (empty($valor)) {
                 $leadCompleto = false;
-                $datosFaltantes[] = "lead.{$campo}";
+                break;
             }
         }
 
+        // Si el lead está incompleto, paso 1
         if (!$leadCompleto) {
             $pasoAMostrar = 1;
         }
 
         // Verificar datos del contacto
         $camposContacto = [
-            'tipo_responsabilidad_id' => 'Tipo de responsabilidad',
-            'tipo_documento_id' => 'Tipo de documento',
-            'nro_documento' => 'Número de documento',
-            'nacionalidad_id' => 'Nacionalidad',
-            'fecha_nacimiento' => 'Fecha de nacimiento',
-            'direccion_personal' => 'Dirección personal',
-            'codigo_postal_personal' => 'Código postal'
+            'tipo_responsabilidad_id' => $contacto->tipo_responsabilidad_id,
+            'tipo_documento_id' => $contacto->tipo_documento_id,
+            'nro_documento' => $contacto->nro_documento,
+            'nacionalidad_id' => $contacto->nacionalidad_id,
+            'fecha_nacimiento' => $contacto->fecha_nacimiento,
+            'direccion_personal' => $contacto->direccion_personal,
+            'codigo_postal_personal' => $contacto->codigo_postal_personal,
         ];
 
         $contactoCompleto = true;
-        foreach ($camposContacto as $campo => $label) {
-            if (empty($contacto->$campo)) {
+        foreach ($camposContacto as $campo => $valor) {
+            if (empty($valor)) {
                 $contactoCompleto = false;
-                $datosFaltantes[] = "contacto.{$campo}";
+                break;
             }
         }
 
-        if (!$contactoCompleto && $pasoAMostrar === 1) {
+        // Si el lead está completo pero el contacto incompleto, paso 2
+        if ($leadCompleto && !$contactoCompleto) {
             $pasoAMostrar = 2;
         }
 
         // Verificar datos de la empresa
-        $camposEmpresa = [
-            'nombre_fantasia' => 'Nombre de fantasía',
-            'razon_social' => 'Razón social',
-            'cuit' => 'CUIT',
-            'direccion_fiscal' => 'Dirección fiscal',
-            'codigo_postal_fiscal' => 'Código postal fiscal',
-            'localidad_fiscal_id' => 'Localidad fiscal',
-            'telefono_fiscal' => 'Teléfono fiscal',
-            'email_fiscal' => 'Email fiscal',
-            'rubro_id' => 'Rubro',
-            'cat_fiscal_id' => 'Categoría fiscal',
-            'plataforma_id' => 'Plataforma',
-            'nombre_flota' => 'Nombre de flota'
-        ];
-
-        $empresaCompleta = true;
-        foreach ($camposEmpresa as $campo => $label) {
-            if (empty($empresa->$campo)) {
-                $empresaCompleta = false;
-                $datosFaltantes[] = "empresa.{$campo}";
+        $empresaCompleta = false;
+        if ($empresa) {
+            $camposEmpresa = [
+                'nombre_fantasia' => $empresa->nombre_fantasia,
+                'razon_social' => $empresa->razon_social,
+                'cuit' => $empresa->cuit,
+                'direccion_fiscal' => $empresa->direccion_fiscal,
+                'codigo_postal_fiscal' => $empresa->codigo_postal_fiscal,
+                'localidad_fiscal_id' => $empresa->localidad_fiscal_id,
+                'telefono_fiscal' => $empresa->telefono_fiscal,
+                'email_fiscal' => $empresa->email_fiscal,
+                'rubro_id' => $empresa->rubro_id,
+                'cat_fiscal_id' => $empresa->cat_fiscal_id,
+                'plataforma_id' => $empresa->plataforma_id,
+                'nombre_flota' => $empresa->nombre_flota,
+            ];
+            
+            $empresaCompleta = true;
+            foreach ($camposEmpresa as $campo => $valor) {
+                if (empty($valor)) {
+                    $empresaCompleta = false;
+                    break;
+                }
             }
         }
 
-        if (!$empresaCompleta && $contactoCompleto && $pasoAMostrar <= 2) {
+        // Si lead y contacto están completos pero empresa incompleta, paso 3
+        if ($leadCompleto && $contactoCompleto && !$empresaCompleta) {
             $pasoAMostrar = 3;
         }
 
@@ -322,15 +346,19 @@ public function verificarDatosContrato($id)
         if ($empresaCompleta && $contactoCompleto && $leadCompleto) {
             return response()->json([
                 'todosCompletos' => true,
-                'message' => 'Todos los datos están completos'
+                'message' => 'Todos los datos están completos',
+                'lead' => $leadData,  // 🔥 DEVOLVER DATOS DEL LEAD
+                'empresa' => $empresaData,
+                'contacto' => $contactoData
             ]);
         }
 
         return response()->json([
             'todosCompletos' => false,
             'pasoAMostrar' => $pasoAMostrar,
-            'datosFaltantes' => $datosFaltantes,
+            'datosFaltantes' => $datosFaltantes ?? [],
             'message' => 'Faltan completar algunos datos',
+            'lead' => $leadData,  // 🔥 DEVOLVER DATOS DEL LEAD
             'empresa' => $empresaData,
             'contacto' => $contactoData
         ]);

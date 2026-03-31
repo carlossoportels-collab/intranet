@@ -1,7 +1,7 @@
 // resources/js/components/empresa/pasos/Paso3DatosEmpresa.tsx
 
-import { Building, Hash, MapPin, Phone, Mail, Briefcase, Tag, Truck, Search, Loader } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import { Building, Hash, MapPin, Phone, Mail, Briefcase, Tag, Truck, Search, Loader,Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import { DatosEmpresaForm, CategoriaFiscal, Plataforma } from '@/types/empresa';
 import { Provincia, Localidad } from '@/types/leads';
@@ -29,22 +29,62 @@ export default function Paso3DatosEmpresa({
     localidadInicial = '',
     provinciaInicial = ''
 }: Props) {
-    const [searchLocalidad, setSearchLocalidad] = useState(localidadInicial);
+    const [searchLocalidad, setSearchLocalidad] = useState('');
     const [showLocalidadesDropdown, setShowLocalidadesDropdown] = useState(false);
     const [searching, setSearching] = useState(false);
     const [localidadesResult, setLocalidadesResult] = useState<Localidad[]>([]);
-    const [provinciaId, setProvinciaId] = useState<string>(provinciaInicial ? String(provinciaInicial) : '');
+    const [provinciaId, setProvinciaId] = useState<string>('');
     const [tipoDocumento, setTipoDocumento] = useState<'cuit' | 'dni'>('cuit');
+    const [isInitialized, setIsInitialized] = useState(false);
+    
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
+    // Helper para obtener errores específicos
+    const getError = (field: string): string | undefined => {
+        return errores[`empresa.${field}`];
+    };
+
+    // 🔥 INICIALIZAR datos cuando cambian las props
     useEffect(() => {
-        if (provinciaInicial) {
+        if (provinciaInicial && !isInitialized) {
             setProvinciaId(String(provinciaInicial));
         }
         
-        if (localidadInicial) {
+        if (localidadInicial && !isInitialized) {
             setSearchLocalidad(localidadInicial);
+            setIsInitialized(true);
         }
-    }, [localidadInicial, provinciaInicial]);
+        
+        // Si tenemos localidad_id pero no nombre, intentar obtenerlo
+        if (data.localidad_fiscal_id && !localidadInicial && !isInitialized) {
+            // Podrías hacer una llamada para obtener el nombre de la localidad
+            // Por ahora, dejamos que el usuario vea que está seleccionada
+            setIsInitialized(true);
+        }
+    }, [provinciaInicial, localidadInicial, data.localidad_fiscal_id, isInitialized]);
+
+    // Cerrar dropdown al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setShowLocalidadesDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Detectar tipo de documento por el formato del CUIT/DNI existente
+    useEffect(() => {
+        if (data.cuit && !isInitialized) {
+            const soloNumeros = data.cuit.replace(/\D/g, '');
+            if (soloNumeros.length <= 8) {
+                setTipoDocumento('dni');
+            } else {
+                setTipoDocumento('cuit');
+            }
+        }
+    }, [data.cuit, isInitialized]);
 
     const handleSearchLocalidad = async (value: string) => {
         setSearchLocalidad(value);
@@ -152,13 +192,13 @@ export default function Paso3DatosEmpresa({
                         onChange={(e) => onChange('nombre_fantasia', e.target.value)}
                         maxLength={200}
                         className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                            errores['empresa.nombre_fantasia'] ? 'border-red-300' : 'border-gray-300'
+                            getError('nombre_fantasia') ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Ej: Empresa SRL"
                         required
                     />
-                    {errores['empresa.nombre_fantasia'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.nombre_fantasia']}</p>
+                    {getError('nombre_fantasia') && (
+                        <p className="text-xs text-red-600">{getError('nombre_fantasia')}</p>
                     )}
                 </div>
 
@@ -172,13 +212,13 @@ export default function Paso3DatosEmpresa({
                         onChange={(e) => onChange('razon_social', e.target.value)}
                         maxLength={200}
                         className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                            errores['empresa.razon_social'] ? 'border-red-300' : 'border-gray-300'
+                            getError('razon_social') ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Ej: Empresa SRL"
                         required
                     />
-                    {errores['empresa.razon_social'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.razon_social']}</p>
+                    {getError('razon_social') && (
+                        <p className="text-xs text-red-600">{getError('razon_social')}</p>
                     )}
                 </div>
             </div>
@@ -233,14 +273,14 @@ export default function Paso3DatosEmpresa({
                             onChange={(e) => handleDocumentoChange(e.target.value)}
                             maxLength={tipoDocumento === 'cuit' ? 13 : 11}
                             className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                                errores['empresa.cuit'] ? 'border-red-300' : 'border-gray-300'
+                                getError('cuit') ? 'border-red-500' : 'border-gray-300'
                             }`}
                             placeholder={tipoDocumento === 'cuit' ? 'Ej: 30-12345678-9' : 'Ej: 20.123.456'}
                             required
                         />
                     </div>
-                    {errores['empresa.cuit'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.cuit']}</p>
+                    {getError('cuit') && (
+                        <p className="text-xs text-red-600">{getError('cuit')}</p>
                     )}
                 </div>
             </div>
@@ -264,14 +304,14 @@ export default function Paso3DatosEmpresa({
                             }}
                             maxLength={30}
                             className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                                errores['empresa.telefono_fiscal'] ? 'border-red-300' : 'border-gray-300'
+                                getError('telefono_fiscal') ? 'border-red-500' : 'border-gray-300'
                             }`}
                             placeholder="Ej: 01112345678"
                             required
                         />
                     </div>
-                    {errores['empresa.telefono_fiscal'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.telefono_fiscal']}</p>
+                    {getError('telefono_fiscal') && (
+                        <p className="text-xs text-red-600">{getError('telefono_fiscal')}</p>
                     )}
                 </div>
 
@@ -287,14 +327,14 @@ export default function Paso3DatosEmpresa({
                             onChange={(e) => onChange('email_fiscal', e.target.value)}
                             maxLength={150}
                             className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                                errores['empresa.email_fiscal'] ? 'border-red-300' : 'border-gray-300'
+                                getError('email_fiscal') ? 'border-red-500' : 'border-gray-300'
                             }`}
                             placeholder="Ej: contacto@empresa.com"
                             required
                         />
                     </div>
-                    {errores['empresa.email_fiscal'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.email_fiscal']}</p>
+                    {getError('email_fiscal') && (
+                        <p className="text-xs text-red-600">{getError('email_fiscal')}</p>
                     )}
                 </div>
             </div>
@@ -303,7 +343,7 @@ export default function Paso3DatosEmpresa({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
-                        Dirección <span className="text-red-500">*</span>
+                        Dirección Fiscal <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                         <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -313,14 +353,14 @@ export default function Paso3DatosEmpresa({
                             onChange={(e) => onChange('direccion_fiscal', e.target.value)}
                             maxLength={255}
                             className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                                errores['empresa.direccion_fiscal'] ? 'border-red-300' : 'border-gray-300'
+                                getError('direccion_fiscal') ? 'border-red-500' : 'border-gray-300'
                             }`}
                             placeholder="Ej: Av. Corrientes 1234"
                             required
                         />
                     </div>
-                    {errores['empresa.direccion_fiscal'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.direccion_fiscal']}</p>
+                    {getError('direccion_fiscal') && (
+                        <p className="text-xs text-red-600">{getError('direccion_fiscal')}</p>
                     )}
                 </div>
 
@@ -339,13 +379,13 @@ export default function Paso3DatosEmpresa({
                         }}
                         maxLength={10}
                         className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                            errores['empresa.codigo_postal_fiscal'] ? 'border-red-300' : 'border-gray-300'
+                            getError('codigo_postal_fiscal') ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Ej: 1000"
                         required
                     />
-                    {errores['empresa.codigo_postal_fiscal'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.codigo_postal_fiscal']}</p>
+                    {getError('codigo_postal_fiscal') && (
+                        <p className="text-xs text-red-600">{getError('codigo_postal_fiscal')}</p>
                     )}
                 </div>
             </div>
@@ -360,7 +400,7 @@ export default function Paso3DatosEmpresa({
                         value={provinciaId}
                         onChange={(e) => handleProvinciaChange(e.target.value)}
                         className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                            errores['empresa.provincia_id'] ? 'border-red-300' : 'border-gray-300'
+                            getError('provincia_id') ? 'border-red-500' : 'border-gray-300'
                         }`}
                     >
                         <option value="">Seleccionar provincia</option>
@@ -370,12 +410,12 @@ export default function Paso3DatosEmpresa({
                             </option>
                         ))}
                     </select>
-                    {errores['empresa.provincia_id'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.provincia_id']}</p>
+                    {getError('provincia_id') && (
+                        <p className="text-xs text-red-600">{getError('provincia_id')}</p>
                     )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 relative" ref={dropdownRef}>
                     <label className="block text-sm font-medium text-gray-700">
                         Localidad <span className="text-red-500">*</span>
                     </label>
@@ -386,7 +426,7 @@ export default function Paso3DatosEmpresa({
                             value={searchLocalidad}
                             onChange={(e) => handleSearchLocalidad(e.target.value)}
                             className={`w-full pl-10 pr-10 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                                errores['empresa.localidad_fiscal_id'] ? 'border-red-300' : 'border-gray-300'
+                                getError('localidad_fiscal_id') ? 'border-red-500' : 'border-gray-300'
                             }`}
                             placeholder="Escriba al menos 3 letras para buscar..."
                             required
@@ -411,8 +451,15 @@ export default function Paso3DatosEmpresa({
                             </div>
                         )}
                     </div>
-                    {errores['empresa.localidad_fiscal_id'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.localidad_fiscal_id']}</p>
+                    {getError('localidad_fiscal_id') && (
+                        <p className="text-xs text-red-600">{getError('localidad_fiscal_id')}</p>
+                    )}
+                    {/* Indicador visual de que hay una localidad seleccionada */}
+                    {data.localidad_fiscal_id && searchLocalidad && !showLocalidadesDropdown && (
+                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                            <Check className="h-3 w-3" />
+                            Localidad seleccionada: {searchLocalidad}
+                        </p>
                     )}
                 </div>
             </div>
@@ -429,7 +476,7 @@ export default function Paso3DatosEmpresa({
                             value={data.rubro_id}
                             onChange={(e) => onChange('rubro_id', e.target.value ? Number(e.target.value) : '')}
                             className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                                errores['empresa.rubro_id'] ? 'border-red-300' : 'border-gray-300'
+                                getError('rubro_id') ? 'border-red-500' : 'border-gray-300'
                             }`}
                         >
                             <option value="">Seleccionar rubro</option>
@@ -440,8 +487,8 @@ export default function Paso3DatosEmpresa({
                             ))}
                         </select>
                     </div>
-                    {errores['empresa.rubro_id'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.rubro_id']}</p>
+                    {getError('rubro_id') && (
+                        <p className="text-xs text-red-600">{getError('rubro_id')}</p>
                     )}
                 </div>
 
@@ -455,7 +502,7 @@ export default function Paso3DatosEmpresa({
                             value={data.cat_fiscal_id}
                             onChange={(e) => onChange('cat_fiscal_id', e.target.value ? Number(e.target.value) : '')}
                             className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                                errores['empresa.cat_fiscal_id'] ? 'border-red-300' : 'border-gray-300'
+                                getError('cat_fiscal_id') ? 'border-red-500' : 'border-gray-300'
                             }`}
                         >
                             <option value="">Seleccionar categoría</option>
@@ -466,8 +513,8 @@ export default function Paso3DatosEmpresa({
                             ))}
                         </select>
                     </div>
-                    {errores['empresa.cat_fiscal_id'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.cat_fiscal_id']}</p>
+                    {getError('cat_fiscal_id') && (
+                        <p className="text-xs text-red-600">{getError('cat_fiscal_id')}</p>
                     )}
                 </div>
 
@@ -479,7 +526,7 @@ export default function Paso3DatosEmpresa({
                         value={data.plataforma_id}
                         onChange={(e) => onChange('plataforma_id', e.target.value ? Number(e.target.value) : '')}
                         className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                            errores['empresa.plataforma_id'] ? 'border-red-300' : 'border-gray-300'
+                            getError('plataforma_id') ? 'border-red-500' : 'border-gray-300'
                         }`}
                     >
                         <option value="">Seleccionar plataforma</option>
@@ -489,8 +536,8 @@ export default function Paso3DatosEmpresa({
                             </option>
                         ))}
                     </select>
-                    {errores['empresa.plataforma_id'] && (
-                        <p className="text-xs text-red-600">{errores['empresa.plataforma_id']}</p>
+                    {getError('plataforma_id') && (
+                        <p className="text-xs text-red-600">{getError('plataforma_id')}</p>
                     )}
                 </div>
             </div>
@@ -508,14 +555,14 @@ export default function Paso3DatosEmpresa({
                         onChange={(e) => onChange('nombre_flota', e.target.value)}
                         maxLength={200}
                         className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 ${
-                            errores['empresa.nombre_flota'] ? 'border-red-300' : 'border-gray-300'
+                            getError('nombre_flota') ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Ej: Flota Principal"
                         required
                     />
                 </div>
-                {errores['empresa.nombre_flota'] && (
-                    <p className="text-xs text-red-600">{errores['empresa.nombre_flota']}</p>
+                {getError('nombre_flota') && (
+                    <p className="text-xs text-red-600">{getError('nombre_flota')}</p>
                 )}
             </div>
         </div>

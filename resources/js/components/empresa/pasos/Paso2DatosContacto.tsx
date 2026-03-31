@@ -21,6 +21,9 @@ export default function Paso2DatosContacto({
     onChange,
     errores
 }: Props) {
+    const getError = (field: string): string | undefined => {
+        return errores[`contacto.${field}`];
+    };
     return (
         <div className="space-y-6">
             <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mb-6">
@@ -35,7 +38,7 @@ export default function Paso2DatosContacto({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Tipo de Responsabilidad */}
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
@@ -45,7 +48,7 @@ export default function Paso2DatosContacto({
                         value={data.tipo_responsabilidad_id}
                         onChange={(e) => onChange('tipo_responsabilidad_id', e.target.value ? Number(e.target.value) : '')}
                         className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 ${
-                            errores['contacto.tipo_responsabilidad_id'] ? 'border-red-300' : 'border-gray-300'
+                            getError('tipo_responsabilidad_id') ? 'border-red-500' : 'border-gray-300'
                         }`}
                     >
                         <option value="">Seleccionar tipo</option>
@@ -55,8 +58,8 @@ export default function Paso2DatosContacto({
                             </option>
                         ))}
                     </select>
-                    {errores['contacto.tipo_responsabilidad_id'] && (
-                        <p className="text-xs text-red-600">{errores['contacto.tipo_responsabilidad_id']}</p>
+                    {getError('tipo_responsabilidad_id') && (
+                        <p className="text-xs text-red-600">{getError('tipo_responsabilidad_id')}</p>
                     )}
                 </div>
 
@@ -69,7 +72,7 @@ export default function Paso2DatosContacto({
                         value={data.tipo_documento_id}
                         onChange={(e) => onChange('tipo_documento_id', e.target.value ? Number(e.target.value) : '')}
                         className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 ${
-                            errores['contacto.tipo_documento_id'] ? 'border-red-300' : 'border-gray-300'
+                            getError('tipo_documento_id') ? 'border-red-500' : 'border-gray-300'
                         }`}
                     >
                         <option value="">Seleccionar tipo</option>
@@ -79,8 +82,8 @@ export default function Paso2DatosContacto({
                             </option>
                         ))}
                     </select>
-                    {errores['contacto.tipo_documento_id'] && (
-                        <p className="text-xs text-red-600">{errores['contacto.tipo_documento_id']}</p>
+                    {getError('tipo_documento_id') && (
+                        <p className="text-xs text-red-600">{getError('tipo_documento_id')}</p>
                     )}
                 </div>
 
@@ -102,14 +105,14 @@ export default function Paso2DatosContacto({
                             }}
                             maxLength={20}
                             className={`w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 ${
-                                errores['contacto.nro_documento'] ? 'border-red-300' : 'border-gray-300'
+                                getError('nro_documento') ? 'border-red-500' : 'border-gray-300'
                             }`}
                             placeholder="Ej: 12345678"
                             required
                         />
                     </div>
-                    {errores['contacto.nro_documento'] && (
-                        <p className="text-xs text-red-600">{errores['contacto.nro_documento']}</p>
+                    {getError('nro_documento') && (
+                        <p className="text-xs text-red-600">{getError('nro_documento')}</p>
                     )}
                 </div>
 

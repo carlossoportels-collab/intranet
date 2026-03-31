@@ -176,6 +176,8 @@ Route::prefix('temp')->name('temp.')->group(function () {
     Route::get('/welcome', [LoginController::class, 'welcome'])->name('welcome');
     Route::get('/', [DashboardController::class, 'index'])->name('home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    
     
     // ========== GESTIÓN COMERCIAL ==========
     Route::prefix('comercial')->name('comercial.')->group(function () {
@@ -251,7 +253,7 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::get('/certificados/vehiculo/{vehiculoId}', [CertificadosFlotaController::class, 'generarCertificadoVehiculo'])->name('certificados.vehiculo');
             Route::get('/cambio-titularidad', [CambioTitularidadController::class, 'index'])->name('cambio-titularidad')->middleware('permiso:' . config('permisos.GESTIONAR_CAMBIO_TITULARIDAD'));
             Route::get('/cambio-razon-social', [CambioRazonSocialController::class, 'index'])->name('cambio-razon-social')->middleware('permiso:' . config('permisos.GESTIONAR_CAMBIO_RAZON_SOCIAL'));
-            Route::get('/transferencias', [TransferenciasController::class, 'index'])->name('transferencias');
+            Route::get('/transferencias', [TransferenciasController::class, 'index'])->name('transferencias')->middleware('permiso:' . config('permisos.GESTIONAR_TRANSFERENCIAS'));
             
 
             // API endpoints para cuentas
@@ -512,5 +514,10 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
         Route::post('/email/enviar-contrato', [App\Http\Controllers\Api\EmailController::class, 'enviarContrato'])->name('email.enviar-contrato');
        Route::post('/email/vista-previa-bienvenida', [App\Http\Controllers\Api\EmailController::class, 'vistaPreviaBienvenida'])->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
        Route::get('/transferencias/buscar', [TransferenciasController::class, 'buscar'])->name('transferencias.buscar');
+
+
+
+
+       
 });
 

@@ -20,7 +20,8 @@ import {
   Square,
   CheckSquare,
   Maximize2,
-  Minimize2
+  Minimize2,
+  MessageCircle
 } from 'lucide-react';
 import React, { useState } from 'react';
 
@@ -29,19 +30,7 @@ import Pagination from '@/components/ui/Pagination';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { notificacionesApi } from '@/utils/axiosHelper';
 import { useToast } from '@/contexts/ToastContext';
-
-interface Notificacion {
-  id: number;
-  titulo: string;
-  mensaje: string;
-  tipo: string;
-  entidad_tipo: 'lead' | 'presupuesto' | 'contrato' | 'comentario' | 'seguimiento_perdida' | 'personal';
-  entidad_id: number | null;
-  leida: boolean;
-  fecha_notificacion: string;
-  prioridad: 'baja' | 'normal' | 'alta' | 'urgente';
-  created: string;
-}
+import { Notificacion } from '@/types/notificaciones';
 
 interface PageProps {
   auth: {
@@ -76,11 +65,9 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
   const [cargando, setCargando] = useState(false);
   const [mensajeExpandido, setMensajeExpandido] = useState<number | null>(null);
   
-  // Estados para selección múltiple
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   
-  // Estados para confirmación
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{
     type: 'delete' | 'deleteSelected';
@@ -95,7 +82,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     prioridad: filtros.prioridad || ''
   };
 
-  // Filtrar notificaciones por búsqueda
   const notificacionesFiltradas = busqueda 
     ? notificaciones.data.filter(n => 
         n.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -103,7 +89,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
       )
     : notificaciones.data;
 
-  // Actualizar selectAll cuando cambian los datos
   React.useEffect(() => {
     if (selectAll) {
       setSelectedIds(notificacionesFiltradas.map(n => n.id));
@@ -112,7 +97,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     }
   }, [notificacionesFiltradas, selectAll]);
 
-  // Aplicar filtros
   const aplicarFiltros = () => {
     router.get('/notificaciones', filtrosLocales, {
       preserveState: true,
@@ -124,7 +108,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     setSelectAll(false);
   };
 
-  // Limpiar filtros
   const limpiarFiltros = () => {
     router.get('/notificaciones', {}, {
       preserveState: true,
@@ -136,7 +119,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     setSelectAll(false);
   };
 
-  // Mostrar confirmación para eliminar una notificación
   const mostrarConfirmacionEliminar = (notificacion: Notificacion) => {
     setConfirmAction({
       type: 'delete',
@@ -145,7 +127,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     setConfirmDialogOpen(true);
   };
 
-  // Mostrar confirmación para eliminar seleccionadas
   const mostrarConfirmacionEliminarSeleccionadas = () => {
     if (selectedIds.length === 0) return;
     setConfirmAction({
@@ -154,7 +135,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     setConfirmDialogOpen(true);
   };
 
-  // Ejecutar eliminación
   const ejecutarEliminacion = async () => {
     if (!confirmAction) return;
     
@@ -162,33 +142,22 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     
     try {
       if (confirmAction.type === 'delete' && confirmAction.notificacion) {
-        // Eliminar una notificación
         const response = await notificacionesApi.eliminar(confirmAction.notificacion.id);
         
         if (response.data.success) {
           toast.success('Notificación eliminada correctamente');
-          
-          // Actualizar dropdown
           window.dispatchEvent(new Event('notificaciones-actualizadas'));
-          
-          // Recargar
-          router.reload({ 
-            only: ['notificaciones', 'totalNoLeidas'],
-          });
+          router.reload({ only: ['notificaciones', 'totalNoLeidas'] });
         }
       } else if (confirmAction.type === 'deleteSelected') {
-        // Eliminar múltiples notificaciones
         let successCount = 0;
         let errorCount = 0;
         
         for (const id of selectedIds) {
           try {
             const response = await notificacionesApi.eliminar(id);
-            if (response.data.success) {
-              successCount++;
-            } else {
-              errorCount++;
-            }
+            if (response.data.success) successCount++;
+            else errorCount++;
           } catch {
             errorCount++;
           }
@@ -196,14 +165,8 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
         
         if (successCount > 0) {
           toast.success(`${successCount} notificación(es) eliminada(s) correctamente${errorCount > 0 ? `. ${errorCount} fallaron` : ''}`);
-          
-          // Actualizar dropdown
           window.dispatchEvent(new Event('notificaciones-actualizadas'));
-          
-          // Recargar
-          router.reload({ 
-            only: ['notificaciones', 'totalNoLeidas'],
-          });
+          router.reload({ only: ['notificaciones', 'totalNoLeidas'] });
         }
       }
     } catch (error) {
@@ -218,28 +181,24 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     }
   };
 
-  // Marcar como leída
   const marcarComoLeida = async (id: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     
     try {
-        setCargando(true);
-        const response = await notificacionesApi.marcarLeida(id);
-        
-        if (response.data.success) {
-            window.dispatchEvent(new Event('notificaciones-actualizadas'));
-            router.reload({ 
-                only: ['notificaciones', 'totalNoLeidas'],
-            });
-        }
+      setCargando(true);
+      const response = await notificacionesApi.marcarLeida(id);
+      
+      if (response.data.success) {
+        window.dispatchEvent(new Event('notificaciones-actualizadas'));
+        router.reload({ only: ['notificaciones', 'totalNoLeidas'] });
+      }
     } catch (error) {
-        console.error('Error:', error);
+      console.error('Error:', error);
     } finally {
-        setCargando(false);
+      setCargando(false);
     }
   };
 
-  // Marcar seleccionadas como leídas
   const marcarSeleccionadasLeidas = async () => {
     if (selectedIds.length === 0) return;
     
@@ -250,18 +209,13 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
       
       for (const id of selectedIds) {
         const response = await notificacionesApi.marcarLeida(id);
-        if (response.data.success) {
-          successCount++;
-        }
+        if (response.data.success) successCount++;
       }
       
       if (successCount > 0) {
         toast.success(`${successCount} notificación(es) marcada(s) como leída(s)`);
-        
         window.dispatchEvent(new Event('notificaciones-actualizadas'));
-        router.reload({ 
-          only: ['notificaciones', 'totalNoLeidas'],
-        });
+        router.reload({ only: ['notificaciones', 'totalNoLeidas'] });
       }
     } catch (error) {
       console.error('Error:', error);
@@ -272,26 +226,22 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     }
   };
 
-  // Marcar todas como leídas
   const marcarTodasLeidas = async () => {
     try {
-        setCargando(true);
-        const response = await notificacionesApi.marcarTodasLeidas();
-        
-        if (response.data.success) {
-            window.dispatchEvent(new Event('notificaciones-actualizadas'));
-            router.reload({ 
-                only: ['notificaciones', 'totalNoLeidas'],
-            });
-        }
+      setCargando(true);
+      const response = await notificacionesApi.marcarTodasLeidas();
+      
+      if (response.data.success) {
+        window.dispatchEvent(new Event('notificaciones-actualizadas'));
+        router.reload({ only: ['notificaciones', 'totalNoLeidas'] });
+      }
     } catch (error) {
-        console.error('Error:', error);
+      console.error('Error:', error);
     } finally {
-        setCargando(false);
+      setCargando(false);
     }
   };
 
-  // Manejar selección de una notificación
   const toggleSelect = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -300,14 +250,12 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
         ? prev.filter(itemId => itemId !== id)
         : [...prev, id];
       
-      // Actualizar selectAll
       setSelectAll(newSelected.length === notificacionesFiltradas.length && notificacionesFiltradas.length > 0);
       
       return newSelected;
     });
   };
 
-  // Manejar seleccionar/deseleccionar todas
   const toggleSelectAll = () => {
     if (selectAll) {
       setSelectedIds([]);
@@ -317,38 +265,38 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     setSelectAll(!selectAll);
   };
 
-  // Cancelar confirmación
   const cancelarConfirmacion = () => {
     setConfirmDialogOpen(false);
     setConfirmAction(null);
   };
 
-  // Navegar a entidad
   const navegarAEntidad = (notificacion: Notificacion) => {
     if (!notificacion.entidad_tipo || !notificacion.entidad_id) return;
     
     let ruta = '';
-    switch(notificacion.entidad_tipo) {
-      case 'lead':
-        ruta = `/comercial/leads/${notificacion.entidad_id}`;
-        break;
-      case 'presupuesto':
-        ruta = `/comercial/presupuestos/${notificacion.entidad_id}`;
-        break;
-      case 'contrato':
-        ruta = `/comercial/cuentas/${notificacion.entidad_id}`;
-        break;
-      case 'comentario':
-        ruta = `/comercial/leads/${notificacion.entidad_id}`;
-        break;
-      case 'seguimiento_perdida':
-        ruta = `/comercial/seguimientos-perdida`;
-        break;
-      case 'personal':
-        ruta = `/rrhh/personal/cumpleanos`;
-        break;
-      default:
-        return;
+    
+    // Para comentarios, usar el lead_id que viene en la notificación
+    if (notificacion.entidad_tipo === 'comentario' && notificacion.lead_id) {
+      ruta = `/comercial/leads/${notificacion.lead_id}`;
+    } else if (notificacion.entidad_tipo === 'seguimiento_perdida' && notificacion.lead_id) {
+      ruta = `/comercial/leads/${notificacion.lead_id}`;
+    } else {
+      switch(notificacion.entidad_tipo) {
+        case 'lead':
+          ruta = `/comercial/leads/${notificacion.entidad_id}`;
+          break;
+        case 'presupuesto':
+          ruta = `/comercial/presupuestos/${notificacion.entidad_id}`;
+          break;
+        case 'contrato':
+          ruta = `/comercial/cuentas/${notificacion.entidad_id}`;
+          break;
+        case 'personal':
+          ruta = `/rrhh/personal/cumpleanos`;
+          break;
+        default:
+          return;
+      }
     }
     
     if (!notificacion.leida) {
@@ -358,13 +306,11 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     router.visit(ruta);
   };
 
-  // Toggle expandir mensaje
   const toggleExpandirMensaje = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setMensajeExpandido(mensajeExpandido === id ? null : id);
   };
 
-  // Funciones auxiliares
   const getIconoPorTipo = (tipo: string) => {
     switch(tipo) {
       case 'cumpleanos':
@@ -385,7 +331,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
       case 'asignacion_lead':
         return <Users className="h-5 w-5 text-green-500" />;
       case 'comentario_recordatorio':
-        return <CheckCircle className="h-5 w-5 text-indigo-500" />;
+        return <MessageCircle className="h-5 w-5 text-indigo-500" />;
       case 'lead_posible_recontacto':
         return <RefreshCw className="h-5 w-5 text-cyan-500" />;
       case 'actividad_sospechosa':
@@ -435,7 +381,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
       <Head title="Notificaciones" />
       
       <div className="max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-4 lg:px-8">
-        {/* Confirm Dialog */}
         <ConfirmDialog
           isOpen={confirmDialogOpen}
           onClose={cancelarConfirmacion}
@@ -451,7 +396,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
           type="danger"
         />
 
-        {/* Header - Responsive */}
         <div className="mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
             <div className="flex items-center justify-between">
@@ -471,7 +415,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                 </p>
               </div>
               
-              {/* Botón menú móvil */}
               <button
                 onClick={() => setMostrarMenuMovil(!mostrarMenuMovil)}
                 className="sm:hidden p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
@@ -480,7 +423,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
               </button>
             </div>
             
-            {/* Botones de acción - Desktop */}
             <div className="hidden sm:flex items-center gap-2">
               <button
                 onClick={() => router.reload()}
@@ -498,11 +440,9 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                 <Filter className="h-4 w-4" />
                 Filtros
               </button>
-              
             </div>
           </div>
           
-          {/* Botones de acción - Mobile (si menú está abierto) */}
           {mostrarMenuMovil && (
             <div className="sm:hidden mt-4 flex flex-wrap gap-2">
               <button
@@ -526,17 +466,13 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
               </button>
             </div>
           )}
-          
         </div>
 
-        {/* Filtros - Responsive */}
         {mostrarFiltros && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 mb-4 sm:mb-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                 <select
                   value={filtrosLocales.tipo}
                   onChange={(e) => {
@@ -560,9 +496,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estado
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                 <select
                   value={filtrosLocales.leida}
                   onChange={(e) => {
@@ -578,9 +512,7 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Prioridad
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
                 <select
                   value={filtrosLocales.prioridad}
                   onChange={(e) => {
@@ -615,7 +547,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
           </div>
         )}
 
-        {/* Barra de selección múltiple - ARRIBA */}
         {notificacionesFiltradas.length > 0 && (
           <div className="bg-gray-50 border border-gray-200 rounded-t-lg p-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-4">
@@ -663,7 +594,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
           </div>
         )}
 
-        {/* Lista de notificaciones */}
         <div className={`bg-white shadow-sm rounded-b-lg border border-t-0 border-gray-200 overflow-hidden ${notificacionesFiltradas.length === 0 ? 'rounded-lg border-t' : ''}`}>
           {cargando ? (
             <div className="p-6 sm:p-8 text-center">
@@ -702,7 +632,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                     }`}
                   >
                     <div className="flex items-start">
-                      {/* Checkbox para selección */}
                       <div className="mr-2 sm:mr-3 mt-1" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={(e) => toggleSelect(notificacion.id, e)}
@@ -716,12 +645,10 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                         </button>
                       </div>
                       
-                      {/* Icono */}
                       <div className="mr-2 sm:mr-3 mt-0.5 sm:mt-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                         {getIconoPorTipo(notificacion.tipo)}
                       </div>
                       
-                      {/* Contenido (clickeable para navegar) */}
                       <div 
                         className="flex-1 min-w-0 cursor-pointer"
                         onClick={() => navegarAEntidad(notificacion)}
@@ -739,7 +666,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                               )}
                             </div>
                             
-                            {/* Mensaje - SIN line-clamp, con opción de expandir */}
                             <div className="relative">
                               <p className={`text-xs sm:text-sm text-gray-600 whitespace-pre-wrap ${
                                 mensajeExpandido === notificacion.id ? '' : 'max-h-20 overflow-hidden'
@@ -747,7 +673,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                                 {notificacion.mensaje}
                               </p>
                               
-                              {/* Botón para expandir/colapsar si el mensaje es largo */}
                               {notificacion.mensaje.length > 150 && (
                                 <button
                                   onClick={(e) => toggleExpandirMensaje(notificacion.id, e)}
@@ -798,7 +723,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                             <span className="text-xs text-gray-500">
                               {formatFecha(notificacion.fecha_notificacion)}
                             </span>
-                            {/* Badge prioridad móvil */}
                             <div className="sm:hidden">
                               {getBadgePrioridad(notificacion.prioridad)}
                             </div>
@@ -816,7 +740,6 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
                 ))}
               </div>
               
-              {/* Paginación con componente existente */}
               {notificaciones.total > 0 && (
                 <div className="px-3 sm:px-4 py-3 border-t border-gray-200">
                   <Pagination

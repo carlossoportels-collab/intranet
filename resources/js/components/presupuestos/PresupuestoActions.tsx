@@ -66,6 +66,7 @@ export const PresupuestoActions: React.FC<Props> = ({
     const [verificandoDatos, setVerificandoDatos] = useState(false);
     const [modoCompletar, setModoCompletar] = useState(false);
     const [datosExistentes, setDatosExistentes] = useState<{ empresa?: any; contacto?: any } | undefined>(undefined);
+    const [pasoInicial, setPasoInicial] = useState<number>(1); // 🔥 NUEVO: guardar el paso inicial
     
     const toast = useToast();
 
@@ -236,49 +237,69 @@ const handleWhatsAppConPDF = async () => {
     };
 
     const verificarYabrirModal = useCallback(async () => {
-        if (!leadId) {
-            toast.error('No se pudo identificar el lead');
-            return;
-        }
+    if (!leadId) {
+        toast.error('No se pudo identificar el lead');
+        return;
+    }
 
-        setVerificandoDatos(true);
+    setVerificandoDatos(true);
+    
+    try {
+        const response = await fetch(`/comercial/leads/${leadId}/verificar-datos-contrato`);
+        const data = await response.json();
         
-        try {
-            const response = await fetch(`/comercial/leads/${leadId}/verificar-datos-contrato`);
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error || 'Error al verificar datos');
-            }
-            
-            setDatosExistentes({
-                empresa: data.empresa || undefined,
-                contacto: data.contacto || undefined
-            });
-            
-            const tieneAlgunDato = !!data.contacto || !!data.empresa;
-            
-            if (data.todosCompletos) {
-                toast.success('Todos los datos están completos. Generando contrato...');
-                setTimeout(() => {
-                    window.location.href = `/comercial/contratos/create-from-lead/${presupuestoId}`;
-                }, 500);
-            } else {
-                setModoCompletar(tieneAlgunDato);
-                setModalAltaEmpresaOpen(true);
-                
-                if (tieneAlgunDato) {
-                    toast.info('Complete los datos faltantes para continuar');
-                } else {
-                    toast.info('Complete los datos de la nueva empresa');
-                }
-            }
-        } catch {
-            toast.error('Error al verificar datos del cliente');
-        } finally {
-            setVerificandoDatos(false);
+        if (!response.ok) {
+            throw new Error(data.error || 'Error al verificar datos');
         }
-    }, [leadId, presupuestoId, toast]);
+        
+        // 🔥 CONSTRUIR LEAD ACTUALIZADO CON LOS DATOS DEL BACKEND
+        const leadActualizado = data.lead ? {
+            ...lead,
+            id: data.lead.id,
+            nombre_completo: data.lead.nombre_completo,
+            genero: data.lead.genero,
+            telefono: data.lead.telefono,
+            email: data.lead.email,
+            localidad_id: data.lead.localidad_id,
+            localidad: data.lead.localidad_nombre ? {
+                nombre: data.lead.localidad_nombre,
+                provincia_id: data.lead.provincia_id,
+                provincia: data.lead.provincia_nombre ? { nombre: data.lead.provincia_nombre } : null
+            } : null,
+            rubro_id: data.lead.rubro_id,
+            origen_id: data.lead.origen_id,
+            prefijo_id: data.lead.prefijo_id,
+        } : lead;
+        
+        setDatosExistentes({
+            empresa: data.empresa || undefined,
+            contacto: data.contacto || undefined
+        });
+        
+        const paso = data.pasoAMostrar || 1;
+        setPasoInicial(paso);
+        
+        const tieneAlgunDato = !!data.contacto || !!data.empresa;
+        
+        if (data.todosCompletos) {
+            toast.success('Todos los datos están completos. Generando contrato...');
+            setTimeout(() => {
+                window.location.href = `/comercial/contratos/create-from-lead/${presupuestoId}`;
+            }, 500);
+        } else {
+            setModoCompletar(tieneAlgunDato);
+            setModalAltaEmpresaOpen(true);
+            
+            const nombresPasos = { 1: 'Datos del Lead', 2: 'Datos Personales', 3: 'Datos de Empresa' };
+            toast.info(`Complete los datos faltantes en "${nombresPasos[paso as 1 | 2 | 3]}"`);
+        }
+    } catch (error) {
+        console.error('Error verificando datos:', error);
+        toast.error('Error al verificar datos del cliente');
+    } finally {
+        setVerificandoDatos(false);
+    }
+}, [leadId, presupuestoId, toast, lead]);
 
     const handleAccionPrincipal = useCallback(async () => {
         await verificarYabrirModal();
@@ -468,6 +489,7 @@ const handleWhatsAppConPDF = async () => {
                 provincias={provincias}
                 modoCompletar={modoCompletar}
                 datosExistentes={datosExistentes}
+                pasoInicial={pasoInicial} 
             />
         </>
     );

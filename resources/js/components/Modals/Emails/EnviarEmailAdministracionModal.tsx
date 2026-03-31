@@ -1,7 +1,7 @@
 // resources/js/components/Modals/Emails/EnviarEmailAdministracionModal.tsx
 
 import { router } from '@inertiajs/react';
-import { X, Send, Mail, Building2, FileText, Files, Upload, Trash2, Eye } from 'lucide-react';
+import { X, Send, Mail, Building2, FileText, Files, Upload, Trash2, Eye, Paperclip } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 
 import { useToast } from '@/contexts/ToastContext';
@@ -60,27 +60,9 @@ export default function EnviarEmailAdministracionModal({
     // Obtener tipo de operación
     const tipoOperacion = contrato?.tipo_operacion;
 
-    // Determinar destinatarios según tipo de operación
+    // 🔥 DESTINATARIOS: SOLO GFAURE Y PAGOMEZ
     const getDestinatarios = () => {
-        // Destinatarios base (siempre incluye a Guillermo y comercial en CC)
-        let destinatarios = ['gfaure@localsat.com.ar', 'pgomez@localsat.com.ar'];
-        
-        // Para venta a cliente o alta nueva, incluir informes
-        if (tipoOperacion === 'venta_cliente' || tipoOperacion === 'alta_nueva') {
-            destinatarios.push('informes@localsat.com.ar');
-        }
-        
-        // Para cambio de titularidad, no incluir informes
-        if (tipoOperacion === 'cambio_titularidad') {
-            // Solo Guillermo y comercial
-        }
-        
-        // Para cambio de razón social, no incluir informes
-        if (tipoOperacion === 'cambio_razon_social') {
-            // Solo Guillermo y comercial
-        }
-        
-        return destinatarios.join(';');
+        return 'gfaure@localsat.com.ar;pgomez@localsat.com.ar';
     };
 
     // Obtener asunto según tipo de operación
@@ -350,7 +332,7 @@ export default function EnviarEmailAdministracionModal({
 
     const [formData, setFormData] = useState({
         to: '',
-        cc: comercialEmail,
+        cc: '',
         bcc: '',
         subject: '',
         body: '',
@@ -361,7 +343,7 @@ export default function EnviarEmailAdministracionModal({
             mensajeGenericoRef.current = generarMensajeAdministracion();
             setFormData({
                 to: getDestinatarios(),
-                cc: comercialEmail,
+                cc: '',
                 bcc: '',
                 subject: getSubject(),
                 body: mensajeGenericoRef.current,
@@ -432,7 +414,6 @@ export default function EnviarEmailAdministracionModal({
         setArchivosPlataforma(prev => prev.filter((_, i) => i !== index));
     };
 
-    // 🔥 HANDLER CORREGIDO - No serializar campos de texto como JSON
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.to) {
@@ -446,43 +427,34 @@ export default function EnviarEmailAdministracionModal({
         try {
             const formDataToSend = new FormData();
             
-            // 🔥 PROCESAR DESTINATARIOS - Convertir string con ; a array JSON
             const toArray = formData.to.split(';').map(email => email.trim()).filter(email => email);
             formDataToSend.append('to', JSON.stringify(toArray));
             
-            // CC - soportar múltiples separadores
             if (formData.cc) {
                 const ccArray = formData.cc.split(/[;,]+/).map(email => email.trim()).filter(email => email);
                 formDataToSend.append('cc', JSON.stringify(ccArray));
             }
             
-            // BCC
             if (formData.bcc) {
                 const bccArray = formData.bcc.split(/[;,]+/).map(email => email.trim()).filter(email => email);
                 formDataToSend.append('bcc', JSON.stringify(bccArray));
             }
             
-            // 🔥 CAMPOS QUE NO DEBEN SER JSON - Enviar como texto plano
             formDataToSend.append('subject', formData.subject);
             formDataToSend.append('body', formData.body);
             formDataToSend.append('contratoId', String(contrato.id));
             formDataToSend.append('numeroContrato', contrato.numero_contrato);
             formDataToSend.append('tipo', 'administracion');
-            
-            // Opciones de bienvenida (false para administración)
             formDataToSend.append('incluirBienvenida', JSON.stringify(false));
             
-            // Adjuntar PDF
             if (pdfFile) {
                 formDataToSend.append('pdf', pdfFile);
             }
             
-            // Documentos locales
             archivosLocales.forEach((file, index) => {
                 formDataToSend.append(`documento_local_${index}`, file);
             });
             
-            // Documentos de plataforma
             archivosPlataforma.forEach((file, index) => {
                 formDataToSend.append(`documento_plataforma_${index}`, file);
             });
@@ -558,6 +530,72 @@ export default function EnviarEmailAdministracionModal({
                     {/* Content - Scrollable */}
                     <div ref={modalContentRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
                         <form id="adminEmailForm" onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                            {/* 🔥 DOCUMENTACIÓN ADICIONAL - PRIMERO (ARRIBA) */}
+                            <div className="space-y-3 bg-purple-50/50 p-4 sm:p-5 rounded-xl border border-purple-200">
+                                <div className="flex items-center gap-2">
+                                    <Paperclip className="h-4 w-4 text-purple-600" />
+                                    <h3 className="font-medium text-purple-900 text-sm sm:text-base">Documentación adicional</h3>
+                                </div>
+                                
+                                <p className="text-xs sm:text-sm text-purple-700 bg-purple-100/50 p-2 rounded-lg">
+                                    📎 Adjuntar: <strong>DNI, poder (si corresponde)</strong>
+                                </p>
+                                
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs sm:text-sm text-gray-700 hover:bg-gray-50"
+                                        >
+                                            <Upload className="h-3.5 w-3.5" />
+                                            Subir archivos
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowDocumentSelector(true)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 rounded-lg text-xs sm:text-sm text-purple-700 hover:bg-purple-50"
+                                        >
+                                            <Files className="h-3.5 w-3.5" />
+                                            Buscar en biblioteca
+                                        </button>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleLocalFilesChange}
+                                        multiple
+                                        className="hidden"
+                                    />
+                                </div>
+
+                                {documentosAdjuntos.length > 0 && (
+                                    <div className="bg-white p-3 rounded-xl border border-purple-200">
+                                        <p className="text-xs sm:text-sm font-medium text-purple-800 mb-2">
+                                            Archivos adjuntos ({documentosAdjuntos.length})
+                                        </p>
+                                        <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                                            {documentosAdjuntos.map((doc, index) => (
+                                                <div key={index} className="flex items-center justify-between gap-2 text-xs sm:text-sm bg-purple-50 p-2 rounded-lg">
+                                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                        <FileText className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
+                                                        <span className="truncate text-purple-900">{doc.name}</span>
+                                                        {doc.size && <span className="text-xs text-purple-500 flex-shrink-0">({doc.size})</span>}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeAdjunto(index)}
+                                                        className="p-1 hover:bg-purple-200 rounded-lg text-purple-400 hover:text-purple-600"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Campos principales */}
                             <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
                                 <div className="space-y-2">
@@ -612,7 +650,7 @@ export default function EnviarEmailAdministracionModal({
                                 </div>
                             </div>
 
-                            {/* Mensaje */}
+                            {/* Mensaje para Administración */}
                             <div className="space-y-2">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                     <label className="text-sm font-medium text-gray-700">
@@ -660,64 +698,6 @@ export default function EnviarEmailAdministracionModal({
                                         )}
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Documentación adicional */}
-                            <div className="space-y-3">
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                    <span className="text-sm font-medium text-gray-700">Documentación adicional:</span>
-                                    <div className="flex flex-wrap gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs sm:text-sm text-gray-700 hover:bg-gray-50"
-                                        >
-                                            <Upload className="h-3.5 w-3.5" />
-                                            Subir archivos
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowDocumentSelector(true)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs sm:text-sm text-purple-700 hover:bg-purple-100"
-                                        >
-                                            <Files className="h-3.5 w-3.5" />
-                                            Buscar en biblioteca
-                                        </button>
-                                    </div>
-                                    <input
-                                        type="file"
-                                        ref={fileInputRef}
-                                        onChange={handleLocalFilesChange}
-                                        multiple
-                                        className="hidden"
-                                    />
-                                </div>
-
-                                {documentosAdjuntos.length > 0 && (
-                                    <div className="bg-purple-50 p-3 sm:p-4 rounded-xl border border-purple-200">
-                                        <p className="text-xs sm:text-sm font-medium text-purple-800 mb-2">
-                                            Archivos adjuntos ({documentosAdjuntos.length})
-                                        </p>
-                                        <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                                            {documentosAdjuntos.map((doc, index) => (
-                                                <div key={index} className="flex items-center justify-between gap-2 text-xs sm:text-sm bg-white p-2 rounded-lg border border-purple-100">
-                                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                        <FileText className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
-                                                        <span className="truncate text-purple-900">{doc.name}</span>
-                                                        {doc.size && <span className="text-xs text-purple-500 flex-shrink-0">({doc.size})</span>}
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeAdjunto(index)}
-                                                        className="p-1 hover:bg-purple-100 rounded-lg text-purple-400 hover:text-purple-600"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </form>
                     </div>

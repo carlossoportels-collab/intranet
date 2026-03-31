@@ -658,10 +658,7 @@ public function createFromEmpresa($empresaId)
     ]);
 }
     
-/**
- * Guardar nuevo contrato desde empresa existente (con cotización opcional)
- * Puede tener un presupuesto asociado (creado desde la cotización)
- */
+
 /**
  * Guardar nuevo contrato desde empresa existente (con cotización opcional)
  */
@@ -670,6 +667,7 @@ public function storeFromEmpresa(Request $request)
     $this->authorizePermiso(config('permisos.GESTIONAR_CONTRATOS'));
     
     Log::info('=== INICIO STORE FROM EMPRESA ===');
+    Log::info('Datos recibidos:', $request->all());
     
     $request->validate([
         'empresa_id' => 'required|exists:empresas,id',
@@ -684,6 +682,7 @@ public function storeFromEmpresa(Request $request)
     ]);
 
     $usuario = Auth::user();
+    
     DB::beginTransaction();
     
     try {
@@ -722,8 +721,13 @@ public function storeFromEmpresa(Request $request)
             $vendedorNombre = $usuario->personal->nombre_completo ?? $usuario->nombre_usuario ?? 'Sistema';
         }
         
+        Log::info('Vendedor:', [
+            'nombre' => $vendedorNombre,
+            'prefijo' => $vendedorPrefijo
+        ]);
+        
         // ============================================
-        // OBTENER EMPRESA, CONTACTO Y LEAD
+        // OBTENER EMPRESA
         // ============================================
         $empresa = Empresa::with([
             'localidadFiscal.provincia',
@@ -732,72 +736,150 @@ public function storeFromEmpresa(Request $request)
             'plataforma',
             'prefijo'
         ])->findOrFail($request->empresa_id);
-
-        $contacto = EmpresaContacto::with(['lead.localidad.provincia', 'lead.rubro', 'lead.origen'])
-            ->find($request->contacto_id) ?? 
-            EmpresaContacto::where('empresa_id', $empresa->id)
-                ->where('es_contacto_principal', true)
-                ->first();
         
-        $lead = $contacto ? $contacto->lead : null;
-
-        $presupuesto = $request->presupuesto_id ?
-            Presupuesto::with(['tasa', 'abono', 'agregados.productoServicio'])->find($request->presupuesto_id) : null;
-
+        Log::info('Empresa:', [
+            'id' => $empresa->id,
+            'nombre' => $empresa->nombre_fantasia,
+            'numeroalfa' => $empresa->numeroalfa
+        ]);
+        
         // ============================================
-        // DETERMINAR TIPO DE OPERACIÓN (CON PRIORIDAD SMARTSAT)
+        // OBTENER CONTACTO Y LEAD
         // ============================================
-        $tipoOperacion = null;
-
-        // 1. PRIORIDAD: Transferencia reciente a SmartSat (ID 9)
-        $transferenciaSS = \App\Models\HistorialTransferencia::where('entidad_id', $empresa->id)
-            ->where('tipo_entidad', 'cliente')
-            ->where('prefijo_destino_id', 9)
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        if ($transferenciaSS) {
-            $tipoOperacion = 'cambio_smartsat';
-            Log::info('Tipo operación: cambio_smartsat detectado vía Historial');
-        } else {
-            // 2. Cambio de Titularidad
-            $cambioTit = \App\Models\CambioTitularidad::where('empresa_destino_id', $empresa->id)
-                ->orderBy('fecha_cambio', 'desc')->first();
-
-            if ($cambioTit) {
-                $tipoOperacion = 'cambio_titularidad';
-            } else {
-                // 3. Cambio de Razón Social
-                $cambioRS = \App\Models\CambioRazonSocial::where('empresa_id', $empresa->id)
-                    ->orderBy('fecha_cambio', 'desc')->first();
-                
-                if ($cambioRS) {
-                    $tipoOperacion = 'cambio_razon_social';
-                } else {
-                    // 4. Lógica estándar de cliente existente
-                    $esCliente = (Contrato::where('empresa_id', $empresa->id)->exists() || ($lead && $lead->es_cliente));
-                    $tipoOperacion = $esCliente ? 'venta_cliente' : 'alta_nueva';
-                }
+        $contacto = null;
+        $lead = null;
+        
+        if ($request->contacto_id) {
+            $contacto = EmpresaContacto::with([
+                'lead.localidad.provincia',
+                'lead.rubro',
+                'lead.origen',
+                'tipoResponsabilidad',
+                'tipoDocumento',
+                'nacionalidad'
+            ])->find($request->contacto_id);
+            
+            if ($contacto && $contacto->lead) {
+                $lead = $contacto->lead;
             }
         }
-
-        // ============================================
-        // GENERAR ID Y CREAR CONTRATO
-        // ============================================
-        $contratoId = \App\Helpers\ContratoHelper::generarNumeroContrato($empresa->prefijo_id);
         
+        if (!$contacto) {
+            $contacto = EmpresaContacto::where('empresa_id', $empresa->id)
+                ->where('es_contacto_principal', true)
+                ->with(['lead', 'tipoResponsabilidad', 'tipoDocumento', 'nacionalidad'])
+                ->first();
+                
+            if ($contacto && $contacto->lead) {
+                $lead = $contacto->lead;
+            }
+        }
+        
+        if (!$lead) {
+            $contacto = EmpresaContacto::where('empresa_id', $empresa->id)
+                ->where('es_activo', true)
+                ->with(['lead', 'tipoResponsabilidad', 'tipoDocumento', 'nacionalidad'])
+                ->first();
+                
+            if ($contacto && $contacto->lead) {
+                $lead = $contacto->lead;
+            }
+        }
+        
+        Log::info('Contacto y lead:', [
+            'contacto_id' => $contacto?->id,
+            'lead_id' => $lead?->id,
+            'lead_nombre' => $lead?->nombre_completo
+        ]);
+        
+        // ============================================
+        // OBTENER PRESUPUESTO ASOCIADO
+        // ============================================
+        $presupuesto = null;
+        if ($request->presupuesto_id) {
+            $presupuesto = Presupuesto::with(['tasa', 'abono', 'agregados.productoServicio'])
+                ->find($request->presupuesto_id);
+            Log::info('Presupuesto asociado:', ['id' => $presupuesto?->id]);
+        }
+        
+        // ============================================
+        // OBTENER CAMBIO DE TITULARIDAD ASOCIADO
+        // ============================================
+        $cambioTitularidad = CambioTitularidad::where('empresa_destino_id', $empresa->id)
+            ->orderBy('fecha_cambio', 'desc')
+            ->first();
+        
+        Log::info('Cambio de titularidad asociado:', [
+            'cambio_id' => $cambioTitularidad?->id,
+            'existe' => $cambioTitularidad ? 'SI' : 'NO'
+        ]);
+        
+        // ============================================
+        // OBTENER VEHÍCULOS DEL CAMBIO DE TITULARIDAD
+        // ============================================
+        $vehiculosTransferidos = [];
+        if ($cambioTitularidad && $cambioTitularidad->vehiculos) {
+            $vehiculosTransferidos = is_string($cambioTitularidad->vehiculos) 
+                ? json_decode($cambioTitularidad->vehiculos, true) 
+                : ($cambioTitularidad->vehiculos ?? []);
+            
+            Log::info('Vehículos del cambio de titularidad:', [
+                'cantidad' => count($vehiculosTransferidos)
+            ]);
+        }
+        
+        // ============================================
+        // DETERMINAR TIPO DE OPERACIÓN
+        // ============================================
+        $tipoOperacion = null;
+        
+        if ($cambioTitularidad) {
+            $tipoOperacion = 'cambio_titularidad';
+            Log::info('Tipo operación: cambio_titularidad');
+        } else {
+            $cambioRazonSocial = CambioRazonSocial::where('empresa_id', $empresa->id)
+                ->orderBy('fecha_cambio', 'desc')
+                ->first();
+                
+            if ($cambioRazonSocial) {
+                $tipoOperacion = 'cambio_razon_social';
+                Log::info('Tipo operación: cambio_razon_social');
+            } else {
+                // Determinar si es cliente
+                $esCliente = false;
+                
+                $contratosPreviosEmpresa = Contrato::where('empresa_id', $empresa->id)->count();
+                if ($contratosPreviosEmpresa > 0) $esCliente = true;
+                
+                if ($lead && $lead->es_cliente) $esCliente = true;
+                if ($lead && $lead->estado_lead && $lead->estado_lead->tipo === 'final_positivo') $esCliente = true;
+                
+                $tipoOperacion = $esCliente ? 'venta_cliente' : 'alta_nueva';
+                Log::info('Tipo operación:', ['tipo' => $tipoOperacion, 'es_cliente' => $esCliente]);
+            }
+        }
+        
+        // ============================================
+        // GENERAR ID DEL CONTRATO
+        // ============================================
+        $contratoId = ContratoHelper::generarNumeroContrato($empresa->prefijo_id);
+        Log::info('Nuevo contrato ID: ' . $contratoId);
+        
+        // ============================================
+        // CREAR CONTRATO
+        // ============================================
         $contrato = new Contrato();
         $contrato->id = $contratoId;
         $contrato->presupuesto_id = $presupuesto?->id;
         $contrato->empresa_id = $empresa->id;
-        $contrato->lead_id = $lead?->id;
+        $contrato->lead_id = $lead?->id ?? null;
         $contrato->fecha_emision = now();
         $contrato->estado_id = 1;
         $contrato->tipo_operacion = $tipoOperacion;
         $contrato->vendedor_nombre = $vendedorNombre;
         $contrato->vendedor_prefijo = $vendedorPrefijo;
         
-        // Mapeo de datos del Lead/Cliente
+        // Datos del cliente
         $contrato->cliente_nombre_completo = $lead?->nombre_completo ?? $empresa->nombre_fantasia;
         $contrato->cliente_genero = $lead?->genero ?? 'no_especifica';
         $contrato->cliente_telefono = $lead?->telefono ?? $empresa->telefono_fiscal;
@@ -805,53 +887,245 @@ public function storeFromEmpresa(Request $request)
         
         if ($lead && $lead->localidad) {
             $contrato->cliente_localidad = $lead->localidad->nombre;
-            $contrato->cliente_provincia = $lead->localidad->provincia->nombre ?? null;
+            if ($lead->localidad->provincia) {
+                $contrato->cliente_provincia = $lead->localidad->provincia->nombre;
+            }
         }
         
-        // Mapeo de datos de la Empresa
+        $contrato->cliente_rubro = $lead?->rubro?->nombre;
+        $contrato->cliente_origen = $lead?->origen?->nombre;
+        
+        // Datos del contacto
+        if ($contacto) {
+            $contrato->contacto_tipo_responsabilidad = $contacto->tipoResponsabilidad?->nombre;
+            $contrato->contacto_tipo_documento = $contacto->tipoDocumento?->nombre;
+            $contrato->contacto_nro_documento = $contacto->nro_documento;
+            $contrato->contacto_nacionalidad = $contacto->nacionalidad?->pais;
+            $contrato->contacto_fecha_nacimiento = $contacto->fecha_nacimiento;
+            $contrato->contacto_direccion_personal = $contacto->direccion_personal;
+            $contrato->contacto_codigo_postal_personal = $contacto->codigo_postal_personal;
+        }
+        
+        // Datos de la empresa
         $contrato->empresa_nombre_fantasia = $empresa->nombre_fantasia;
         $contrato->empresa_razon_social = $empresa->razon_social;
         $contrato->empresa_cuit = $empresa->cuit;
         $contrato->empresa_domicilio_fiscal = $empresa->direccion_fiscal;
         $contrato->empresa_codigo_postal_fiscal = $empresa->codigo_postal_fiscal;
-        $contrato->empresa_localidad_fiscal = $empresa->localidadFiscal->nombre ?? null;
-        $contrato->empresa_provincia_fiscal = $empresa->localidadFiscal->provincia->nombre ?? null;
-        $contrato->empresa_situacion_afip = $empresa->categoriaFiscal->nombre ?? null;
-        $contrato->empresa_actividad = $empresa->rubro->nombre ?? null;
-        $contrato->empresa_plataforma = $empresa->plataforma->nombre ?? null;
+        
+        if ($empresa->localidadFiscal) {
+            $contrato->empresa_localidad_fiscal = $empresa->localidadFiscal->nombre;
+            if ($empresa->localidadFiscal->provincia) {
+                $contrato->empresa_provincia_fiscal = $empresa->localidadFiscal->provincia->nombre;
+            }
+        }
+        
+        $contrato->empresa_telefono_fiscal = $empresa->telefono_fiscal;
+        $contrato->empresa_email_fiscal = $empresa->email_fiscal;
+        $contrato->empresa_actividad = $empresa->rubro?->nombre;
+        $contrato->empresa_situacion_afip = $empresa->categoriaFiscal?->nombre;
+        $contrato->empresa_plataforma = $empresa->plataforma?->nombre;
         $contrato->empresa_nombre_flota = $empresa->nombre_flota;
-
-        // Totales
+        
+        // Totales del presupuesto o cotización
         if ($presupuesto) {
             $contrato->presupuesto_cantidad_vehiculos = $presupuesto->cantidad_vehiculos;
             $contrato->presupuesto_total_inversion = ($presupuesto->subtotal_tasa ?? 0) + ($presupuesto->subtotal_productos_agregados ?? 0);
             $contrato->presupuesto_total_mensual = $presupuesto->subtotal_abono ?? 0;
+        } else {
+            $contrato->presupuesto_cantidad_vehiculos = count($request->vehiculos ?? []);
+            $contrato->presupuesto_total_inversion = $request->cotizacion['total_inversion_inicial'] ?? 0;
+            $contrato->presupuesto_total_mensual = $request->cotizacion['total_costo_mensual'] ?? 0;
         }
-
+        
         $contrato->created_by = $usuario->id;
         $contrato->created = now();
+        $contrato->modified = now();
         $contrato->activo = true;
         $contrato->save();
-
+        
+        Log::info('Contrato guardado:', ['id' => $contrato->id]);
+        
         // ============================================
-        // ACTUALIZACIONES POST-GUARDADO
+        // ACTUALIZAR ESTADO DEL PRESUPUESTO
         // ============================================
         if ($presupuesto) {
-            $presupuesto->update(['estado_id' => 3]);
+            $presupuesto->estado_id = 3; // Aprobado / Convertido a contrato
+            $presupuesto->save();
+            Log::info('Presupuesto actualizado a estado 3:', ['id' => $presupuesto->id]);
+        }
+        
+        // ============================================
+        // GUARDAR VEHÍCULOS DEL CONTRATO
+        // ============================================
+        $vehiculosAGuardar = [];
+        
+        // Prioridad 1: Vehículos del cambio de titularidad
+        if (!empty($vehiculosTransferidos)) {
+            foreach ($vehiculosTransferidos as $vehiculoData) {
+                $vehiculosAGuardar[] = [
+                    'patente' => $vehiculoData['patente'] ?? '',
+                    'marca' => $vehiculoData['marca'] ?? '',
+                    'modelo' => $vehiculoData['modelo'] ?? '',
+                    'anio' => $vehiculoData['anio'] ?? null,
+                    'color' => $vehiculoData['color'] ?? '',
+                    'identificador' => $vehiculoData['identificador'] ?? '',
+                    'tipo' => $vehiculoData['tipo'] ?? null,
+                ];
+            }
+            Log::info('Usando vehículos del cambio de titularidad:', ['cantidad' => count($vehiculosAGuardar)]);
+        } 
+        // Prioridad 2: Vehículos del frontend
+        elseif ($request->has('vehiculos') && is_array($request->vehiculos) && count($request->vehiculos) > 0) {
+            foreach ($request->vehiculos as $vehiculoData) {
+                $vehiculosAGuardar[] = [
+                    'patente' => $vehiculoData['patente'] ?? '',
+                    'marca' => $vehiculoData['marca'] ?? '',
+                    'modelo' => $vehiculoData['modelo'] ?? '',
+                    'anio' => $vehiculoData['anio'] ?? null,
+                    'color' => $vehiculoData['color'] ?? '',
+                    'identificador' => $vehiculoData['identificador'] ?? '',
+                    'tipo' => $vehiculoData['tipo'] ?? null,
+                ];
+            }
+            Log::info('Usando vehículos del frontend:', ['cantidad' => count($vehiculosAGuardar)]);
+        } 
+        // Prioridad 3: Vehículos de admin_vehiculos
+        else {
+            $adminEmpresa = AdminEmpresa::where('codigoalf2', $empresa->numeroalfa)->first();
+            if ($adminEmpresa) {
+                $vehiculosDB = AdminVehiculo::where('empresa_id', $adminEmpresa->id)
+                    ->orderBy('codigoalfa')
+                    ->get();
+                
+                foreach ($vehiculosDB as $vehiculo) {
+                    $vehiculosAGuardar[] = [
+                        'patente' => $vehiculo->avl_patente,
+                        'marca' => $vehiculo->avl_marca,
+                        'modelo' => $vehiculo->avl_modelo,
+                        'anio' => $vehiculo->avl_anio,
+                        'color' => $vehiculo->avl_color,
+                        'identificador' => $vehiculo->avl_identificador,
+                        'tipo' => null,
+                    ];
+                }
+                Log::info('Usando vehículos de admin_vehiculos:', ['cantidad' => count($vehiculosAGuardar)]);
+            }
+        }
+        
+        // Insertar vehículos en contrato_vehiculos
+        foreach ($vehiculosAGuardar as $index => $vehiculoData) {
+            ContratoVehiculo::create([
+                'contrato_id' => $contrato->id,
+                'patente' => $vehiculoData['patente'],
+                'marca' => $vehiculoData['marca'],
+                'modelo' => $vehiculoData['modelo'],
+                'anio' => $vehiculoData['anio'],
+                'color' => $vehiculoData['color'],
+                'identificador' => $vehiculoData['identificador'],
+                'tipo' => $vehiculoData['tipo'],
+                'orden' => $index + 1,
+                'created' => now(),
+            ]);
+        }
+        
+        Log::info('Vehículos guardados en contrato:', ['cantidad' => count($vehiculosAGuardar)]);
+        
+        // ============================================
+        // GUARDAR RESPONSABLES ADICIONALES
+        // ============================================
+        if ($request->has('responsables') && is_array($request->responsables)) {
+            foreach ($request->responsables as $responsableData) {
+                if (isset($responsableData['nombre_completo']) && !empty($responsableData['nombre_completo'])) {
+                    EmpresaResponsable::create([
+                        'empresa_id' => $empresa->id,
+                        'tipo_responsabilidad_id' => $responsableData['tipo_responsabilidad_id'] ?? null,
+                        'nombre_completo' => $responsableData['nombre_completo'],
+                        'telefono' => $responsableData['telefono'] ?? null,
+                        'email' => $responsableData['email'] ?? null,
+                        'es_activo' => true,
+                        'created_by' => $usuario->id,
+                        'created' => now(),
+                    ]);
+                }
+            }
+            Log::info('Responsables adicionales guardados');
+        }
+        
+        // ============================================
+        // OBTENER Y GUARDAR RESPONSABLES DE FLOTA Y PAGOS
+        // ============================================
+        $responsableFlota = EmpresaResponsable::where('empresa_id', $empresa->id)
+            ->where('es_activo', true)
+            ->whereIn('tipo_responsabilidad_id', [3, 5])
+            ->first();
+            
+        $responsablePagos = EmpresaResponsable::where('empresa_id', $empresa->id)
+            ->where('es_activo', true)
+            ->whereIn('tipo_responsabilidad_id', [4, 5])
+            ->first();
+        
+        $contrato->responsable_flota_nombre = $responsableFlota?->nombre_completo;
+        $contrato->responsable_flota_telefono = $responsableFlota?->telefono;
+        $contrato->responsable_flota_email = $responsableFlota?->email;
+        $contrato->responsable_pagos_nombre = $responsablePagos?->nombre_completo;
+        $contrato->responsable_pagos_telefono = $responsablePagos?->telefono;
+        $contrato->responsable_pagos_email = $responsablePagos?->email;
+        $contrato->save();
+        
+        // ============================================
+        // GUARDAR MÉTODO DE PAGO
+        // ============================================
+        if ($request->metodo_pago === 'cbu' && $request->datos_cbu) {
+            DebitoCbu::create([
+                'contrato_id' => $contrato->id,
+                'nombre_banco' => $request->datos_cbu['nombre_banco'],
+                'cbu' => $request->datos_cbu['cbu'],
+                'alias_cbu' => $request->datos_cbu['alias_cbu'] ?? null,
+                'titular_cuenta' => $request->datos_cbu['titular_cuenta'],
+                'tipo_cuenta' => $request->datos_cbu['tipo_cuenta'],
+                'es_activo' => true,
+                'created_by' => $usuario->id,
+                'created' => now(),
+            ]);
+            Log::info('Método de pago CBU guardado');
+        } elseif ($request->metodo_pago === 'tarjeta' && $request->datos_tarjeta) {
+            DebitoTarjeta::create([
+                'contrato_id' => $contrato->id,
+                'tarjeta_emisor' => $request->datos_tarjeta['tarjeta_emisor'],
+                'tarjeta_expiracion' => $request->datos_tarjeta['tarjeta_expiracion'],
+                'tarjeta_numero' => $request->datos_tarjeta['tarjeta_numero'],
+                'tarjeta_codigo' => $request->datos_tarjeta['tarjeta_codigo'] ?? null,
+                'tarjeta_banco' => $request->datos_tarjeta['tarjeta_banco'],
+                'titular_tarjeta' => $request->datos_tarjeta['titular_tarjeta'],
+                'tipo_tarjeta' => $request->datos_tarjeta['tipo_tarjeta'],
+                'es_activo' => true,
+                'created_by' => $usuario->id,
+                'created' => now(),
+            ]);
+            Log::info('Método de pago Tarjeta guardado');
         }
 
-        // Actualizar empresa con el nuevo número de contrato (especialmente para SmartSat)
-        $empresa->update(['numeroalfa' => $contratoId]);
-
-        // Guardar vehículos, responsables y pagos...
-        // [Lógica omitida igual a la original]
-
         DB::commit();
-        return redirect()->route('comercial.contratos.show', $contrato->id)->with('success', 'Contrato generado exitosamente');
+        
+        Log::info('=== FIN STORE FROM EMPRESA EXITOSO ===');
+        Log::info('Contrato generado:', [
+            'contrato_id' => $contrato->id,
+            'empresa_id' => $empresa->id,
+            'presupuesto_id' => $presupuesto?->id,
+            'cambio_titularidad_id' => $cambioTitularidad?->id,
+            'vehiculos_guardados' => count($vehiculosAGuardar)
+        ]);
+
+        return redirect()->route('comercial.contratos.show', $contrato->id)
+            ->with('success', 'Contrato generado exitosamente');
 
     } catch (\Exception $e) {
         DB::rollBack();
-        Log::error('Error en storeFromEmpresa: ' . $e->getMessage());
+        Log::error('=== ERROR STORE FROM EMPRESA ===');
+        Log::error('Error: ' . $e->getMessage());
+        Log::error('Trace: ' . $e->getTraceAsString());
+        
         return back()->withErrors(['error' => 'Error al generar contrato: ' . $e->getMessage()]);
     }
 }

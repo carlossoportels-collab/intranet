@@ -22,37 +22,68 @@ class NotificacionController extends Controller
     /**
      * Vista principal de notificaciones (página completa)
      */
-    public function index(Request $request)
-    {
-        // 🔥 VERIFICAR PERMISO
-        $this->authorizePermiso(config('permisos.VER_NOTIFICACIONES'));
+public function index(Request $request)
+{
+    $this->authorizePermiso(config('permisos.VER_NOTIFICACIONES'));
+    
+    $usuarioId = Auth::id();
+    
+    $query = $this->baseQuery($usuarioId)
+        ->where('fecha_notificacion', '<=', Carbon::now());
+    
+    $this->aplicarFiltros($query, $request);
+    
+    $notificaciones = $query->paginate(10);
+    
+    // 🔥 TRANSFORMAR NOTIFICACIONES CON LEAD_ID
+    $notificaciones->getCollection()->transform(function($notificacion) {
+        $notif = $this->transformarNotificacion($notificacion);
         
-        $usuarioId = Auth::id();
+        $notif->lead_id = null;
+        $notif->lead_nombre = null;
         
-        // Query base - NOTIFICACIONES ACTIVAS (fecha <= ahora)
-        $query = $this->baseQuery($usuarioId)
-            ->where('fecha_notificacion', '<=', Carbon::now());
+        if ($notif->entidad_tipo === 'comentario') {
+            $comentario = DB::table('comentarios')
+                ->select('comentarios.lead_id', 'leads.nombre_completo')
+                ->join('leads', 'comentarios.lead_id', '=', 'leads.id')
+                ->where('comentarios.id', $notif->entidad_id)
+                ->first();
+            if ($comentario) {
+                $notif->lead_id = $comentario->lead_id;
+                $notif->lead_nombre = $comentario->nombre_completo;
+            }
+        } elseif ($notif->entidad_tipo === 'lead') {
+            $lead = DB::table('leads')
+                ->select('nombre_completo')
+                ->where('id', $notif->entidad_id)
+                ->first();
+            if ($lead) {
+                $notif->lead_nombre = $lead->nombre_completo;
+                $notif->lead_id = $notif->entidad_id;
+            }
+        } elseif ($notif->entidad_tipo === 'seguimiento_perdida') {
+            $seguimiento = DB::table('seguimientos_perdida')
+                ->select('seguimientos_perdida.lead_id', 'leads.nombre_completo')
+                ->join('leads', 'seguimientos_perdida.lead_id', '=', 'leads.id')
+                ->where('seguimientos_perdida.id', $notif->entidad_id)
+                ->first();
+            if ($seguimiento) {
+                $notif->lead_id = $seguimiento->lead_id;
+                $notif->lead_nombre = $seguimiento->nombre_completo;
+            }
+        }
         
-        // Aplicar filtros
-        $this->aplicarFiltros($query, $request);
-        
-        // Paginación
-        $notificaciones = $query->paginate(10);
-        
-        // Transformar resultados
-        $notificaciones->getCollection()->transform(function($notificacion) {
-            return $this->transformarNotificacion($notificacion);
-        });
-        
-        // Contar no leídas activas
-        $totalNoLeidas = $this->contarNoLeidas($usuarioId);
-        
-        return Inertia::render('Notificaciones/Index', [
-            'notificaciones' => $notificaciones,
-            'filtros' => $request->only(['tipo', 'leida', 'prioridad']),
-            'totalNoLeidas' => $totalNoLeidas,
-        ]);
-    }
+        return $notif;
+    });
+    
+    $totalNoLeidas = $this->contarNoLeidas($usuarioId);
+    
+    return Inertia::render('Notificaciones/Index', [
+        'notificaciones' => $notificaciones,
+        'filtros' => $request->only(['tipo', 'leida', 'prioridad']),
+        'totalNoLeidas' => $totalNoLeidas,
+    ]);
+}
     
     /**
      * Vista de notificaciones programadas (futuras)
@@ -159,64 +190,72 @@ class NotificacionController extends Controller
     /**
      * API para dropdown - solo notificaciones NO LEÍDAS
      */
-    public function ajaxIndex(Request $request)
-    {
-        $usuarioId = Auth::id();
-        
-        if (!$usuarioId) {
-            return $this->jsonError('No autenticado', 401);
-        }
-        
-        $query = $this->baseQuery($usuarioId)
-            ->where('fecha_notificacion', '<=', Carbon::now());
-        
-        if (!$request->get('todas', false)) {
-            $query->where('leida', false);
-        }
-        
-        $limit = $request->get('limit', 10);
-        $notificaciones = $query->limit($limit)->get()
-            ->map(function($notif) {
-                $notif = $this->transformarNotificacion($notif);
-                
-                // Incluir información del lead
-                $notif->lead_nombre = null;
-                $notif->lead_id = null;
-                
-                if ($notif->entidad_tipo === 'comentario') {
-                    $comentario = DB::table('comentarios')
-                        ->select('comentarios.lead_id', 'leads.nombre_completo')
-                        ->join('leads', 'comentarios.lead_id', '=', 'leads.id')
-                        ->where('comentarios.id', $notif->entidad_id)
-                        ->first();
-                    if ($comentario) {
-                        $notif->lead_id = $comentario->lead_id;
-                        $notif->lead_nombre = $comentario->nombre_completo;
-                    }
-                }
-                
-                if ($notif->entidad_tipo === 'lead') {
-                    $lead = DB::table('leads')
-                        ->select('nombre_completo')
-                        ->where('id', $notif->entidad_id)
-                        ->first();
-                    if ($lead) {
-                        $notif->lead_nombre = $lead->nombre_completo;
-                        $notif->lead_id = $notif->entidad_id;
-                    }
-                }
-                
-                return $notif;
-            });
-        
-        return response()->json([
-            'success' => true,
-            'data' => $notificaciones,
-            'meta' => [
-                'total_no_leidas' => $this->contarNoLeidas($usuarioId)
-            ]
-        ]);
+public function ajaxIndex(Request $request)
+{
+    $usuarioId = Auth::id();
+    
+    if (!$usuarioId) {
+        return $this->jsonError('No autenticado', 401);
     }
+    
+    $query = $this->baseQuery($usuarioId)
+        ->where('fecha_notificacion', '<=', Carbon::now());
+    
+    if (!$request->get('todas', false)) {
+        $query->where('leida', false);
+    }
+    
+    $limit = $request->get('limit', 10);
+    $notificaciones = $query->limit($limit)->get()
+        ->map(function($notif) {
+            $notif = $this->transformarNotificacion($notif);
+            
+            // 🔥 OBTENER LEAD_ID PARA COMENTARIOS
+            $notif->lead_id = null;
+            $notif->lead_nombre = null;
+            
+            if ($notif->entidad_tipo === 'comentario') {
+                $comentario = DB::table('comentarios')
+                    ->select('comentarios.lead_id', 'leads.nombre_completo')
+                    ->join('leads', 'comentarios.lead_id', '=', 'leads.id')
+                    ->where('comentarios.id', $notif->entidad_id)
+                    ->first();
+                if ($comentario) {
+                    $notif->lead_id = $comentario->lead_id;
+                    $notif->lead_nombre = $comentario->nombre_completo;
+                }
+            } elseif ($notif->entidad_tipo === 'lead') {
+                $lead = DB::table('leads')
+                    ->select('nombre_completo')
+                    ->where('id', $notif->entidad_id)
+                    ->first();
+                if ($lead) {
+                    $notif->lead_nombre = $lead->nombre_completo;
+                    $notif->lead_id = $notif->entidad_id;
+                }
+            } elseif ($notif->entidad_tipo === 'seguimiento_perdida') {
+                $seguimiento = DB::table('seguimientos_perdida')
+                    ->select('seguimientos_perdida.lead_id', 'leads.nombre_completo')
+                    ->join('leads', 'seguimientos_perdida.lead_id', '=', 'leads.id')
+                    ->where('seguimientos_perdida.id', $notif->entidad_id)
+                    ->first();
+                if ($seguimiento) {
+                    $notif->lead_id = $seguimiento->lead_id;
+                    $notif->lead_nombre = $seguimiento->nombre_completo;
+                }
+            }
+            
+            return $notif;
+        });
+    
+    return response()->json([
+        'success' => true,
+        'data' => $notificaciones,
+        'meta' => [
+            'total_no_leidas' => $this->contarNoLeidas($usuarioId)
+        ]
+    ]);
+}
     
     /**
      * Marcar una notificación como leída

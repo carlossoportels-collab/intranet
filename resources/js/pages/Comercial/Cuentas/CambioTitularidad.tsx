@@ -255,36 +255,35 @@ export default function CambioTitularidad({
         }
     };
 
-const handleModalClose = (empresaGuardada?: boolean, irAContrato?: boolean, empresaCreada?: any) => {
-    setShowAltaEmpresaModal(false);
-    
-    
-    if (empresaGuardada && empresaCreada && tipoOperacion === 'nueva_empresa') {
-        setLoading(true);
+    const handleModalClose = (empresaGuardada?: boolean, irAContrato?: boolean, empresaCreada?: any) => {
+        setShowAltaEmpresaModal(false);
         
-        // 🔥 CREAR EL CAMBIO DE TITULARIDAD USANDO LA EMPRESA YA CREADA
-        const datosEnvio = {
-            tipo_operacion: 'nueva_empresa',
-            empresa_origen_id: empresaOrigen?.id,
-            vehiculos: vehiculosSeleccionados.map(v => v.id),
-            empresa_destino_id: empresaCreada.empresa_id, // ← USAR LA EMPRESA YA CREADA
-        };
-        
-        
-        router.post('/comercial/cuentas/cambio-titularidad', datosEnvio, {
-            onSuccess: () => {
-                toast.success('Empresa creada y cambio de titularidad registrado');
-                setLoading(false);
-                handleCancelar();
-                router.reload({ only: ['historial'] });
-            },
-            onError: (errors) => {
-                toast.error('Error al registrar el cambio de titularidad');
-                setLoading(false);
-            },
-        });
-    }
-};
+        if (empresaGuardada && empresaCreada && tipoOperacion === 'nueva_empresa') {
+            setLoading(true);
+            
+            const datosEnvio = {
+                tipo_operacion: 'nueva_empresa',
+                empresa_origen_id: empresaOrigen?.id,
+                vehiculos: vehiculosSeleccionados.map(v => v.id),
+                empresa_destino_id: empresaCreada.empresa_id,
+            };
+            
+            router.post('/comercial/cuentas/cambio-titularidad', datosEnvio, {
+                onSuccess: (page) => {
+                    toast.success('Empresa creada y cambio de titularidad registrado');
+                    setLoading(false);
+                    handleCancelar();
+                    
+                    // 🔥 REDIRIGIR DIRECTAMENTE A GENERAR CONTRATO
+                    router.visit(`/comercial/contratos/desde-empresa/${empresaCreada.empresa_id}`);
+                },
+                onError: (errors) => {
+                    toast.error('Error al registrar el cambio de titularidad');
+                    setLoading(false);
+                },
+            });
+        }
+    };
 
     // Validaciones
     const validarPaso = (): boolean => {
@@ -338,44 +337,54 @@ const handleModalClose = (empresaGuardada?: boolean, irAContrato?: boolean, empr
     };
 
     const handleGuardar = () => {
-        if (tipoOperacion === 'nueva_empresa' && !empresaDestino) {
-            toast.error('Debe completar el alta de la empresa');
-            return;
-        }
+    if (tipoOperacion === 'nueva_empresa' && !empresaDestino) {
+        toast.error('Debe completar el alta de la empresa');
+        return;
+    }
 
-        setLoading(true);
+    setLoading(true);
 
-        const datosEnvio: any = {
-            tipo_operacion: tipoOperacion,
-            empresa_origen_id: empresaOrigen?.id,
-            vehiculos: vehiculosSeleccionados.map(v => v.id),
-        };
-        
-        if (tipoOperacion === 'entre_empresas') {
-            datosEnvio.empresa_destino_id = empresaDestino?.id;
-        } else {
-            datosEnvio.empresa_destino_id = empresaDestino?.id;
-            if (empresaDestino) {
-                datosEnvio.nombre_fantasia = empresaDestino.nombre_fantasia;
-                datosEnvio.razon_social = empresaDestino.razon_social;
-                datosEnvio.cuit = empresaDestino.cuit;
-            }
-        }
-        
-        router.post('/comercial/cuentas/cambio-titularidad', datosEnvio, {
-            onSuccess: () => {
-                toast.success('Cambio de titularidad registrado');
-                setLoading(false);
-                handleCancelar();
-                router.reload({ only: ['historial'] });
-            },
-            onError: (errors) => {
-                setErrores(errors);
-                toast.error('Error al registrar el cambio');
-                setLoading(false);
-            },
-        });
+    const datosEnvio: any = {
+        tipo_operacion: tipoOperacion,
+        empresa_origen_id: empresaOrigen?.id,
+        vehiculos: vehiculosSeleccionados.map(v => v.id),
     };
+    
+    if (tipoOperacion === 'entre_empresas') {
+        datosEnvio.empresa_destino_id = empresaDestino?.id;
+    } else {
+        datosEnvio.empresa_destino_id = empresaDestino?.id;
+        if (empresaDestino) {
+            datosEnvio.nombre_fantasia = empresaDestino.nombre_fantasia;
+            datosEnvio.razon_social = empresaDestino.razon_social;
+            datosEnvio.cuit = empresaDestino.cuit;
+        }
+    }
+    
+    router.post('/comercial/cuentas/cambio-titularidad', datosEnvio, {
+        onSuccess: (page) => {
+            toast.success('Cambio de titularidad registrado');
+            setLoading(false);
+            handleCancelar();
+            
+            // 🔥 REDIRIGIR A GENERAR CONTRATO SEGÚN EL TIPO
+            const empresaId = tipoOperacion === 'entre_empresas' 
+                ? empresaDestino?.id 
+                : empresaDestino?.id;
+            
+            if (empresaId) {
+                router.visit(`/comercial/contratos/desde-empresa/${empresaId}`);
+            } else {
+                router.reload({ only: ['historial'] });
+            }
+        },
+        onError: (errors) => {
+            setErrores(errors);
+            toast.error('Error al registrar el cambio');
+            setLoading(false);
+        },
+    });
+};
 
     const verDetalle = async (id: number) => {
         try {

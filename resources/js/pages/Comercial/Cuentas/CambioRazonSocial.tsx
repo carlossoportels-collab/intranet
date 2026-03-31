@@ -1,4 +1,5 @@
 // resources/js/Pages/Comercial/Cuentas/CambioRazonSocial.tsx
+
 import React, { useState, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
@@ -6,7 +7,7 @@ import axios from 'axios';
 import AppLayout from '@/layouts/app-layout';
 import { useToast } from '@/contexts/ToastContext';
 import Pagination from '@/components/ui/Pagination';
-import { User, Phone, Mail, MapPin, Briefcase, Building, Loader, CheckCircle } from 'lucide-react';
+import { User, Building, Loader, CheckCircle, AlertCircle } from 'lucide-react';
 
 // Componentes de los pasos
 import Paso1DatosLead from '@/components/empresa/pasos/Paso1DatosLead';
@@ -18,14 +19,12 @@ import {
     DatosLeadForm,
     DatosContactoForm,
     DatosEmpresaForm,
-    Plataforma 
 } from '@/types/empresa';
 
 import { 
     CambioRazonSocialProps, 
     Empresa, 
     EmpresaCompleta, 
-    Localidad,
     Contacto,
     HistorialCambio
 } from '@/types/cambiosRazonSocial';
@@ -37,6 +36,30 @@ const PASOS = [
     { id: 3, nombre: 'Datos Personales', icon: User },
     { id: 4, nombre: 'Finalizar', icon: CheckCircle },
 ];
+
+// Helper para verificar si un ID es válido (puede ser number | "")
+const isValidId = (value: number | string | null | undefined): boolean => {
+    if (value === undefined || value === null) return false;
+    if (value === "") return false;
+    if (typeof value === "number") return value !== 0 && !isNaN(value);
+    if (typeof value === "string") {
+        const num = Number(value);
+        return !isNaN(num) && num !== 0;
+    }
+    return false;
+};
+
+// Helper para convertir a número de forma segura
+const toNumberOrNull = (value: number | string | null | undefined): number | null => {
+    if (value === undefined || value === null) return null;
+    if (value === "") return null;
+    if (typeof value === "number") return value !== 0 ? value : null;
+    if (typeof value === "string") {
+        const num = Number(value);
+        return !isNaN(num) && num !== 0 ? num : null;
+    }
+    return null;
+};
 
 export default function CambioRazonSocial({ 
     empresas, 
@@ -142,7 +165,6 @@ export default function CambioRazonSocial({
                 nombre_flota: data.nombre_flota || '',
             });
 
-                        
             // Precargar datos del lead si existe contacto principal
             if (principal?.lead) {
                 setFormDataLead({
@@ -169,6 +191,10 @@ export default function CambioRazonSocial({
             setShowResults(false);
             setSearchTerm('');
             setPasoActual(1);
+            setPaso1Completado(false);
+            setPaso2Completado(false);
+            setPaso3Completado(false);
+            setErrores({});
             setLoading(false);
         } catch (error) {
             console.error('Error al cargar empresa:', error);
@@ -186,45 +212,87 @@ export default function CambioRazonSocial({
         const nuevosErrores: Record<string, string> = {};
 
         if (paso === 1) { // Datos de Empresa
-            if (!formDataEmpresa.nombre_fantasia) nuevosErrores['empresa.nombre_fantasia'] = 'El nombre de fantasía es requerido';
-            if (!formDataEmpresa.razon_social) nuevosErrores['empresa.razon_social'] = 'La razón social es requerida';
-            if (!formDataEmpresa.cuit) nuevosErrores['empresa.cuit'] = 'El CUIT es requerido';
-            if (!formDataEmpresa.direccion_fiscal) nuevosErrores['empresa.direccion_fiscal'] = 'La dirección es requerida';
-            if (!formDataEmpresa.codigo_postal_fiscal) nuevosErrores['empresa.codigo_postal_fiscal'] = 'El código postal es requerido';
-            if (!formDataEmpresa.localidad_fiscal_id) nuevosErrores['empresa.localidad_fiscal_id'] = 'La localidad es requerida';
-            if (!formDataEmpresa.telefono_fiscal) nuevosErrores['empresa.telefono_fiscal'] = 'El teléfono es requerido';
-            if (!formDataEmpresa.email_fiscal) nuevosErrores['empresa.email_fiscal'] = 'El email es requerido';
-            if (!formDataEmpresa.rubro_id) nuevosErrores['empresa.rubro_id'] = 'El rubro es requerido';
-            if (!formDataEmpresa.cat_fiscal_id) nuevosErrores['empresa.cat_fiscal_id'] = 'La categoría fiscal es requerida';
-            if (!formDataEmpresa.plataforma_id) nuevosErrores['empresa.plataforma_id'] = 'La plataforma es requerida';
-            if (!formDataEmpresa.nombre_flota) nuevosErrores['empresa.nombre_flota'] = 'El nombre de flota es requerido';
+            const d = formDataEmpresa;
+            
+            // Strings
+            if (!d.nombre_fantasia?.trim()) nuevosErrores['empresa.nombre_fantasia'] = 'El nombre de fantasía es requerido';
+            if (!d.razon_social?.trim()) nuevosErrores['empresa.razon_social'] = 'La razón social es requerida';
+            if (!d.cuit?.trim()) nuevosErrores['empresa.cuit'] = 'El CUIT es requerido';
+            if (!d.direccion_fiscal?.trim()) nuevosErrores['empresa.direccion_fiscal'] = 'La dirección es requerida';
+            if (!d.codigo_postal_fiscal?.trim()) nuevosErrores['empresa.codigo_postal_fiscal'] = 'El código postal es requerido';
+            if (!d.telefono_fiscal?.trim()) nuevosErrores['empresa.telefono_fiscal'] = 'El teléfono es requerido';
+            if (!d.email_fiscal?.trim()) nuevosErrores['empresa.email_fiscal'] = 'El email es requerido';
+            if (!d.nombre_flota?.trim()) nuevosErrores['empresa.nombre_flota'] = 'El nombre de flota es requerido';
+            
+            // IDs numéricos
+            if (!isValidId(d.localidad_fiscal_id)) {
+                nuevosErrores['empresa.localidad_fiscal_id'] = 'La localidad es requerida';
+            }
+            if (!isValidId(d.rubro_id)) {
+                nuevosErrores['empresa.rubro_id'] = 'El rubro es requerido';
+            }
+            if (!isValidId(d.cat_fiscal_id)) {
+                nuevosErrores['empresa.cat_fiscal_id'] = 'La categoría fiscal es requerida';
+            }
+            if (!isValidId(d.plataforma_id)) {
+                nuevosErrores['empresa.plataforma_id'] = 'La plataforma es requerida';
+            }
         }
 
         if (paso === 2) { // Datos del Lead
-            if (!formDataLead.nombre_completo) nuevosErrores['lead.nombre_completo'] = 'El nombre es requerido';
-            if (!formDataLead.telefono) nuevosErrores['lead.telefono'] = 'El teléfono es requerido';
-            if (!formDataLead.email) nuevosErrores['lead.email'] = 'El email es requerido';
-            if (formDataLead.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formDataLead.email)) {
+            const d = formDataLead;
+            
+            // Strings
+            if (!d.nombre_completo?.trim()) nuevosErrores['lead.nombre_completo'] = 'El nombre es requerido';
+            if (!d.telefono?.trim()) nuevosErrores['lead.telefono'] = 'El teléfono es requerido';
+            if (!d.email?.trim()) nuevosErrores['lead.email'] = 'El email es requerido';
+            if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) {
                 nuevosErrores['lead.email'] = 'Email inválido';
             }
-            if (!formDataLead.genero) nuevosErrores['lead.genero'] = 'El género es requerido';
-            if (!formDataLead.localidad_id) nuevosErrores['lead.localidad_id'] = 'La localidad es requerida';
-            if (!formDataLead.rubro_id) nuevosErrores['lead.rubro_id'] = 'El rubro es requerido';
-            if (!formDataLead.origen_id) nuevosErrores['lead.origen_id'] = 'El origen es requerido';
+            if (!d.genero) nuevosErrores['lead.genero'] = 'El género es requerido';
+            
+            // IDs numéricos
+            if (!isValidId(d.localidad_id)) {
+                nuevosErrores['lead.localidad_id'] = 'La localidad es requerida';
+            }
+            if (!isValidId(d.rubro_id)) {
+                nuevosErrores['lead.rubro_id'] = 'El rubro es requerido';
+            }
+            if (!isValidId(d.origen_id)) {
+                nuevosErrores['lead.origen_id'] = 'El origen es requerido';
+            }
         }
 
         if (paso === 3) { // Datos Personales del Contacto
-            if (!formDataContacto.tipo_responsabilidad_id) nuevosErrores['contacto.tipo_responsabilidad_id'] = 'Seleccione tipo de responsabilidad';
-            if (!formDataContacto.tipo_documento_id) nuevosErrores['contacto.tipo_documento_id'] = 'Seleccione tipo de documento';
-            if (!formDataContacto.nro_documento) nuevosErrores['contacto.nro_documento'] = 'Ingrese número de documento';
-            if (!formDataContacto.nacionalidad_id) nuevosErrores['contacto.nacionalidad_id'] = 'Seleccione nacionalidad';
-            if (!formDataContacto.fecha_nacimiento) nuevosErrores['contacto.fecha_nacimiento'] = 'Ingrese fecha de nacimiento';
-            if (!formDataContacto.direccion_personal) nuevosErrores['contacto.direccion_personal'] = 'Ingrese dirección personal';
-            if (!formDataContacto.codigo_postal_personal) nuevosErrores['contacto.codigo_postal_personal'] = 'Ingrese código postal';
+            const d = formDataContacto;
+            
+            // Strings
+            if (!d.nro_documento?.trim()) nuevosErrores['contacto.nro_documento'] = 'Ingrese número de documento';
+            if (!d.fecha_nacimiento) nuevosErrores['contacto.fecha_nacimiento'] = 'Ingrese fecha de nacimiento';
+            if (!d.direccion_personal?.trim()) nuevosErrores['contacto.direccion_personal'] = 'Ingrese dirección personal';
+            if (!d.codigo_postal_personal?.trim()) nuevosErrores['contacto.codigo_postal_personal'] = 'Ingrese código postal';
+            
+            // IDs numéricos
+            if (!isValidId(d.tipo_responsabilidad_id)) {
+                nuevosErrores['contacto.tipo_responsabilidad_id'] = 'Seleccione tipo de responsabilidad';
+            }
+            if (!isValidId(d.tipo_documento_id)) {
+                nuevosErrores['contacto.tipo_documento_id'] = 'Seleccione tipo de documento';
+            }
+            if (!isValidId(d.nacionalidad_id)) {
+                nuevosErrores['contacto.nacionalidad_id'] = 'Seleccione nacionalidad';
+            }
         }
 
         setErrores(nuevosErrores);
-        return Object.keys(nuevosErrores).length === 0;
+        
+        if (Object.keys(nuevosErrores).length > 0) {
+            const primerError = Object.values(nuevosErrores)[0];
+            toast.error(primerError);
+            return false;
+        }
+        
+        return true;
     };
 
     // Handlers para cambios en los formularios
@@ -282,63 +350,74 @@ export default function CambioRazonSocial({
     };
 
     // Guardar todos los cambios
-// Guardar todos los cambios
-const handleFinalizar = () => {
-    if (!selectedEmpresa) return;
-    
-    setLoading(true);
-
-    // Aplanar todos los datos para Inertia
-    const datosEnvio = {
-        empresa_id: selectedEmpresa.id,
+    const handleFinalizar = () => {
+        if (!selectedEmpresa) return;
         
-        // Datos de empresa (planos)
-        nombre_fantasia: formDataEmpresa.nombre_fantasia,
-        razon_social: formDataEmpresa.razon_social,
-        cuit: formDataEmpresa.cuit,
-        direccion_fiscal: formDataEmpresa.direccion_fiscal,
-        codigo_postal_fiscal: formDataEmpresa.codigo_postal_fiscal,
-        localidad_fiscal_id: formDataEmpresa.localidad_fiscal_id,
-        telefono_fiscal: formDataEmpresa.telefono_fiscal,
-        email_fiscal: formDataEmpresa.email_fiscal,
-        rubro_id: formDataEmpresa.rubro_id,
-        cat_fiscal_id: formDataEmpresa.cat_fiscal_id,
-        plataforma_id: formDataEmpresa.plataforma_id,
-        nombre_flota: formDataEmpresa.nombre_flota,
+        // Validación final antes de enviar
+        const paso1Valido = validarPaso(1);
+        const paso2Valido = validarPaso(2);
+        const paso3Valido = validarPaso(3);
         
-        // Datos de lead (con prefijo lead_)
-        lead_nombre_completo: formDataLead.nombre_completo,
-        lead_genero: formDataLead.genero,
-        lead_telefono: formDataLead.telefono,
-        lead_email: formDataLead.email,
-        lead_localidad_id: formDataLead.localidad_id,
-        lead_rubro_id: formDataLead.rubro_id,
-        lead_origen_id: formDataLead.origen_id,
-        
-        // Datos de contacto (con prefijo contacto_)
-        contacto_tipo_responsabilidad_id: formDataContacto.tipo_responsabilidad_id,
-        contacto_tipo_documento_id: formDataContacto.tipo_documento_id,
-        contacto_nro_documento: formDataContacto.nro_documento,
-        contacto_nacionalidad_id: formDataContacto.nacionalidad_id,
-        contacto_fecha_nacimiento: formDataContacto.fecha_nacimiento,
-        contacto_direccion_personal: formDataContacto.direccion_personal,
-        contacto_codigo_postal_personal: formDataContacto.codigo_postal_personal,
-    };
-
-    router.post('/comercial/cuentas/cambio-razon-social/completo', datosEnvio, {
-        onSuccess: () => {
-            toast.success('Datos actualizados correctamente');
-            setLoading(false);
-            window.location.href = `/comercial/contratos/desde-empresa/${selectedEmpresa.id}`;
-        },
-        onError: (errors) => {
-            console.error('Error:', errors);
-            setErrores(errors);
-            toast.error('Error al actualizar datos');
-            setLoading(false);
+        if (!paso1Valido || !paso2Valido || !paso3Valido) {
+            toast.error('Complete todos los campos requeridos antes de finalizar');
+            if (!paso1Valido) setPasoActual(1);
+            else if (!paso2Valido) setPasoActual(2);
+            else if (!paso3Valido) setPasoActual(3);
+            return;
         }
-    });
-};
+        
+        setLoading(true);
+
+        const datosEnvio = {
+            empresa_id: selectedEmpresa.id,
+            
+            // Datos de empresa
+            nombre_fantasia: formDataEmpresa.nombre_fantasia,
+            razon_social: formDataEmpresa.razon_social,
+            cuit: formDataEmpresa.cuit,
+            direccion_fiscal: formDataEmpresa.direccion_fiscal,
+            codigo_postal_fiscal: formDataEmpresa.codigo_postal_fiscal,
+            localidad_fiscal_id: toNumberOrNull(formDataEmpresa.localidad_fiscal_id),
+            telefono_fiscal: formDataEmpresa.telefono_fiscal,
+            email_fiscal: formDataEmpresa.email_fiscal,
+            rubro_id: toNumberOrNull(formDataEmpresa.rubro_id),
+            cat_fiscal_id: toNumberOrNull(formDataEmpresa.cat_fiscal_id),
+            plataforma_id: toNumberOrNull(formDataEmpresa.plataforma_id),
+            nombre_flota: formDataEmpresa.nombre_flota,
+            
+            // Datos de lead
+            lead_nombre_completo: formDataLead.nombre_completo,
+            lead_genero: formDataLead.genero,
+            lead_telefono: formDataLead.telefono,
+            lead_email: formDataLead.email,
+            lead_localidad_id: toNumberOrNull(formDataLead.localidad_id),
+            lead_rubro_id: toNumberOrNull(formDataLead.rubro_id),
+            lead_origen_id: toNumberOrNull(formDataLead.origen_id),
+            
+            // Datos de contacto
+            contacto_tipo_responsabilidad_id: toNumberOrNull(formDataContacto.tipo_responsabilidad_id),
+            contacto_tipo_documento_id: toNumberOrNull(formDataContacto.tipo_documento_id),
+            contacto_nro_documento: formDataContacto.nro_documento,
+            contacto_nacionalidad_id: toNumberOrNull(formDataContacto.nacionalidad_id),
+            contacto_fecha_nacimiento: formDataContacto.fecha_nacimiento,
+            contacto_direccion_personal: formDataContacto.direccion_personal,
+            contacto_codigo_postal_personal: formDataContacto.codigo_postal_personal,
+        };
+
+        router.post('/comercial/cuentas/cambio-razon-social/completo', datosEnvio, {
+            onSuccess: () => {
+                toast.success('Datos actualizados correctamente');
+                setLoading(false);
+                window.location.href = `/comercial/contratos/desde-empresa/${selectedEmpresa.id}`;
+            },
+            onError: (errors) => {
+                console.error('Error:', errors);
+                setErrores(errors);
+                toast.error('Error al actualizar datos. Verifique todos los campos.');
+                setLoading(false);
+            }
+        });
+    };
 
     const verDetalle = async (id: number) => {
         try {
@@ -492,6 +571,8 @@ const handleFinalizar = () => {
                                         errores={errores}
                                         localidadInicial={selectedEmpresa?.contactos?.find(c => c.es_contacto_principal)?.lead?.localidad?.nombre || ''}
                                         provinciaInicial={selectedEmpresa?.contactos?.find(c => c.es_contacto_principal)?.lead?.localidad?.provincia_id?.toString() || ''}
+                                        esComercial={false}
+                                        usuario={null}
                                     />
                                 )}
 
@@ -508,22 +589,46 @@ const handleFinalizar = () => {
 
                                 {pasoActual === 4 && (
                                     <div className="text-center py-8">
-                                        <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                                        <h3 className="text-xl font-semibold text-slate-900 mb-2">
-                                            ¡Todos los datos están completos!
-                                        </h3>
-                                        <p className="text-slate-600 mb-6">
-                                            Ya puede generar el contrato para {selectedEmpresa.nombre_fantasia}
-                                        </p>
-                                        <div className="flex justify-center gap-4">
-                                            <button
-                                                onClick={handleFinalizar}
-                                                disabled={loading}
-                                                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                                            >
-                                                {loading ? 'Guardando...' : 'Guardar y completar contrato'}
-                                            </button>
-                                        </div>
+                                        {Object.keys(errores).length > 0 ? (
+                                            <>
+                                                <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                                                <h3 className="text-xl font-semibold text-red-800 mb-2">
+                                                    ¡Hay errores en los datos!
+                                                </h3>
+                                                <div className="bg-red-50 p-4 rounded-lg mb-6 max-w-md mx-auto">
+                                                    {Object.entries(errores).map(([campo, error]) => (
+                                                        <p key={campo} className="text-sm text-red-600">• {error}</p>
+                                                    ))}
+                                                </div>
+                                                <div className="flex justify-center gap-4">
+                                                    <button
+                                                        onClick={() => setPasoActual(1)}
+                                                        className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                                                    >
+                                                        Volver a corregir
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                                                <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                                                    ¡Todos los datos están completos!
+                                                </h3>
+                                                <p className="text-slate-600 mb-6">
+                                                    Ya puede generar el contrato para {selectedEmpresa.nombre_fantasia}
+                                                </p>
+                                                <div className="flex justify-center gap-4">
+                                                    <button
+                                                        onClick={handleFinalizar}
+                                                        disabled={loading}
+                                                        className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                                                    >
+                                                        {loading ? 'Guardando...' : 'Guardar y completar contrato'}
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -629,223 +734,90 @@ const handleFinalizar = () => {
                 </div>
             </div>
 
-{/* Modal de detalle mejorado */}
-{detalleModal.show && detalleModal.cambio && (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setDetalleModal({ show: false, cambio: null })}>
-        <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-indigo-50 to-violet-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center sticky top-0">
-                <div>
-                    <h3 className="text-lg font-semibold text-indigo-900">Detalle del Cambio</h3>
-                    <p className="text-sm text-indigo-600">Modificación registrada el {detalleModal.cambio.fecha_cambio}</p>
-                </div>
-                <button onClick={() => setDetalleModal({ show: false, cambio: null })} className="text-slate-400 hover:text-slate-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-            </div>
-            
-            <div className="p-6 space-y-6">
-                {/* Info de empresa */}
-                <div className="bg-slate-50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <span className="font-mono text-xs bg-indigo-600 text-white px-2 py-1 rounded">{detalleModal.cambio.empresa.codigo}</span>
-                        <span className="text-xs text-slate-500">ID: {detalleModal.cambio.empresa.id}</span>
-                    </div>
-                    <p className="font-medium text-slate-900 text-lg">{detalleModal.cambio.empresa.nombre}</p>
-                </div>
-
-                {/* Comparación principal */}
-                <div className="grid md:grid-cols-2 gap-6">
-                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <h4 className="text-xs font-semibold text-slate-500 uppercase mb-4 flex items-center gap-1">
-                            <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
-                            Datos Anteriores
-                        </h4>
-                        <div className="space-y-4">
+            {/* Modal de detalle */}
+            {detalleModal.show && detalleModal.cambio && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setDetalleModal({ show: false, cambio: null })}>
+                    <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="bg-gradient-to-r from-indigo-50 to-violet-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center sticky top-0">
                             <div>
-                                <span className="text-xs text-slate-500 block">Razón Social</span>
-                                <p className="text-sm font-medium text-slate-900">{detalleModal.cambio.razon_social_anterior}</p>
+                                <h3 className="text-lg font-semibold text-indigo-900">Detalle del Cambio</h3>
+                                <p className="text-sm text-indigo-600">Modificación registrada el {detalleModal.cambio.fecha_cambio}</p>
                             </div>
-                            <div>
-                                <span className="text-xs text-slate-500 block">CUIT</span>
-                                <p className="text-sm font-mono text-slate-700">{detalleModal.cambio.cuit_anterior}</p>
-                            </div>
+                            <button onClick={() => setDetalleModal({ show: false, cambio: null })} className="text-slate-400 hover:text-slate-600">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                         </div>
-                    </div>
-                    
-                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-                        <h4 className="text-xs font-semibold text-indigo-600 uppercase mb-4 flex items-center gap-1">
-                            <span className="w-2 h-2 bg-indigo-400 rounded-full"></span>
-                            Datos Nuevos
-                        </h4>
-                        <div className="space-y-4">
-                            <div>
-                                <span className="text-xs text-indigo-500 block">Razón Social</span>
-                                <p className="text-sm font-medium text-indigo-900">{detalleModal.cambio.razon_social_nueva}</p>
-                            </div>
-                            <div>
-                                <span className="text-xs text-indigo-500 block">CUIT</span>
-                                <p className="text-sm font-mono text-indigo-800">{detalleModal.cambio.cuit_nuevo}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Datos adicionales del JSON */}
-                {detalleModal.cambio.datos_adicionales && (
-                    <div className="border-t border-slate-200 pt-4">
-                        <h4 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                            </svg>
-                            Otros cambios registrados
-                        </h4>
                         
-                        {/* Datos de empresa adicionales */}
-                        {detalleModal.cambio.datos_adicionales.empresa && (
-                            <div className="mb-6">
-                                <h5 className="text-xs font-medium text-slate-500 uppercase mb-3">Datos de empresa</h5>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {Object.entries(detalleModal.cambio.datos_adicionales.empresa).map(([campo, valores]: [string, any]) => {
-                                        const campoNombre = {
-                                            nombre_fantasia: 'Nombre Fantasía',
-                                            direccion_fiscal: 'Dirección',
-                                            codigo_postal_fiscal: 'Código Postal',
-                                            localidad_id: 'Localidad',
-                                            telefono_fiscal: 'Teléfono',
-                                            email_fiscal: 'Email',
-                                            rubro_id: 'Rubro',
-                                            cat_fiscal_id: 'Categoría Fiscal',
-                                            plataforma_id: 'Plataforma',
-                                            nombre_flota: 'Nombre Flota'
-                                        }[campo] || campo;
-                                        
-                                        return (
-                                            <div key={campo} className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                                <span className="text-xs font-medium text-slate-600 block mb-2">{campoNombre}</span>
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <span className="text-slate-500 line-through decoration-rose-300">{valores.anterior || 'Vacío'}</span>
-                                                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                                    </svg>
-                                                    <span className="font-medium text-indigo-600">{valores.nuevo || 'Vacío'}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                        <div className="p-6 space-y-6">
+                            {/* Info de empresa */}
+                            <div className="bg-slate-50 rounded-lg p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="font-mono text-xs bg-indigo-600 text-white px-2 py-1 rounded">{detalleModal.cambio.empresa.codigo}</span>
+                                    <span className="text-xs text-slate-500">ID: {detalleModal.cambio.empresa.id}</span>
                                 </div>
+                                <p className="font-medium text-slate-900 text-lg">{detalleModal.cambio.empresa.nombre}</p>
                             </div>
-                        )}
 
-                        {/* Datos del lead modificados */}
-                        {detalleModal.cambio.datos_adicionales.lead && (
-                            <div className="mb-6">
-                                <h5 className="text-xs font-medium text-slate-500 uppercase mb-3">Datos del Lead</h5>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {Object.entries(detalleModal.cambio.datos_adicionales.lead).map(([campo, valores]: [string, any]) => {
-                                        const campoNombre = {
-                                            nombre_completo: 'Nombre',
-                                            email: 'Email',
-                                            telefono: 'Teléfono',
-                                            genero: 'Género',
-                                            localidad_id: 'Localidad',
-                                            rubro_id: 'Rubro',
-                                            origen_id: 'Origen'
-                                        }[campo] || campo;
-                                        
-                                        return (
-                                            <div key={campo} className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                                <span className="text-xs font-medium text-slate-600 block mb-2">{campoNombre}</span>
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <span className="text-slate-500 line-through decoration-rose-300">{valores.anterior || 'Vacío'}</span>
-                                                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                                    </svg>
-                                                    <span className="font-medium text-indigo-600">{valores.nuevo || 'Vacío'}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Contactos modificados */}
-                        {detalleModal.cambio.datos_adicionales.contactos && (
-                            <div className="mb-6">
-                                <h5 className="text-xs font-medium text-slate-500 uppercase mb-3">Contactos modificados</h5>
-                                {Object.entries(detalleModal.cambio.datos_adicionales.contactos).map(([contactoId, cambios]: [string, any]) => (
-                                    <div key={contactoId} className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-3">
-                                        <p className="text-xs font-semibold text-slate-700 mb-3">Contacto ID: {contactoId}</p>
-                                        <div className="space-y-3">
-                                            {Object.entries(cambios).map(([campo, valores]: [string, any]) => (
-                                                <div key={campo} className="grid grid-cols-2 gap-4 text-sm">
-                                                    <div>
-                                                        <span className="text-xs text-slate-500 block">{campo}</span>
-                                                        <span className="text-slate-700">{valores.anterior || 'Vacío'}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-xs text-indigo-500 block">→</span>
-                                                        <span className="text-indigo-700 font-medium">{valores.nuevo || 'Vacío'}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
+                            {/* Comparación principal */}
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <h4 className="text-xs font-semibold text-slate-500 uppercase mb-4 flex items-center gap-1">
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
+                                        Datos Anteriores
+                                    </h4>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <span className="text-xs text-slate-500 block">Razón Social</span>
+                                            <p className="text-sm font-medium text-slate-900">{detalleModal.cambio.razon_social_anterior}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-slate-500 block">CUIT</span>
+                                            <p className="text-sm font-mono text-slate-700">{detalleModal.cambio.cuit_anterior}</p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Responsables modificados */}
-                        {detalleModal.cambio.datos_adicionales.responsables && (
-                            <div>
-                                <h5 className="text-xs font-medium text-slate-500 uppercase mb-3">Responsables modificados</h5>
-                                {Object.entries(detalleModal.cambio.datos_adicionales.responsables).map(([responsableId, cambios]: [string, any]) => (
-                                    <div key={responsableId} className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-3">
-                                        <p className="text-xs font-semibold text-slate-700 mb-3">Responsable ID: {responsableId}</p>
-                                        <div className="space-y-3">
-                                            {Object.entries(cambios).map(([campo, valores]: [string, any]) => (
-                                                <div key={campo} className="grid grid-cols-2 gap-4 text-sm">
-                                                    <div>
-                                                        <span className="text-xs text-slate-500 block">{campo}</span>
-                                                        <span className="text-slate-700">{valores.anterior || 'Vacío'}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-xs text-indigo-500 block">→</span>
-                                                        <span className="text-indigo-700 font-medium">{valores.nuevo || 'Vacío'}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                </div>
+                                
+                                <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                                    <h4 className="text-xs font-semibold text-indigo-600 uppercase mb-4 flex items-center gap-1">
+                                        <span className="w-2 h-2 bg-indigo-400 rounded-full"></span>
+                                        Datos Nuevos
+                                    </h4>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <span className="text-xs text-indigo-500 block">Razón Social</span>
+                                            <p className="text-sm font-medium text-indigo-900">{detalleModal.cambio.razon_social_nueva}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-indigo-500 block">CUIT</span>
+                                            <p className="text-sm font-mono text-indigo-800">{detalleModal.cambio.cuit_nuevo}</p>
                                         </div>
                                     </div>
-                                ))}
+                                </div>
                             </div>
-                        )}
-                    </div>
-                )}
 
-                {/* Metadatos */}
-                <div className="bg-slate-50 rounded-lg p-4 border-t border-slate-200">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <span className="text-xs text-slate-500 block">Registrado por</span>
-                            <p className="font-medium text-slate-900">{detalleModal.cambio.usuario}</p>
+                            {/* Metadatos */}
+                            <div className="bg-slate-50 rounded-lg p-4 border-t border-slate-200">
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-xs text-slate-500 block">Registrado por</span>
+                                        <p className="font-medium text-slate-900">{detalleModal.cambio.usuario}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-slate-500 block">Fecha del cambio</span>
+                                        <p className="font-medium text-slate-900">{detalleModal.cambio.fecha_cambio}</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <span className="text-xs text-slate-500 block">Fecha del cambio</span>
-                            <p className="font-medium text-slate-900">{detalleModal.cambio.fecha_cambio}</p>
+
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end sticky bottom-0">
+                            <button onClick={() => setDetalleModal({ show: false, cambio: null })} className="px-4 py-2 text-sm bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
+                                Cerrar
+                            </button>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end sticky bottom-0">
-                <button onClick={() => setDetalleModal({ show: false, cambio: null })} className="px-4 py-2 text-sm bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
-                    Cerrar
-                </button>
-            </div>
-        </div>
-    </div>
-)}
+            )}
         </AppLayout>
     );
 }

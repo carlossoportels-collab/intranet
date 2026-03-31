@@ -158,19 +158,19 @@
                                     <p style="margin: 0;">Ingresá primero por la web para registrar tu email en la opción flota segura. Allí generarás un código de seguridad para la app.</p>
                                 </div>
                                 
-                                <!-- Commercial card - CENTRADO Y CON IMAGEN MÁS GRANDE -->
+                                <!-- Commercial card -->
                                 <table width="100%" border="0" cellpadding="20" cellspacing="0" bgcolor="#ffffff" style="background-color: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #ff5000; border-radius: 12px; margin-bottom: 28px;" class="commercial-table">
                                     <tr>
-                                        <td width="110" align="center" valign="middle" style="padding: 20px 0 20px 20px;" class="commercial-avatar-cell">
-                                            <div style="width: 100px; height: 100px; border-radius: 50%; overflow: hidden; background: #ff5000; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                                        <td width="90" align="center" valign="middle" style="padding: 20px 0 20px 20px;" class="commercial-avatar-cell">
+                                            <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #ff5000; display: flex; align-items: center; justify-content: center; margin: 0 auto; box-shadow: 0 0 0 2px rgba(255,80,0,0.2);">
                                                 @if(!empty($fotoComercial) && file_exists(public_path('images/comerciales/' . $fotoComercial)))
                                                     @if(isset($message))
-                                                        <img src="{{ $message->embed(public_path('images/comerciales/' . $fotoComercial)) }}" width="100" height="100" style="width: 100px; height: 100px; object-fit: cover;">
+                                                        <img src="{{ $message->embed(public_path('images/comerciales/' . $fotoComercial)) }}" style="width: 100%; height: 100%; object-fit: cover; object-position: center center;">
                                                     @else
-                                                        <img src="{{ asset('images/comerciales/' . $fotoComercial) }}" width="100" height="100" style="width: 100px; height: 100px; object-fit: cover;">
+                                                        <img src="{{ asset('images/comerciales/' . $fotoComercial) }}" style="width: 100%; height: 100%; object-fit: cover; object-position: center center;">
                                                     @endif
                                                 @else
-                                                    <span style="color: white; font-size: 40px; font-weight: bold;">{{ $inicialesComercial }}</span>
+                                                    <span style="color: white; font-size: 32px; font-weight: bold;">{{ $inicialesComercial }}</span>
                                                 @endif
                                             </div>
                                         </td>

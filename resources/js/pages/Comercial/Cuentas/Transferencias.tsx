@@ -6,7 +6,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { 
     Search, Loader, ArrowRight, Shield, 
     RefreshCcw, Building, User, Info, CheckCircle2, History, FileText, Edit3, X,
-    ChevronLeft, ChevronRight, Check
+    ChevronLeft, ChevronRight, Check, ClipboardList, AlertCircle
 } from 'lucide-react';
 
 import Paso3DatosEmpresa from '@/components/empresa/pasos/Paso3DatosEmpresa';
@@ -30,8 +30,9 @@ export default function Transferencias({
     const [showChequeoModal, setShowChequeoModal] = useState(false);
     const [pasoValidacion, setPasoValidacion] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [erroresValidacion, setErroresValidacion] = useState<Record<string, string>>({});
 
-    // 🔥 ESTADOS PLANOS PARA LOS PASOS (Igual que en CambioRazonSocial)
+    // Estados para los formularios
     const [idEmpresaActual, setIdEmpresaActual] = useState<number | null>(null);
     const [formDataEmpresa, setFormDataEmpresa] = useState<any>({});
     const [formDataLead, setFormDataLead] = useState<any>({});
@@ -41,13 +42,13 @@ export default function Transferencias({
 
     const abrirChequeo = async (id: number) => {
         setCargando(true);
+        setErroresValidacion({});
         try {
             const resp = await axios.get(`/comercial/cuentas/cambio-razon-social/empresa/${id}/completa`);
             const data = resp.data;
             
             setIdEmpresaActual(data.id);
             
-            // Aplanar datos para los formularios
             setFormDataEmpresa({
                 ...data,
                 localidad_fiscal_id: data.localidad_fiscal_id?.toString() || '',
@@ -86,22 +87,73 @@ export default function Transferencias({
         }
     };
 
+    // Handlers para cambios en los formularios (limpian errores)
+    const handleChangeLead = (field: string, value: any) => {
+        setFormDataLead((prev: any) => ({ ...prev, [field]: value }));
+        if (erroresValidacion[field]) {
+            setErroresValidacion((prev: any) => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
+
+    const handleChangeContacto = (field: string, value: any) => {
+        setFormDataContacto((prev: any) => ({ ...prev, [field]: value }));
+        if (erroresValidacion[field]) {
+            setErroresValidacion((prev: any) => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
+
+    const handleChangeEmpresa = (field: string, value: any) => {
+        setFormDataEmpresa((prev: any) => ({ ...prev, [field]: value }));
+        if (erroresValidacion[field]) {
+            setErroresValidacion((prev: any) => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
+
     const handleSiguiente = async () => {
         setIsSubmitting(true);
+        setErroresValidacion({});
+        
         try {
             if (pasoValidacion === 1) {
-                await axios.put(`/comercial/utils/empresa/paso1/${formDataLead.id}`, formDataLead);
+                await axios.put(`/comercial/utils/empresa/paso1/${formDataLead.id}`, formDataLead, {
+                    headers: { 'Accept-Language': 'es' }
+                });
                 success('Lead actualizado');
+                setPasoValidacion(prev => prev + 1);
             } else if (pasoValidacion === 2) {
                 await axios.put(`/comercial/utils/empresa/paso2/${formDataContacto.id}`, {
                     ...formDataContacto,
                     lead_id: formDataLead.id
+                }, {
+                    headers: { 'Accept-Language': 'es' }
                 });
                 success('Contacto actualizado');
+                setPasoValidacion(prev => prev + 1);
             }
-            setPasoValidacion(prev => prev + 1);
         } catch (err: any) {
-            error(err.response?.data?.error || 'Error al guardar');
+            const responseData = err.response?.data;
+            
+            if (responseData?.errors) {
+                setErroresValidacion(responseData.errors);
+                const primerError = Object.values(responseData.errors)[0];
+                error(Array.isArray(primerError) ? primerError[0] : primerError);
+            } else if (responseData?.error) {
+                error(responseData.error);
+            } else {
+                error('Error al guardar los datos');
+            }
         } finally { 
             setIsSubmitting(false); 
         }
@@ -109,15 +161,29 @@ export default function Transferencias({
 
     const handleFinalizar = async () => {
         setIsSubmitting(true);
+        setErroresValidacion({});
+        
         try {
             await axios.put(`/comercial/utils/empresa/paso3/${idEmpresaActual}`, {
                 ...formDataEmpresa,
                 lead_id: formDataLead.id
+            }, {
+                headers: { 'Accept-Language': 'es' }
             });
             success('Empresa validada correctamente');
             setShowChequeoModal(false);
         } catch (err: any) {
-            error(err.response?.data?.error || 'Error al actualizar empresa');
+            const responseData = err.response?.data;
+            
+            if (responseData?.errors) {
+                setErroresValidacion(responseData.errors);
+                const primerError = Object.values(responseData.errors)[0];
+                error(Array.isArray(primerError) ? primerError[0] : primerError);
+            } else if (responseData?.error) {
+                error(responseData.error);
+            } else {
+                error('Error al actualizar la empresa');
+            }
         } finally { 
             setIsSubmitting(false); 
         }
@@ -234,35 +300,79 @@ export default function Transferencias({
 
                 {/* VISTA SMART-SAT */}
                 {opcionPrincipal === 'smartsat' && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                                <tr>
-                                    <th className="p-4">Entidad</th>
-                                    <th className="p-4">Origen Anterior</th>
-                                    <th className="p-4">Fecha de Pase</th>
-                                    <th className="p-4 text-right">Acciones de Calidad</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {historialSmartSat.map((h: any) => (
-                                    <tr key={h.id} className="hover:bg-slate-50">
-                                        <td className="p-4 font-bold">{h.entidad_nombre}</td>
-                                        <td className="p-4 font-mono text-xs">{h.prefijo_origen}</td>
-                                        <td className="p-4 text-slate-400 text-xs">{h.fecha}</td>
-                                        <td className="p-4 text-right space-x-2">
-                                            <button onClick={() => abrirChequeo(h.entidad_id)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-200 hover:bg-amber-100 transition-colors"><Edit3 size={14} /> Validar Datos</button>
-                                            <button onClick={() => router.visit(`/comercial/contratos/desde-empresa/${h.entidad_id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 hover:bg-emerald-100 transition-colors"><FileText size={14} /> Contratar</button>
-                                        </td>
+                    <>
+                        {/* Tarjeta de instrucciones */}
+                        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl overflow-hidden shadow-sm">
+                            <div className="px-6 py-3 bg-blue-100 border-b border-blue-200">
+                                <h2 className="text-sm font-semibold text-blue-800 flex items-center gap-2">
+                                    <ClipboardList className="h-4 w-4" />
+                                    Instrucciones para Migraciones SmartSAT
+                                </h2>
+                            </div>
+                            <div className="px-6 py-4">
+                                <div className="flex flex-col sm:flex-row gap-4">
+                                    <div className="flex items-center gap-3 flex-1">
+                                        <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                                        <div>
+                                            <p className="font-medium text-gray-900">Validar datos</p>
+                                            <p className="text-xs text-gray-600">Haga clic en <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs border border-amber-200">Validar Datos</span> y complete los campos faltantes</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-center text-gray-400">
+                                        <ArrowRight className="h-5 w-5" />
+                                    </div>
+                                    <div className="flex items-center gap-3 flex-1">
+                                        <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                                        <div>
+                                            <p className="font-medium text-gray-900">Generar contrato</p>
+                                            <p className="text-xs text-gray-600">Una vez validado, haga clic en <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-xs border border-emerald-200">Generar contrato</span> para crear el contrato</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-4 pt-3 border-t border-blue-200">
+                                    <p className="text-xs text-blue-700 flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        Importante: Complete todos los datos antes de generar el contrato.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tabla de Migraciones */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                                    <tr>
+                                        <th className="p-4">Entidad</th>
+                                        <th className="p-4">Origen Anterior</th>
+                                        <th className="p-4">Fecha de Pase</th>
+                                        <th className="p-4 text-right">Acciones de Calidad</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {historialSmartSat.map((h: any) => (
+                                        <tr key={h.id} className="hover:bg-slate-50">
+                                            <td className="p-4 font-bold">{h.entidad_nombre}</td>
+                                            <td className="p-4 font-mono text-xs">{h.prefijo_origen}</td>
+                                            <td className="p-4 text-slate-400 text-xs">{h.fecha}</td>
+                                            <td className="p-4 text-right space-x-2">
+                                                <button onClick={() => abrirChequeo(h.entidad_id)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-200 hover:bg-amber-100 transition-colors">
+                                                    <Edit3 size={14} /> Validar Datos
+                                                </button>
+                                                <button onClick={() => router.visit(`/comercial/contratos/desde-empresa/${h.entidad_id}`)} className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 hover:bg-emerald-100 transition-colors">
+                                                    <FileText size={14} /> Generar contrato
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
                 )}
             </div>
 
-            {/* MODAL DE CHEQUEO */}
+            {/* MODAL DE CHEQUEO CON ERRORES FUNCIONALES */}
             {showChequeoModal && idEmpresaActual && (
                 <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
@@ -290,9 +400,11 @@ export default function Transferencias({
                             {pasoValidacion === 1 && (
                                 <Paso1DatosLead 
                                     data={formDataLead} 
-                                    origenes={origenes} rubros={rubros} provincias={provincias} 
-                                    onChange={(f:any, v:any) => setFormDataLead((p:any) => ({...p, [f]: v}))} 
-                                    errores={{}} 
+                                    origenes={origenes} 
+                                    rubros={rubros} 
+                                    provincias={provincias} 
+                                    onChange={handleChangeLead}
+                                    errores={erroresValidacion}
                                     localidadInicial={formDataLead.localidad?.nombre || ''} 
                                     provinciaInicial={formDataLead.localidad?.provincia_id?.toString() || ''} 
                                 />
@@ -300,17 +412,22 @@ export default function Transferencias({
                             {pasoValidacion === 2 && (
                                 <Paso2DatosContacto 
                                     data={formDataContacto} 
-                                    tiposResponsabilidad={tiposResponsabilidad} tiposDocumento={tiposDocumento} nacionalidades={nacionalidades} 
-                                    onChange={(f:any, v:any) => setFormDataContacto((p:any) => ({...p, [f]: v}))} 
-                                    errores={{}} 
+                                    tiposResponsabilidad={tiposResponsabilidad} 
+                                    tiposDocumento={tiposDocumento} 
+                                    nacionalidades={nacionalidades} 
+                                    onChange={handleChangeContacto}
+                                    errores={erroresValidacion}
                                 />
                             )}
                             {pasoValidacion === 3 && (
                                 <Paso3DatosEmpresa 
                                     data={formDataEmpresa} 
-                                    onChange={(f:any, v:any) => setFormDataEmpresa((p:any) => ({...p, [f]: v}))} 
-                                    rubros={rubros} provincias={provincias} categoriasFiscales={categoriasFiscales} plataformas={plataformas} 
-                                    errores={{}} 
+                                    onChange={handleChangeEmpresa}
+                                    rubros={rubros} 
+                                    provincias={provincias} 
+                                    categoriasFiscales={categoriasFiscales} 
+                                    plataformas={plataformas} 
+                                    errores={erroresValidacion}
                                     localidadInicial={localidadFiscalNombre} 
                                     provinciaInicial={localidadFiscalProvinciaId} 
                                 />
@@ -318,16 +435,31 @@ export default function Transferencias({
                         </div>
 
                         <div className="p-6 border-t bg-slate-50 flex justify-between items-center">
-                            <button onClick={() => setPasoValidacion(prev => Math.max(1, prev - 1))} disabled={pasoValidacion === 1 || isSubmitting} className="px-6 py-2 text-slate-600 font-semibold disabled:opacity-30 flex items-center gap-2">
+                            <button 
+                                onClick={() => {
+                                    setPasoValidacion(prev => Math.max(1, prev - 1));
+                                    setErroresValidacion({});
+                                }} 
+                                disabled={pasoValidacion === 1 || isSubmitting} 
+                                className="px-6 py-2 text-slate-600 font-semibold disabled:opacity-30 flex items-center gap-2"
+                            >
                                 <ChevronLeft size={18}/> Anterior
                             </button>
                             <div className="flex gap-3">
                                 {pasoValidacion < 3 ? (
-                                    <button onClick={handleSiguiente} disabled={isSubmitting} className="px-8 py-2 bg-slate-800 text-white rounded-xl font-bold flex items-center gap-2">
+                                    <button 
+                                        onClick={handleSiguiente} 
+                                        disabled={isSubmitting} 
+                                        className="px-8 py-2 bg-slate-800 text-white rounded-xl font-bold flex items-center gap-2"
+                                    >
                                         {isSubmitting ? <Loader className="animate-spin" size={18}/> : <>Siguiente <ChevronRight size={18}/></>}
                                     </button>
                                 ) : (
-                                    <button onClick={handleFinalizar} disabled={isSubmitting} className="px-8 py-2 bg-sat text-white rounded-xl font-bold shadow-lg shadow-sat/20 flex items-center gap-2">
+                                    <button 
+                                        onClick={handleFinalizar} 
+                                        disabled={isSubmitting} 
+                                        className="px-8 py-2 bg-sat text-white rounded-xl font-bold shadow-lg shadow-sat/20 flex items-center gap-2"
+                                    >
                                         {isSubmitting ? <Loader className="animate-spin" size={18}/> : <>Finalizar y Validar <Check size={18}/></>}
                                     </button>
                                 )}
