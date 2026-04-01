@@ -1,12 +1,10 @@
-// resources/js/types/notificaciones.ts
-
 export interface Notificacion {
     id: number;
     usuario_id: number;
     titulo: string;
     mensaje: string;
     tipo: string;
-    entidad_tipo: 'lead' | 'presupuesto' | 'contrato' | 'comentario' | 'seguimiento_perdida' | 'personal';
+    entidad_tipo: 'lead' | 'presupuesto' | 'contrato' | 'comentario' | 'seguimiento_perdida' | 'personal' | 'empresa';
     entidad_id: number | null;
     leida: boolean;
     fecha_notificacion: string;

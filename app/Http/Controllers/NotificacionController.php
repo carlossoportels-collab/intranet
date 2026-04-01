@@ -468,8 +468,10 @@ public function ajaxIndex(Request $request)
             'asignacion_lead' => 'Asignación lead',
             'comentario_recordatorio' => 'Recordatorio comentario',
             'lead_posible_recontacto' => 'Posible recontacto de lead perdido',
-            'actividad_sospechosa' => 'Actividad sospechosa', // 🔥 AGREGADO
-            'error_servidor' => 'Error del servidor', // 🔥 AGREGADO
+            'actividad_sospechosa' => 'Actividad sospechosa',
+            'error_servidor' => 'Error del servidor', 
+            'transferencia_lead' => 'Transferencia de lead',
+            'transferencia_empresa' => 'Transferencia de empresa', 
         ];
     }
 }

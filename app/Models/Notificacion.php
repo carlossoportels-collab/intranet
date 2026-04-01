@@ -1,4 +1,5 @@
 <?php
+// app/Models/Notificacion.php
 
 namespace App\Models;
 
@@ -30,8 +31,11 @@ class Notificacion extends Model
         'leida' => 'boolean',
         'fecha_notificacion' => 'datetime',
         'fecha_leida' => 'datetime',
-        'prioridad' => 'integer',
     ];
+    
+    // 🔥 Tipos de notificaciones
+    const TIPO_TRANSFERENCIA_LEAD = 'transferencia_lead';
+    const TIPO_TRANSFERENCIA_EMPRESA = 'transferencia_empresa';
     
     public function usuario()
     {
@@ -51,5 +55,11 @@ class Notificacion extends Model
     public function scopePorUsuario($query, $usuarioId)
     {
         return $query->where('usuario_id', $usuarioId);
+    }
+    
+    // 🔥 Scope para notificaciones de transferencia
+    public function scopeTransferencias($query)
+    {
+        return $query->whereIn('tipo', [self::TIPO_TRANSFERENCIA_LEAD, self::TIPO_TRANSFERENCIA_EMPRESA]);
     }
 }

@@ -12,6 +12,7 @@ import {
   FileText, 
   Users,
   CheckCircle,
+  ArrowLeftRight,
   Eye,
   Search,
   RefreshCw,
@@ -311,35 +312,39 @@ export default function Index({ notificaciones, filtros, totalNoLeidas }: PagePr
     setMensajeExpandido(mensajeExpandido === id ? null : id);
   };
 
-  const getIconoPorTipo = (tipo: string) => {
-    switch(tipo) {
-      case 'cumpleanos':
-        return <Clock className="h-5 w-5 text-pink-500" />;
-      case 'lead_sin_contactar':
-        return <Clock className="h-5 w-5 text-orange-500" />;
-      case 'lead_proximo_contacto':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
-      case 'presupuesto_por_vencer':
-      case 'presupuesto_vencido':
-        return <FileText className="h-5 w-5 text-yellow-500" />;
-      case 'contrato_activo':
-      case 'contrato_pendiente':
-      case 'contrato_instalado':
-        return <FileText className="h-5 w-5 text-blue-500" />;
-      case 'recordatorio_seguimiento':
-        return <CheckCircle className="h-5 w-5 text-purple-500" />;
-      case 'asignacion_lead':
-        return <Users className="h-5 w-5 text-green-500" />;
-      case 'comentario_recordatorio':
-        return <MessageCircle className="h-5 w-5 text-indigo-500" />;
-      case 'lead_posible_recontacto':
-        return <RefreshCw className="h-5 w-5 text-cyan-500" />;
-      case 'actividad_sospechosa':
-        return <AlertCircle className="h-5 w-5 text-red-600" />;
-      default:
-        return <Bell className="h-5 w-5 text-gray-500" />;
-    }
-  };
+const getIconoPorTipo = (tipo: string) => {
+  switch(tipo) {
+    case 'cumpleanos':
+      return <Clock className="h-5 w-5 text-pink-500" />;
+    case 'lead_sin_contactar':
+      return <Clock className="h-5 w-5 text-orange-500" />;
+    case 'lead_proximo_contacto':
+      return <AlertCircle className="h-5 w-5 text-red-500" />;
+    case 'presupuesto_por_vencer':
+    case 'presupuesto_vencido':
+      return <FileText className="h-5 w-5 text-yellow-500" />;
+    case 'contrato_activo':
+    case 'contrato_pendiente':
+    case 'contrato_instalado':
+      return <FileText className="h-5 w-5 text-blue-500" />;
+    case 'recordatorio_seguimiento':
+      return <CheckCircle className="h-5 w-5 text-purple-500" />;
+    case 'asignacion_lead':
+      return <Users className="h-5 w-5 text-green-500" />;
+    case 'comentario_recordatorio':
+      return <MessageCircle className="h-5 w-5 text-indigo-500" />;
+    case 'lead_posible_recontacto':
+      return <RefreshCw className="h-5 w-5 text-cyan-500" />;
+    case 'actividad_sospechosa':
+      return <AlertCircle className="h-5 w-5 text-red-600" />;
+    case 'transferencia_lead':
+      return <ArrowLeftRight className="h-5 w-5 text-purple-500" />;
+    case 'transferencia_empresa':
+      return <ArrowLeftRight className="h-5 w-5 text-indigo-500" />;
+    default:
+      return <Bell className="h-5 w-5 text-gray-500" />;
+  }
+};
 
   const getBadgePrioridad = (prioridad: string) => {
     switch(prioridad) {

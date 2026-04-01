@@ -16,7 +16,8 @@ import {
   Sparkles,
   MessageCircle,
   X,
-  ChevronRight
+  ChevronRight,
+  ArrowLeftRight
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
@@ -156,6 +157,9 @@ const NotificacionesDropdown: React.FC = () => {
         case 'contrato':
           ruta = `/comercial/cuentas/${notificacion.entidad_id}`;
           break;
+        case 'empresa':
+          ruta = `/comercial/cuentas/${notificacion.entidad_id}`;
+          break;
         case 'personal':
           ruta = `/rrhh/personal/cumpleanos`;
           break;
@@ -264,6 +268,16 @@ const NotificacionesDropdown: React.FC = () => {
         return { 
           icon: <RefreshCw className="h-4 w-4 text-cyan-600" />,
           bg: 'bg-cyan-50'
+        };
+      case 'transferencia_lead':
+        return { 
+          icon: <ArrowLeftRight className="h-4 w-4 text-purple-600" />,
+          bg: 'bg-purple-50'
+        };
+      case 'transferencia_empresa':
+        return { 
+          icon: <ArrowLeftRight className="h-4 w-4 text-indigo-600" />,
+          bg: 'bg-indigo-50'
         };
       default:
         return { 
@@ -512,35 +526,34 @@ const NotificacionesDropdown: React.FC = () => {
               )}
             </div>
             
-            {(notificaciones.length > 0 || sinLeer > 0) && (
-              <div className="p-2 border-t bg-gray-50 grid grid-cols-2 gap-1">
-                <a 
-                  href="/notificaciones" 
-                  className="text-xs text-center text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    router.visit('/notificaciones');
-                    setMostrarDropdown(false);
-                  }}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  Ver activas
-                </a>
-                
-                <a 
-                  href="/notificaciones/programadas" 
-                  className="text-xs text-center text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    router.visit('/notificaciones/programadas');
-                    setMostrarDropdown(false);
-                  }}
-                >
-                  <Calendar className="h-3.5 w-3.5" />
-                  Programadas
-                </a>
-              </div>
-            )}
+            {/* Botones siempre visibles */}
+            <div className="p-2 border-t bg-gray-50 grid grid-cols-2 gap-1">
+              <a 
+                href="/notificaciones" 
+                className="text-xs text-center text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.visit('/notificaciones');
+                  setMostrarDropdown(false);
+                }}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                Ver activas
+              </a>
+              
+              <a 
+                href="/notificaciones/programadas" 
+                className="text-xs text-center text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.visit('/notificaciones/programadas');
+                  setMostrarDropdown(false);
+                }}
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                Programadas
+              </a>
+            </div>
           </div>
           
           <div 

@@ -64,7 +64,7 @@ class CertificadosFlotaController extends Controller
         }
     }
 
-    public function index(Request $request)
+      public function index(Request $request)
     {
         $this->authorizePermiso(config('permisos.VER_CERTIFICADOS_FLOTA'));
         
@@ -86,18 +86,25 @@ class CertificadosFlotaController extends Controller
             // Aplicar filtro de prefijos permitidos
             $this->applyPrefijoFilter($empresasQuery, $usuario);
             
-            // Filtro de búsqueda por texto
+            // 🔥 NUEVO: Filtro de búsqueda - SOLO por nombre de empresa o patente
             if ($request->has('search') && !empty($request->search)) {
-                $search = $request->search;
-                $empresasQuery->where(function($q) use ($search) {
-                    $q->where('nombre_fantasia', 'like', "%{$search}%")
-                      ->orWhere('razon_social', 'like', "%{$search}%")
-                      ->orWhere('cuit', 'like', "%{$search}%")
-                      ->orWhereHas('prefijo', function($sq) use ($search) {
-                          $sq->where('codigo', 'like', "%{$search}%");
-                      });
-                });
-            }
+                    $search = $request->search;
+                    $searchTerm = trim($search);
+                    
+                    Log::info('Buscando por término:', ['termino' => $searchTerm]);
+                    
+                    $empresasQuery->where(function($q) use ($searchTerm) {
+                        // Búsqueda por nombre de empresa
+                        $q->where('nombre_fantasia', 'like', "%{$searchTerm}%")
+                        ->orWhere('razon_social', 'like', "%{$searchTerm}%")
+                        // 🔥 Búsqueda por patente a través de la cadena de relaciones
+                        ->orWhereHas('adminEmpresa', function($q2) use ($searchTerm) {
+                            $q2->whereHas('vehiculosImportados', function($q3) use ($searchTerm) {
+                                $q3->where('avl_patente', 'like', "%{$searchTerm}%");
+                            });
+                        });
+                    });
+                }
             
             $empresas = $empresasQuery->orderBy('nombre_fantasia')->get();
             
@@ -156,7 +163,7 @@ class CertificadosFlotaController extends Controller
                             'id' => $vehiculo->id,
                             'codigo_alfa' => $vehiculo->codigoalfa,
                             'patente' => $vehiculo->avl_patente,
-                            'prefijo_codigo' => $vehiculo->prefijo_codigo ?? null, //  Incluir prefijo
+                            'prefijo_codigo' => $vehiculo->prefijo_codigo ?? null,
                             'marca' => $vehiculo->avl_marca,
                             'modelo' => $vehiculo->avl_modelo,
                             'anio' => $vehiculo->avl_anio,

@@ -196,7 +196,7 @@
             border: 1px solid #e9ecef;
             border-radius: 2px;
             padding: 3px 5px;
-            min-height: 22px;
+            min-height: 16px;
         }
 
         .data-label {
@@ -304,7 +304,7 @@
             border: 1px solid #e9ecef;
             border-radius: 2px;
             padding: 4px 6px;
-            min-height: 22px;
+            min-height: 10px;
         }
 
         .total-label-data {
@@ -473,7 +473,6 @@
             width: 100%;
             table-layout: fixed;
             margin-bottom: 6px;
-            padding: 5px 8px;
             background: #f8f9fa;
             border: 1px solid #e9ecef;
             border-radius: 2px;
@@ -512,7 +511,7 @@
         .vehicles-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8px;
+            font-size: 12px;
         }
         
         .vehicles-table th {
@@ -530,7 +529,7 @@
             border-bottom: 1px solid #eee;
             border-left: 1px solid #eee;
             border-right: 1px solid #eee;
-            font-size: 8px;
+            font-size: 10px;
         }
         
         .signature-section {
@@ -582,8 +581,6 @@
             width: 100%;
             table-layout: fixed;
             border-collapse: collapse;
-            margin-top: 6px;
-            margin-bottom: 6px;
         }
 
         .responsables-row {
@@ -605,7 +602,6 @@
             background: #f8f9fa;
             border: 1px solid #e9ecef;
             border-radius: 3px;
-            padding: 6px;
         }
         
         .responsable-title {
@@ -690,7 +686,7 @@
         }
         
         $nombreVendedor = $contrato->vendedor_nombre ?? '';
-        $nombreVendedorCompleto = $nombreVendedor ?: 'G. MOYANO';
+        $nombreVendedorCompleto = $nombreVendedor ?: '';
         
         $fechaNacimiento = !empty($contrato->contacto_fecha_nacimiento) 
             ? \Carbon\Carbon::parse($contrato->contacto_fecha_nacimiento)->format('d/m/Y') 
