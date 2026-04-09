@@ -563,27 +563,13 @@ export default function NuevoComentarioModal({
                                             id="crea_recordatorio"
                                             className="h-4 w-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
                                             checked={data.crea_recordatorio}
-                                            onChange={e => {
-                                                if (!puedeDesactivarRecordatorio) return;
-                                                const nuevoValor = e.target.checked;
-                                                setData('crea_recordatorio', nuevoValor);
-                                                
-                                                if (nuevoValor && data.dias_recordatorio === 0) {
-                                                    setData('dias_recordatorio', 7);
-                                                }
-                                                
-                                                if (!nuevoValor) {
-                                                    setData('dias_recordatorio', 0);
-                                                }
-                                            }}
-                                            disabled={!puedeDesactivarRecordatorio || processing}
+                                            onChange={() => {}} // 🔥 Vacío porque es OBLIGATORIO, no se puede cambiar
+                                            disabled={true} // 🔥 Deshabilitado - siempre activo
                                         />
                                         <label htmlFor="crea_recordatorio" className="ml-2 text-sm text-gray-700 flex items-center gap-2">
                                             <Bell className="h-4 w-4" />
                                             Crear recordatorio
-                                            {esRecordatorioObligatorio && (
-                                                <span className="text-xs text-amber-600">(Obligatorio)</span>
-                                            )}
+                                            <span className="text-xs text-amber-600">(Obligatorio)</span>
                                         </label>
                                     </div>
 
@@ -592,6 +578,59 @@ export default function NuevoComentarioModal({
                                             <label htmlFor="dias_recordatorio" className="block text-sm font-medium text-gray-700">
                                                 Días para recordatorio (máx. 90) *
                                             </label>
+                                            
+                                            {/* 🔥 BOTONES RÁPIDOS */}
+                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setData('dias_recordatorio', 7)}
+                                                    className={`text-xs px-3 py-1 rounded transition-colors ${
+                                                        data.dias_recordatorio === 7
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                    disabled={processing}
+                                                >
+                                                    📅 1 semana
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setData('dias_recordatorio', 14)}
+                                                    className={`text-xs px-3 py-1 rounded transition-colors ${
+                                                        data.dias_recordatorio === 14
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                    disabled={processing}
+                                                >
+                                                    📅 14 días
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setData('dias_recordatorio', 30)}
+                                                    className={`text-xs px-3 py-1 rounded transition-colors ${
+                                                        data.dias_recordatorio === 30
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                    disabled={processing}
+                                                >
+                                                    📅 1 mes
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setData('dias_recordatorio', 60)}
+                                                    className={`text-xs px-3 py-1 rounded transition-colors ${
+                                                        data.dias_recordatorio === 60
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                    disabled={processing}
+                                                >
+                                                    📅 2 meses
+                                                </button>
+                                            </div>
+                                            
                                             <input
                                                 type="number"
                                                 id="dias_recordatorio"
@@ -608,6 +647,29 @@ export default function NuevoComentarioModal({
                                                 required={data.crea_recordatorio}
                                                 disabled={processing}
                                             />
+                                            
+                                            {/* 🔥 LEYENDA CON FECHA PROGRAMADA */}
+                                            {data.dias_recordatorio > 0 && (
+                                                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                                                    <p className="text-sm text-blue-800">
+                                                        <span className="font-medium">Recordatorio programado para:</span>{' '}
+                                                        {(() => {
+                                                            const fecha = new Date();
+                                                            fecha.setDate(fecha.getDate() + data.dias_recordatorio);
+                                                            return fecha.toLocaleDateString('es-ES', {
+                                                                weekday: 'long',
+                                                                year: 'numeric',
+                                                                month: 'long',
+                                                                day: 'numeric'
+                                                            });
+                                                        })()}
+                                                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                                            En {data.dias_recordatorio} días
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                            )}
+                                            
                                             <p className="text-xs text-gray-500">
                                                 El recordatorio se creará para la fecha actual más los días especificados. Máximo 90 días (3 meses).
                                             </p>

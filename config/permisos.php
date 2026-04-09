@@ -8,6 +8,7 @@ return [
     'GESTIONAR_TARIFAS' => 'gestionar_tarifas',
     'GESTIONAR_PROMOCIONES' => 'gestionar_promociones',
     'GESTIONAR_USUARIOS' => 'gestionar_usuarios',
+    'GESTION_ADMIN' => 'gestion_admin',
     'GESTIONAR_ROLES_PERMISOS' => 'gestionar_roles_permisos',
     
     // Condiciones Comerciales

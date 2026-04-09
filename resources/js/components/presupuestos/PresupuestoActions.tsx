@@ -345,26 +345,17 @@ const handleWhatsAppConPDF = async () => {
                         <button
                             onClick={handleAccionPrincipal}
                             disabled={estaCargandoAccion}
-                            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-r-lg transition-colors disabled:opacity-50 -ml-px ${
-                                leadEsCliente
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                    : 'bg-green-600 text-white hover:bg-green-700'
-                            }`}
+                            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-r-lg transition-colors disabled:opacity-50 -ml-px bg-blue-600 text-white hover:bg-blue-700`}
                         >
                             {estaCargandoAccion ? (
                                 <>
                                     <Loader className="h-4 w-4 animate-spin" />
                                     <span>Verificando...</span>
                                 </>
-                            ) : leadEsCliente ? (
+                            ) : (
                                 <>
                                     <FileSignature className="h-4 w-4" />
                                     <span className="hidden sm:inline">Generar Contrato</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Building className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Alta Empresa</span>
                                 </>
                             )}
                         </button>

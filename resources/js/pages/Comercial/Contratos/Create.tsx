@@ -1,4 +1,5 @@
 // resources/js/Pages/Comercial/Contratos/Create.tsx
+
 import { Head, router } from '@inertiajs/react';
 import { 
     User, Building, CreditCard, Truck, FileText, 
@@ -21,7 +22,6 @@ interface Presupuesto {
     id: number;
     cantidad_vehiculos: number;
     lead?: any;
-    // ... otros campos
 }
 
 interface Empresa {
@@ -29,7 +29,6 @@ interface Empresa {
     nombre_fantasia: string;
     razon_social: string;
     cuit: string;
-    // ... otros campos
 }
 
 interface Contacto {
@@ -39,8 +38,7 @@ interface Contacto {
         nombre_completo: string;
         email?: string;
         telefono?: string;
-    };
-    // ... otros campos
+    }
 }
 
 interface Props {
@@ -72,11 +70,12 @@ export default function CreateContrato({
 }: Props) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isVisible, setIsVisible] = useState(false); 
+    const [vehiculoToDelete, setVehiculoToDelete] = useState<{ index: number } | null>(null);
     const toast = useToast();
 
-    // Estado para vehículos
+    // 🔥 MODIFICADO: Inicializar con al menos un vehículo vacío (sin restricción de cantidad)
     const [vehiculos, setVehiculos] = useState<any[]>([
-        { patente: '', marca: '', modelo: '', anio: '', color: '', identificador: '' }
+        { patente: '', marca: '', modelo: '', anio: '', color: '', identificador: '', tipo: '' }
     ]);
 
     // Estado para responsables adicionales
@@ -122,16 +121,35 @@ export default function CreateContrato({
         });
     };
 
-    const handleSubmit = () => {
-                // Validar vehículos
-        if (vehiculos.length === 0) {
-            toast.error('Debe cargar al menos un vehículo');
+    // 🔥 NUEVAS FUNCIONES: Agregar y eliminar vehículos
+    const agregarVehiculo = () => {
+        setVehiculos([...vehiculos, { patente: '', marca: '', modelo: '', anio: '', color: '', identificador: '', tipo: '' }]);
+    };
+
+    const confirmarEliminarVehiculo = (index: number) => {
+        if (vehiculos.length === 1) {
+            toast.error('Debe haber al menos un vehículo');
             return;
         }
+        setVehiculoToDelete({ index });
+    };
 
-        // Validar que estén todos los vehículos requeridos
-        if (vehiculos.length < presupuesto.cantidad_vehiculos) {
-            toast.error(`Debe completar los ${presupuesto.cantidad_vehiculos} vehículos presupuestados. Faltan ${presupuesto.cantidad_vehiculos - vehiculos.length}.`);
+    const eliminarVehiculo = () => {
+        if (vehiculoToDelete && vehiculos.length > 1) {
+            const nuevos = vehiculos.filter((_, i) => i !== vehiculoToDelete.index);
+            setVehiculos(nuevos);
+        }
+        setVehiculoToDelete(null);
+    };
+
+    const handleVehiculosChange = (nuevosVehiculos: any[]) => {
+        setVehiculos(nuevosVehiculos);
+    };
+
+    const handleSubmit = () => {
+        // 🔥 MODIFICADO: Solo validar que haya al menos un vehículo con patente
+        if (vehiculos.length === 0) {
+            toast.error('Debe cargar al menos un vehículo');
             return;
         }
 
@@ -141,6 +159,7 @@ export default function CreateContrato({
             toast.error('Todos los vehículos deben tener patente');
             return;
         }
+        
         setIsSubmitting(true);
 
         router.post('/comercial/contratos', {
@@ -171,7 +190,7 @@ export default function CreateContrato({
             
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
                 {/* Header */}
-                <div className="mb-6 flex items-center justify-between">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-4 bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => window.history.back()}
@@ -192,7 +211,7 @@ export default function CreateContrato({
                     <button
                         onClick={handleSubmit}
                         disabled={isSubmitting}
-                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                        className="px-5 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                     >
                         <Save className="h-4 w-4" />
                         {isSubmitting ? 'Generando...' : 'Generar Contrato'}
@@ -221,11 +240,12 @@ export default function CreateContrato({
                             tipoResponsabilidadContacto={contacto.tipo_responsabilidad_id}
                         />
                         
-                        {/* Vehículos */}
+                        {/* 🔥 MODIFICADO: Vehículos - SIN RESTRICCIÓN DE CANTIDAD */}
                         <VehiculosSection
                             vehiculos={vehiculos}
-                            setVehiculos={setVehiculos}
-                            cantidadMaxima={presupuesto.cantidad_vehiculos}
+                            setVehiculos={handleVehiculosChange}
+                            cantidadMaxima={99}
+                            onEliminarVehiculo={confirmarEliminarVehiculo}
                         />
                         
                         {/* Método de Pago */}
@@ -243,9 +263,36 @@ export default function CreateContrato({
                     <div className="space-y-6">
                         {/* Resumen del Presupuesto */}
                         <ResumenContrato presupuesto={presupuesto} />
+                        
                     </div>
                 </div>
             </div>
+
+            {/* ConfirmDialog para eliminar vehículo */}
+            {vehiculoToDelete !== null && (
+                <div className="fixed inset-0 bg-black/50 z-[99990] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                        <div className="p-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Eliminar vehículo</h3>
+                            <p className="text-gray-600">¿Está seguro que desea eliminar este vehículo?</p>
+                        </div>
+                        <div className="flex justify-end gap-3 p-6 pt-0">
+                            <button
+                                onClick={() => setVehiculoToDelete(null)}
+                                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={eliminarVehiculo}
+                                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Botón flotante para volver arriba */}
             <button

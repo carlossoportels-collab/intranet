@@ -12,8 +12,15 @@ class NoCache
     {
         $response = $next($request);
         
-        // No cachear archivos HTML, solo las páginas
-        if (!$request->is('build/*') && !$request->is('assets/*') && !$request->is('favicon*')) {
+        // 🔥 Excluir rutas de API y requests AJAX
+        $shouldNotCache = !$request->is('build/*') 
+                        && !$request->is('assets/*') 
+                        && !$request->is('favicon*')
+                        && !$request->is('api/*')      
+                        && !$request->ajax()              
+                        && !$request->wantsJson();          
+        
+        if ($shouldNotCache) {
             $response->headers->set('Cache-Control', 'no-cache, no-store, must-revalidate');
             $response->headers->set('Pragma', 'no-cache');
             $response->headers->set('Expires', '0');

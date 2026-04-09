@@ -1,7 +1,7 @@
 // resources/js/components/leads/tabs/PresupuestosUnificadosTab.tsx
 
 import { router } from '@inertiajs/react';
-import { FileText, Calendar, Truck, Eye, Download, Tag, User, Loader, Building, ChevronDown, ChevronUp, FileSignature } from 'lucide-react';
+import { FileText, Calendar, Truck, Eye, Download, Tag, User, Loader, FileSignature,ChevronUp, ChevronDown } from 'lucide-react';
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 
 import { Amount } from '@/components/ui/Amount';
@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import Pagination from '@/components/ui/Pagination';
 import { useToast } from '@/contexts/ToastContext';
 import { Lead, Origen, Rubro, Provincia } from '@/types/leads';
-import AltaEmpresaModal from '@/components/empresa/AltaEmpresaModal';
 import { usePagination } from '@/hooks/usePagination';
 
 // Tipos
@@ -65,7 +64,6 @@ interface Props {
     origenes: Origen[];
     rubros: Rubro[];
     provincias: Provincia[];
-    onAltaEmpresa: (presupuestoId: number, lead: Lead) => void;
 }
 
 const ITEMS_PER_PAGE = 5;
@@ -77,19 +75,10 @@ export default function PresupuestosUnificadosTab({
     origenes,
     rubros,
     provincias,
-    onAltaEmpresa
 }: Props) {
     const [orden, setOrden] = useState<'reciente' | 'antiguo'>('reciente');
     const [generandoPDF, setGenerandoPDF] = useState<number | null>(null);
     const [expandedMobileCard, setExpandedMobileCard] = useState<string | null>(null);
-    
-    // Estados para el flujo inteligente
-    const [modalAltaEmpresaOpen, setModalAltaEmpresaOpen] = useState(false);
-    const [presupuestoSeleccionado, setPresupuestoSeleccionado] = useState<number | null>(null);
-    const [verificandoDatos, setVerificandoDatos] = useState(false);
-    const [pasoInicialModal, setPasoInicialModal] = useState<number>(1);
-    const [modoCompletar, setModoCompletar] = useState(false);
-    const [datosExistentes, setDatosExistentes] = useState<{ empresa?: any; contacto?: any } | undefined>(undefined);
     
     const toast = useToast();
 
@@ -172,73 +161,11 @@ export default function PresupuestosUnificadosTab({
     }, [toast]);
 
     /**
-     * Maneja la acción principal del botón (Alta Empresa o Generar Contrato)
+     * 🔥 NUEVO: Navegar directamente al Show del presupuesto
      */
-const handleAccionPrincipal = useCallback(async (presupuestoId: number) => {
-    if (lead.es_cliente) {
-        setVerificandoDatos(true);
-        setGenerandoPDF(presupuestoId);
-        
-        try {
-            const response = await fetch(`/comercial/leads/${lead.id}/verificar-datos-contrato`);
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error || 'Error al verificar datos');
-            }
-            
-            if (data.todosCompletos) {
-                toast.success('Todos los datos están completos. Generando contrato...');
-                setTimeout(() => {
-                    window.location.href = `/comercial/contratos/create-from-lead/${presupuestoId}`;
-                }, 500);
-            } else {
-
-                // Pasar los datos existentes al modal
-                setDatosExistentes({
-                    empresa: data.empresa || undefined,
-                    contacto: data.contacto || undefined
-                });
-                
-                setPasoInicialModal(data.pasoAMostrar || 2);
-                setModoCompletar(true);
-                setPresupuestoSeleccionado(presupuestoId);
-                setModalAltaEmpresaOpen(true);
-                
-                toast.info('Complete los datos faltantes para generar el contrato');
-            }
-        } catch (error) {
-            console.error('Error verificando datos:', error);
-            toast.error('Error al verificar datos del cliente');
-        } finally {
-            setVerificandoDatos(false);
-            setGenerandoPDF(null);
-        }
-    } else {
-        setDatosExistentes(undefined);
-        setModoCompletar(false);
-        setPasoInicialModal(1);
-        onAltaEmpresa(presupuestoId, lead);
-    }
-}, [lead, onAltaEmpresa, toast]);
-
-    /**
-     * Maneja el cierre del modal de alta empresa
-     */
-    const handleModalClose = useCallback((contratoGuardado?: boolean, irAContrato?: boolean) => {
-        setModalAltaEmpresaOpen(false);
-        setPresupuestoSeleccionado(null);
-        setPasoInicialModal(1);
-        setModoCompletar(false);
-        setDatosExistentes(undefined);
-        
-        if (contratoGuardado) {
-            toast.success('Datos guardados correctamente');
-            router.reload({ only: ['lead', 'presupuestos_nuevos', 'presupuestos_legacy'] });
-        } else if (irAContrato && presupuestoSeleccionado) {
-            router.visit(`/comercial/contratos/create-from-lead/${presupuestoSeleccionado}`);
-        }
-    }, [presupuestoSeleccionado, toast]);
+    const handleGenerarContrato = useCallback((presupuestoId: number) => {
+        router.visit(`/comercial/presupuestos/${presupuestoId}`);
+    }, []);
 
     const handlePageChange = useCallback((page: number) => {
         goToPage(page);
@@ -318,16 +245,15 @@ const handleAccionPrincipal = useCallback(async (presupuestoId: number) => {
                 </div>
             </div>
 
-            {/* Lista de presupuestos - mantiene el mismo código */}
+            {/* Lista de presupuestos */}
             {paginatedPresupuestos.map((presupuesto) => {
                 const cardId = `${presupuesto.tipo}-${presupuesto.id}`;
                 const isExpanded = expandedMobileCard === cardId;
                 const mostrarBotonAccion = presupuesto.tipo === 'nuevo';
-                const estaCargando = verificandoDatos && generandoPDF === presupuesto.id;
                 
                 return (
                     <div key={cardId} className="p-3 sm:p-4 hover:bg-gray-50 transition-colors">
-                        {/* Vista Desktop - mantener igual */}
+                        {/* Vista Desktop */}
                         <div className="hidden sm:block">
                             <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                                 <div className="flex-1 min-w-0">
@@ -416,7 +342,7 @@ const handleAccionPrincipal = useCallback(async (presupuestoId: number) => {
                                             disabled={generandoPDF === presupuesto.id}
                                             className="inline-flex items-center px-2 lg:px-3 py-1.5 lg:py-2 border border-gray-300 shadow-sm text-xs lg:text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {generandoPDF === presupuesto.id && !verificandoDatos ? (
+                                            {generandoPDF === presupuesto.id ? (
                                                 <>
                                                     <Loader className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2 animate-spin" />
                                                     <span>Generando...</span>
@@ -429,32 +355,14 @@ const handleAccionPrincipal = useCallback(async (presupuestoId: number) => {
                                             )}
                                         </button>
                                         
+                                        {/* 🔥 BOTÓN SIEMPRE "GENERAR CONTRATO" Y NAVEGA AL SHOW */}
                                         {mostrarBotonAccion && (
                                             <button
-                                                onClick={() => handleAccionPrincipal(presupuesto.id)}
-                                                disabled={estaCargando}
-                                                className={`inline-flex items-center px-2 lg:px-3 py-1.5 lg:py-2 text-xs lg:text-sm leading-4 font-medium rounded-md justify-center transition-colors ${
-                                                    lead.es_cliente
-                                                        ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-                                                        : 'bg-green-600 text-white hover:bg-green-700 focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
-                                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                                onClick={() => handleGenerarContrato(presupuesto.id)}
+                                                className="inline-flex items-center px-2 lg:px-3 py-1.5 lg:py-2 text-xs lg:text-sm leading-4 font-medium rounded-md justify-center transition-colors bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                             >
-                                                {estaCargando ? (
-                                                    <>
-                                                        <Loader className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2 animate-spin" />
-                                                        <span>Verificando...</span>
-                                                    </>
-                                                ) : lead.es_cliente ? (
-                                                    <>
-                                                        <FileSignature className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2" />
-                                                        <span>Generar Contrato</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Building className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2" />
-                                                        <span>Alta Empresa</span>
-                                                    </>
-                                                )}
+                                                <FileSignature className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2" />
+                                                <span>Ir a detalle</span>
                                             </button>
                                         )}
                                     </div>
@@ -464,7 +372,64 @@ const handleAccionPrincipal = useCallback(async (presupuestoId: number) => {
 
                         {/* Vista Mobile - mantener igual */}
                         <div className="sm:hidden">
-                            {/* ... contenido mobile ... */}
+                            {/* ... contenido mobile ... (mismo código pero con el botón actualizado) */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    {presupuesto.tipo === 'nuevo' ? (
+                                        <FileText className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                                    ) : (
+                                        <FileText className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                                    )}
+                                    <div>
+                                        <h3 className="text-sm font-medium text-gray-900">
+                                            {presupuesto.nombre}
+                                        </h3>
+                                        <p className="text-xs text-gray-500">{presupuesto.fecha}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => toggleMobileCard(cardId)}
+                                    className="p-1 text-gray-400 hover:text-gray-600"
+                                >
+                                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </button>
+                            </div>
+                            
+                            {isExpanded && (
+                                <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+                                    {/* ... resto de información mobile ... */}
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={(e) => handleVerPdf(presupuesto, e)}
+                                            className="flex-1 inline-flex items-center justify-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                        >
+                                            <Eye className="h-3 w-3 mr-1" />
+                                            Ver
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleDescargarPdf(presupuesto, e)}
+                                            disabled={generandoPDF === presupuesto.id}
+                                            className="flex-1 inline-flex items-center justify-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            {generandoPDF === presupuesto.id ? (
+                                                <Loader className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                                <Download className="h-3 w-3 mr-1" />
+                                            )}
+                                            Descargar
+                                        </button>
+                                        {mostrarBotonAccion && (
+                                            <button
+                                                onClick={() => handleGenerarContrato(presupuesto.id)}
+                                                className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                                            >
+                                                <FileSignature className="h-3 w-3 mr-1" />
+                                                Contrato
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 );
@@ -483,19 +448,6 @@ const handleAccionPrincipal = useCallback(async (presupuestoId: number) => {
                     />
                 </div>
             )}
-
-            {/* Modal de Alta Empresa */}
-            <AltaEmpresaModal
-                isOpen={modalAltaEmpresaOpen}
-                onClose={handleModalClose}
-                presupuestoId={presupuestoSeleccionado}
-                lead={lead}
-                origenes={origenes}
-                rubros={rubros}
-                provincias={provincias}
-                modoCompletar={modoCompletar}
-                datosExistentes={datosExistentes}
-            />
         </div>
     );
 }

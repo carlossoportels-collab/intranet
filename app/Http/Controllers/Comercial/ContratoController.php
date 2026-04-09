@@ -397,6 +397,11 @@ public function index(Request $request)
             // Guardar método de pago
             $this->contratoService->guardarMetodoPago($contrato, $request->metodo_pago, $request->datos_cbu ?? $request->datos_tarjeta);
             
+            // 🔥 NUEVO: Actualizar lead a cliente y eliminar notificaciones
+            if ($lead && $lead->id) {
+                $this->contratoService->actualizarLeadACliente($lead->id);
+            }
+            
             DB::commit();
 
             Log::info('Contrato creado exitosamente', ['contrato_id' => $contrato->id]);
@@ -945,6 +950,10 @@ public function storeFromEmpresa(Request $request)
         $contrato->save();
         
         Log::info('Contrato guardado:', ['id' => $contrato->id]);
+
+        if ($lead && $lead->id) {
+            $this->contratoService->actualizarLeadACliente($lead->id);
+        }
         
         // ============================================
         // ACTUALIZAR ESTADO DEL PRESUPUESTO

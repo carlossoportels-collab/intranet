@@ -4,7 +4,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\PermisoMiddleware; // 🔥 IMPORTAR
+use App\Http\Middleware\PermisoMiddleware; 
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,6 +13,16 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+
+        $middleware->validateCsrfTokens(except: [
+            'comercial/utils/empresa/paso1',
+            'comercial/utils/empresa/paso1/*',
+            'comercial/utils/empresa/paso2',
+            'comercial/utils/empresa/paso2/*',
+            'comercial/utils/empresa/paso3',
+            'comercial/utils/empresa/paso3/*',
+        ]);
+
         // Cookies que NO se encriptan
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
         

@@ -27,7 +27,7 @@ interface EnviarContratoEmailModalProps {
     companiaNombre: string;
     plataforma: string;
     pdfUrl?: string;
-    leadEsCliente?: boolean;
+    leadEsCliente?: boolean; // 🔥 Ya no se usa, pero lo mantengo por compatibilidad
 }
 
 export default function EnviarContratoEmailModal({
@@ -41,7 +41,7 @@ export default function EnviarContratoEmailModal({
     companiaNombre,
     plataforma,
     pdfUrl,
-    leadEsCliente = false
+    leadEsCliente = false // 🔥 Ya no afecta la lógica
 }: EnviarContratoEmailModalProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showDocumentSelector, setShowDocumentSelector] = useState(false);
@@ -58,7 +58,7 @@ export default function EnviarContratoEmailModal({
         subject: `Contrato ${contrato?.numero_contrato || ''} - ${companiaNombre}`,
         body: '',
         attachPDF: true,
-        incluirBienvenida: !leadEsCliente
+        incluirBienvenida: false // 🔥 CAMBIADO: Por defecto false
     });
     
     const toast = useToast();
@@ -91,7 +91,6 @@ export default function EnviarContratoEmailModal({
     useEffect(() => {
         if (isOpen && contrato) {
             const emailComercial = comercialEmail || contrato.vendedor_email || '';
-            const nuevoIncluirBienvenida = !leadEsCliente;
             mensajeGenericoRef.current = generarMensajeGenerico();
             
             setFormData({
@@ -99,9 +98,9 @@ export default function EnviarContratoEmailModal({
                 cc: emailComercial,
                 bcc: '',
                 subject: `Contrato ${contrato.numero_contrato || ''} - ${companiaNombre}`,
-                body: mensajeGenericoRef.current,
+                body: mensajeGenericoRef.current, // 🔥 Siempre usar mensaje genérico al inicio
                 attachPDF: true,
-                incluirBienvenida: nuevoIncluirBienvenida
+                incluirBienvenida: false // 🔥 Por defecto sin bienvenida
             });
 
             setTimeout(() => {
@@ -110,14 +109,18 @@ export default function EnviarContratoEmailModal({
                 }
             }, 100);
         }
-    }, [isOpen, contrato, comercialEmail, companiaNombre, leadEsCliente]);
+    }, [isOpen, contrato, comercialEmail, companiaNombre]);
 
-    // Cambiar mensaje según checkbox
+    // 🔥 NUEVO: Cambiar mensaje según checkbox
     useEffect(() => {
         if (isOpen) {
             if (!formData.incluirBienvenida) {
-                setFormData(prev => ({ ...prev, body: mensajeGenericoRef.current }));
+                // Si NO está seleccionado, mostrar el mensaje genérico (o el que haya editado el usuario)
+                if (!formData.body || formData.body.includes('[Mensaje de bienvenida')) {
+                    setFormData(prev => ({ ...prev, body: mensajeGenericoRef.current }));
+                }
             } else {
+                // Si está seleccionado, mostrar placeholder del mensaje de bienvenida
                 setFormData(prev => ({ ...prev, body: `[Mensaje de bienvenida de ${companiaNombre} - ${plataforma}]\n\nEl mensaje se generará automáticamente en el servidor.` }));
             }
         }
@@ -185,93 +188,90 @@ export default function EnviarContratoEmailModal({
         setArchivosPlataforma(prev => prev.filter((_, i) => i !== index));
     };
 
-const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.to) {
-        toast.error('El destinatario es requerido');
-        return;
-    }
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formData.to) {
+            toast.error('El destinatario es requerido');
+            return;
+        }
 
-    setIsSubmitting(true);
-    toast.info('Enviando email...');
+        setIsSubmitting(true);
+        toast.info('Enviando email...');
 
-    try {
-        const formDataToSend = new FormData();
-        
-        // 🔥 PROCESAR DESTINATARIOS - Convertir a array JSON
-        const toArray = formData.to.split(',').map(email => email.trim()).filter(email => email);
-        formDataToSend.append('to', JSON.stringify(toArray));
-        
-        // CC - múltiples emails
-        if (formData.cc) {
-            const ccArray = formData.cc.split(',').map(email => email.trim()).filter(email => email);
-            formDataToSend.append('cc', JSON.stringify(ccArray));
-        }
-        
-        // BCC
-        if (formData.bcc) {
-            const bccArray = formData.bcc.split(',').map(email => email.trim()).filter(email => email);
-            formDataToSend.append('bcc', JSON.stringify(bccArray));
-        }
-        
-        // 🔥 CAMPOS QUE NO DEBEN SER JSON - Enviar como texto plano
-        formDataToSend.append('subject', formData.subject);
-        formDataToSend.append('body', formData.body);  // ← ENVIAR COMO TEXTO PLANO, NO JSON
-        formDataToSend.append('contratoId', String(contrato.id));
-        formDataToSend.append('numeroContrato', contrato.numero_contrato);
-        formDataToSend.append('tipo', 'cliente');
-        
-        // Opciones de bienvenida
-        formDataToSend.append('incluirBienvenida', JSON.stringify(formData.incluirBienvenida));
-        
-        // Datos de bienvenida (si aplica)
-        if (formData.incluirBienvenida && !leadEsCliente) {
-            const bienvenidaData = {
-                companiaId,
-                plataforma,
-                nombreCliente: contrato.cliente_nombre_completo,
-                nombreFlota: contrato.empresa_nombre_flota || contrato.cliente_nombre_completo,
-                comercialNombre,
-                comercialEmail,
-                comercialTelefono
-            };
-            formDataToSend.append('bienvenidaData', JSON.stringify(bienvenidaData));
-        }
-        
-        // Adjuntar PDF
-        if (formData.attachPDF && pdfFile) {
-            formDataToSend.append('pdf', pdfFile);
-        }
-        
-        // Documentos locales
-        archivosLocales.forEach((file, index) => {
-            formDataToSend.append(`documento_local_${index}`, file);
-        });
-        
-        // Documentos de plataforma
-        archivosPlataforma.forEach((file, index) => {
-            formDataToSend.append(`documento_plataforma_${index}`, file);
-        });
+        try {
+            const formDataToSend = new FormData();
+            
+            // Procesar destinatarios
+            const toArray = formData.to.split(',').map(email => email.trim()).filter(email => email);
+            formDataToSend.append('to', JSON.stringify(toArray));
+            
+            if (formData.cc) {
+                const ccArray = formData.cc.split(',').map(email => email.trim()).filter(email => email);
+                formDataToSend.append('cc', JSON.stringify(ccArray));
+            }
+            
+            if (formData.bcc) {
+                const bccArray = formData.bcc.split(',').map(email => email.trim()).filter(email => email);
+                formDataToSend.append('bcc', JSON.stringify(bccArray));
+            }
+            
+            formDataToSend.append('subject', formData.subject);
+            formDataToSend.append('body', formData.body);
+            formDataToSend.append('contratoId', String(contrato.id));
+            formDataToSend.append('numeroContrato', contrato.numero_contrato);
+            formDataToSend.append('tipo', 'cliente');
+            
+            // Opciones de bienvenida - 🔥 Ya no depende de leadEsCliente
+            formDataToSend.append('incluirBienvenida', JSON.stringify(formData.incluirBienvenida));
+            
+            // Datos de bienvenida (si aplica)
+            if (formData.incluirBienvenida) {
+                const bienvenidaData = {
+                    companiaId,
+                    plataforma,
+                    nombreCliente: contrato.cliente_nombre_completo,
+                    nombreFlota: contrato.empresa_nombre_flota || contrato.cliente_nombre_completo,
+                    comercialNombre,
+                    comercialEmail,
+                    comercialTelefono
+                };
+                formDataToSend.append('bienvenidaData', JSON.stringify(bienvenidaData));
+            }
+            
+            // Adjuntar PDF
+            if (formData.attachPDF && pdfFile) {
+                formDataToSend.append('pdf', pdfFile);
+            }
+            
+            // Documentos locales
+            archivosLocales.forEach((file, index) => {
+                formDataToSend.append(`documento_local_${index}`, file);
+            });
+            
+            // Documentos de plataforma
+            archivosPlataforma.forEach((file, index) => {
+                formDataToSend.append(`documento_plataforma_${index}`, file);
+            });
 
-        router.post('/api/email/enviar-contrato', formDataToSend, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Email enviado correctamente');
-                onClose();
-            },
-            onError: (errors: any) => {
-                console.error('Errores:', errors);
-                toast.error(errors?.error || 'Error al enviar el email');
-                setIsSubmitting(false);
-            },
-            onFinish: () => setIsSubmitting(false)
-        });
-    } catch (error) {
-        console.error('Error:', error);
-        toast.error('Error al procesar la solicitud');
-        setIsSubmitting(false);
-    }
-};
+            router.post('/api/email/enviar-contrato', formDataToSend, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Email enviado correctamente');
+                    onClose();
+                },
+                onError: (errors: any) => {
+                    console.error('Errores:', errors);
+                    toast.error(errors?.error || 'Error al enviar el email');
+                    setIsSubmitting(false);
+                },
+                onFinish: () => setIsSubmitting(false)
+            });
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Error al procesar la solicitud');
+            setIsSubmitting(false);
+        }
+    };
 
     const handleVerVistaPrevia = () => setShowVistaPrevia(true);
 
@@ -286,7 +286,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] pointer-events-auto border border-gray-100"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {/* Header - Responsive */}
+                    {/* Header */}
                     <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-gray-50 to-white rounded-t-2xl">
                         <div className="flex items-center gap-3 sm:gap-4">
                             <div className="p-2 sm:p-3 bg-blue-100 rounded-xl">
@@ -310,10 +310,10 @@ const handleSubmit = async (e: React.FormEvent) => {
                         </button>
                     </div>
 
-                    {/* Content - Scrollable con padding responsivo */}
+                    {/* Content */}
                     <div ref={modalContentRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
                         <form id="contratoEmailForm" onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                            {/* Campos principales - Stack en móvil, grid en desktop */}
+                            {/* Campos principales */}
                             <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
                                 <div className="space-y-2">
                                     <label className="block text-sm font-medium text-gray-700">
@@ -402,21 +402,19 @@ const handleSubmit = async (e: React.FormEvent) => {
                                 )}
                             </div>
 
-                            {/* Mensaje de bienvenida */}
-                            <div className={`${!leadEsCliente ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'} p-4 sm:p-6 rounded-xl border`}>
+                            {/* 🔥 NUEVO: Mensaje de bienvenida - Siempre visible y sin lógica automática */}
+                            <div className="bg-green-50 border border-green-200 p-4 sm:p-6 rounded-xl">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div className="flex items-center gap-3">
-                                        <div className={`${!leadEsCliente ? 'bg-green-100' : 'bg-gray-200'} p-2 rounded-lg`}>
-                                            <Gift className={`h-5 w-5 ${!leadEsCliente ? 'text-green-600' : 'text-gray-500'}`} />
+                                        <div className="bg-green-100 p-2 rounded-lg">
+                                            <Gift className="h-5 w-5 text-green-600" />
                                         </div>
                                         <div>
-                                            <h3 className={`font-medium text-sm sm:text-base ${!leadEsCliente ? 'text-green-900' : 'text-gray-600'}`}>
+                                            <h3 className="font-medium text-green-900 text-sm sm:text-base">
                                                 Mensaje de bienvenida
                                             </h3>
-                                            <p className="text-xs sm:text-sm mt-1 hidden sm:block">
-                                                {!leadEsCliente 
-                                                    ? 'Recomendado para nuevos clientes. Incluye datos de acceso, guías y contacto del comercial'
-                                                    : 'El cliente ya ha recibido el mensaje de bienvenida previamente'}
+                                            <p className="text-xs sm:text-sm text-green-700 mt-0.5">
+                                                Incluye datos de acceso, guías y contacto del comercial
                                             </p>
                                         </div>
                                     </div>
@@ -427,13 +425,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                                             name="incluirBienvenida"
                                             checked={formData.incluirBienvenida}
                                             onChange={handleChange}
-                                            disabled={leadEsCliente}
-                                            className={`h-4 w-4 rounded ${!leadEsCliente ? 'text-green-600 focus:ring-green-500' : 'text-gray-400 cursor-not-allowed'}`}
+                                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                                         />
-                                        <label htmlFor="incluirBienvenida" className={`text-sm font-medium ${leadEsCliente ? 'text-gray-400' : 'text-gray-700'}`}>
-                                            Incluir
+                                        <label htmlFor="incluirBienvenida" className="text-sm font-medium text-gray-700">
+                                            Incluir mensaje de bienvenida
                                         </label>
-                                        {formData.incluirBienvenida && !leadEsCliente && (
+                                        {formData.incluirBienvenida && (
                                             <button
                                                 type="button"
                                                 onClick={handleVerVistaPrevia}
@@ -445,14 +442,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                                         )}
                                     </div>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-2 sm:hidden">
-                                    {!leadEsCliente 
-                                        ? 'Incluye datos de acceso, guías y contacto del comercial'
-                                        : 'El cliente ya ha recibido el mensaje de bienvenida'}
-                                </p>
                             </div>
 
-                            {/* Textarea editable (solo cuando NO hay bienvenida) */}
+                            {/* Textarea editable (si NO hay bienvenida seleccionada) */}
                             {!formData.incluirBienvenida && (
                                 <div className="space-y-2">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -538,7 +530,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                         </form>
                     </div>
 
-                    {/* Footer - Responsive */}
+                    {/* Footer */}
                     <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 p-4 sm:p-6 border-t border-gray-200 flex-shrink-0 bg-gray-50 rounded-b-2xl">
                         <button
                             type="button"

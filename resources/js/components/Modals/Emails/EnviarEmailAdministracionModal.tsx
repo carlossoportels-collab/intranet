@@ -60,9 +60,16 @@ export default function EnviarEmailAdministracionModal({
     // Obtener tipo de operación
     const tipoOperacion = contrato?.tipo_operacion;
 
-    // 🔥 DESTINATARIOS: SOLO GFAURE Y PAGOMEZ
+    //  DESTINATARIOS: SOLO GFAURE Y PAGOMEZ
     const getDestinatarios = () => {
         return 'gfaure@localsat.com.ar;pgomez@localsat.com.ar';
+    };
+
+    const getCCDestinatarios = () => {
+        if (comercialEmail && comercialEmail.trim() !== '') {
+            return comercialEmail;
+        }
+        return '';
     };
 
     // Obtener asunto según tipo de operación
@@ -297,6 +304,7 @@ export default function EnviarEmailAdministracionModal({
                 if (v.color) detalles.push(v.color);
                 if (detalles.length > 0) vehiculoStr += ` - ${detalles.join(' ')}`;
                 if (v.identificador) vehiculoStr += ` (ID: ${v.identificador})`;
+                if (v.tipo) vehiculoStr += ` [Tipo: ${v.tipo}]`;
                 lineas.push(vehiculoStr);
             });
             lineas.push(``);
@@ -313,11 +321,22 @@ export default function EnviarEmailAdministracionModal({
         }
         
         if (contrato.debito_tarjeta) {
+            const tarjeta = contrato.debito_tarjeta;
             lineas.push(`MEDIO DE PAGO - TARJETA:`);
-            lineas.push(`Banco: ${contrato.debito_tarjeta.tarjeta_banco}`);
-            lineas.push(`Emisor: ${contrato.debito_tarjeta.tarjeta_emisor}`);
-            lineas.push(`Tipo: ${contrato.debito_tarjeta.tipo_tarjeta === 'debito' ? 'Débito' : 'Crédito'}`);
-            lineas.push(`Titular: ${contrato.debito_tarjeta.titular_tarjeta}`);
+            lineas.push(`Banco: ${tarjeta.tarjeta_banco || '-'}`);
+            lineas.push(`Emisor: ${tarjeta.tarjeta_emisor || '-'}`);
+            lineas.push(`Tipo: ${tarjeta.tipo_tarjeta === 'debito' ? 'Débito' : 'Crédito'}`);
+            lineas.push(`Titular: ${tarjeta.titular_tarjeta || '-'}`);
+            if (tarjeta.tarjeta_numero) {
+                lineas.push(`Número: ${tarjeta.tarjeta_numero}`);
+            }
+            if (tarjeta.tarjeta_codigo) {
+                lineas.push(`CVV: ${tarjeta.tarjeta_codigo}`);
+            }
+            if (tarjeta.tarjeta_expiracion) {
+                const expiracion = tarjeta.expiracion_formateada || tarjeta.tarjeta_expiracion;
+                lineas.push(`Vencimiento: ${expiracion}`);
+            }
             lineas.push(``);
         }
         
@@ -343,7 +362,7 @@ export default function EnviarEmailAdministracionModal({
             mensajeGenericoRef.current = generarMensajeAdministracion();
             setFormData({
                 to: getDestinatarios(),
-                cc: '',
+                cc: getCCDestinatarios(),
                 bcc: '',
                 subject: getSubject(),
                 body: mensajeGenericoRef.current,
@@ -530,7 +549,7 @@ export default function EnviarEmailAdministracionModal({
                     {/* Content - Scrollable */}
                     <div ref={modalContentRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
                         <form id="adminEmailForm" onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                            {/* 🔥 DOCUMENTACIÓN ADICIONAL - PRIMERO (ARRIBA) */}
+                            {/*  DOCUMENTACIÓN ADICIONAL - PRIMERO (ARRIBA) */}
                             <div className="space-y-3 bg-purple-50/50 p-4 sm:p-5 rounded-xl border border-purple-200">
                                 <div className="flex items-center gap-2">
                                     <Paperclip className="h-4 w-4 text-purple-600" />

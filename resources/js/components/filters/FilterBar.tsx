@@ -1,7 +1,7 @@
 // resources/js/components/filters/FilterBar.tsx
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, X, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { Calendar, X, ChevronLeft, ChevronRight, User, MapPin } from 'lucide-react';
 import React, { useState, useRef } from 'react';
 
 import { EstadoLead, Origen } from '@/types/leads';
@@ -24,6 +24,8 @@ interface FilterBarProps {
   onOrigenChange: (value: string) => void;
   prefijoValue: string;
   onPrefijoChange: (value: string) => void;
+  localidadNombreValue: string;
+  onLocalidadNombreChange: (value: string) => void;
   fechaInicio: string;
   fechaFin: string;
   onFechaInicioChange: (value: string) => void;
@@ -152,6 +154,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
   onOrigenChange,
   prefijoValue,
   onPrefijoChange,
+  localidadNombreValue,
+  onLocalidadNombreChange,
   fechaInicio,
   fechaFin,
   onFechaInicioChange,
@@ -277,7 +281,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
         </div>
       </form>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <select 
           className="px-3 py-2 border border-gray-300 rounded text-sm"
           value={estadoValue}
@@ -303,6 +307,29 @@ const FilterBar: React.FC<FilterBarProps> = ({
             </option>
           ))}
         </select>
+        
+        {/* Input de Localidad */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Buscar por localidad..."
+            className="w-full px-3 py-2 pl-9 pr-8 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-sat focus:border-transparent"
+            value={localidadNombreValue}
+            onChange={(e) => onLocalidadNombreChange(e.target.value)}
+          />
+          <MapPin className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          {localidadNombreValue && (
+            <button
+              type="button"
+              onClick={() => onLocalidadNombreChange('')}
+              className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        
+        {/* Filtro de Fecha */}
         <div className="relative" ref={datePickerRef}>
           <div 
             className={`w-full px-3 py-2 border border-gray-300 rounded text-sm flex items-center justify-between cursor-pointer ${fechaInicio || fechaFin ? 'bg-blue-50 border-blue-300' : ''}`}
@@ -464,10 +491,10 @@ const FilterBar: React.FC<FilterBarProps> = ({
             </div>
           )}
         </div>
-                       {/* Comercial/Prefijo */}
+        
+        {/* Comercial/Prefijo */}
         <div className="relative">
           {usuarioEsComercial && prefijoUsuario ? (
-            // Para comerciales: mostrar como texto, no como select
             <div className="px-3 py-2 border border-gray-300 rounded text-sm bg-gray-50">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-gray-500" />
@@ -478,7 +505,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
               <input type="hidden" value={prefijoUsuario.id} />
             </div>
           ) : (
-            // Para otros usuarios: select normal
             <select 
               className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
               value={prefijoValue}

@@ -196,38 +196,31 @@ public function recordatoriosNoLeidos()
         ->where('leida', false)
         ->whereNull('deleted_at');
 }
-
- /**
-     * Accessor para obtener el nombre del comercial asignado
-     */
-    public function getAsignadoNombreAttribute(): ?string
-    {
-        // Intentar obtener desde la relación prefijo
-        if ($this->relationLoaded('prefijo') && $this->prefijo) {
-            $comercial = $this->prefijo->comercial;
-            if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
-                $comercial = $comercial->first();
-            }
-            if ($comercial && $comercial->personal) {
-                return $comercial->personal->nombre_completo;
-            }
-        }
-        
-        // Si no está cargada la relación, buscar directamente
-        if ($this->prefijo_id) {
-            $prefijo = Prefijo::with('comercial.personal')->find($this->prefijo_id);
-            if ($prefijo && $prefijo->comercial) {
-                $comercial = $prefijo->comercial;
-                if ($comercial instanceof \Illuminate\Database\Eloquent\Collection) {
-                    $comercial = $comercial->first();
-                }
-                if ($comercial && $comercial->personal) {
-                    return $comercial->personal->nombre_completo;
-                }
-            }
-        }
-        
+/**
+ * Accessor para obtener el nombre del comercial asignado
+ */
+/**
+ * Accessor para obtener el nombre del comercial asignado
+ */
+/**
+ * Accessor para obtener el nombre del comercial asignado
+ */
+public function getAsignadoNombreAttribute(): ?string
+{
+     
+    // Intentar obtener el nombre
+    try {
+        $nombre = $this->prefijo?->comercial?->personal?->nombre_completo ?? 
+                  $this->prefijo?->comercial?->first()?->personal?->nombre_completo ?? 
+                  'Sin asignar';
+        return $nombre;
+    } catch (\Exception $e) {
+        \Log::error('Error obteniendo nombre comercial', [
+            'lead_id' => $this->id,
+            'error' => $e->getMessage()
+        ]);
         return 'Sin asignar';
     }
+}
 
 }

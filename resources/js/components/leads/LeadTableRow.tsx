@@ -37,9 +37,7 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
   const tieneNotas = lead.notas && Array.isArray(lead.notas) && lead.notas.length > 0;
   
   // Obtener nombre del comercial
-  const nombreComercial = lead.prefijo?.codigo 
-    ? `${lead.prefijo.codigo}${lead.prefijo.descripcion ? ` - ${lead.prefijo.descripcion}` : ''}`
-    : lead.asignado_nombre || 'Sin asignar';
+  const nombreComercial = lead.asignado_nombre || 'Sin asignar';
   
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -58,7 +56,10 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
           <p className="font-medium text-gray-900">
             {lead.nombre_completo || 'Sin nombre'}
           </p>
-          <p className="text-xs text-gray-500">ID: {lead.id}</p>
+          <p className="text-xs text-gray-500">{lead.localidad?.nombre 
+          ? `${lead.localidad.nombre}${lead.localidad.provincia?.nombre ? `, ${lead.localidad.provincia.nombre}` : ''}`
+          : 'Sin localidad'
+        }</p>
         </div>
       </td>
       
@@ -119,7 +120,7 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
             title="Nuevo seguimiento"
           >
             <MessageSquare className="h-4 w-4 mr-1" />
-            Seguimiento
+            Comentario
           </button>
           
           {tieneNotas && (

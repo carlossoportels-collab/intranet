@@ -2,20 +2,30 @@
 import { Head, router } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Eye, MessageSquare, FileText, Briefcase, FileSignature } from 'lucide-react'; // ← Agregar FileSignature
+import { Eye, MessageSquare, FileText, Briefcase, FileSignature } from 'lucide-react';
 import React, { useState, useCallback } from 'react';
 
 import ClienteComentarioModal from '@/components/Modals/ClienteComentarioModal';
 import { Pagination, EmptyState } from '@/components/ui';
 import AppLayout from '@/layouts/app-layout';
 import { TipoComentario } from '@/types/leads';
+
 interface Lead {
     id: number;
     nombre_completo: string;
     email?: string;
     telefono?: string;
+    localidad?: {
+        id: number;
+        nombre: string;
+        provincia_id: number;
+        provincia?: {
+            id: number;
+            nombre: string;
+        };
+        nombre_completo?: string;
+    };
 }
-
 
 interface Empresa {
     id: number;
@@ -49,6 +59,7 @@ interface Props {
     };
     filters?: {
         search?: string;
+        localidad_nombre?: string;
     };
     usuario: {
         ve_todas_cuentas: boolean;
@@ -58,7 +69,7 @@ interface Props {
     };
     comentariosPorLead?: Record<number, number>;
     presupuestosPorLead?: Record<number, number>;
-    contratosPorLead?: Record<number, number>; // ← NUEVO
+    contratosPorLead?: Record<number, number>;
 }
 
 export default function Contactos({ 
@@ -68,9 +79,10 @@ export default function Contactos({
     usuario,
     comentariosPorLead = {},
     presupuestosPorLead = {},
-    contratosPorLead = {} // ← NUEVO
+    contratosPorLead = {}
 }: Props) {
     const [search, setSearch] = useState(filters.search || '');
+    const [localidadNombre, setLocalidadNombre] = useState(filters.localidad_nombre || '');
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [showComentarioModal, setShowComentarioModal] = useState(false);
     const [selectedContact, setSelectedContact] = useState<Contacto | null>(null);
@@ -81,7 +93,11 @@ export default function Contactos({
     
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        router.get('/comercial/contactos', { search }, {
+        const params: any = {};
+        if (search) params.search = search;
+        if (localidadNombre) params.localidad_nombre = localidadNombre;
+        
+        router.get('/comercial/contactos', params, {
             preserveState: true,
             replace: true,
         });
@@ -89,6 +105,7 @@ export default function Contactos({
 
     const clearSearch = () => {
         setSearch('');
+        setLocalidadNombre('');
         router.get('/comercial/contactos', {}, {
             preserveState: true,
             replace: true,
@@ -98,10 +115,11 @@ export default function Contactos({
     const handlePageChange = useCallback((page: number) => {
         const params = new URLSearchParams();
         if (search) params.append('search', search);
+        if (localidadNombre) params.append('localidad_nombre', localidadNombre);
         params.append('page', page.toString());
         
         router.get(`/comercial/contactos?${params.toString()}`);
-    }, [search]);
+    }, [search, localidadNombre]);
     
     const handleOpenComentario = useCallback(async (contact: Contacto) => {
         try {
@@ -137,7 +155,7 @@ export default function Contactos({
         return presupuestosPorLead[leadId] || 0;
     }, [presupuestosPorLead]);
     
-    const contarContratosDeLead = useCallback((leadId: number): number => { // ← NUEVO
+    const contarContratosDeLead = useCallback((leadId: number): number => {
         return contratosPorLead[leadId] || 0;
     }, [contratosPorLead]);
 
@@ -149,6 +167,21 @@ export default function Contactos({
             return 'Fecha inválida';
         }
     };
+
+    const getLocalidadDisplay = (contacto: Contacto): string => {
+        if (contacto.lead?.localidad?.nombre_completo) {
+            return contacto.lead.localidad.nombre_completo;
+        }
+        if (contacto.lead?.localidad?.nombre) {
+            const provincia = contacto.lead.localidad.provincia?.nombre;
+            return provincia 
+                ? `${contacto.lead.localidad.nombre}, ${provincia}`
+                : contacto.lead.localidad.nombre;
+        }
+        return 'Sin localidad';
+    };
+
+    const hasActiveFilters = !!search || !!localidadNombre;
 
     return (
         <AppLayout title="Contactos">
@@ -203,37 +236,66 @@ export default function Contactos({
                 </div>
                 
                 <div className={`${showMobileFilters ? 'block' : 'hidden md:block'} mb-6`}>
-                    <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre, email, teléfono o empresa..."
-                            className="flex-grow px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-local focus:ring-2 focus:ring-local/20 text-sm bg-white transition-all"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                        <div className="flex gap-2">
-                            <button
-                                type="submit"
-                                className="px-4 py-2 bg-local text-white text-sm font-medium rounded-lg hover:bg-local-600 transition-colors flex-1 sm:flex-none"
-                            >
-                                Buscar
-                            </button>
-                            {search && (
+                    <form onSubmit={handleSearch} className="flex flex-col gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                                type="text"
+                                placeholder="Buscar por nombre, email, teléfono o empresa..."
+                                className="flex-grow px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-local focus:ring-2 focus:ring-local/20 text-sm bg-white transition-all"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                            
+                            <input
+                                type="text"
+                                placeholder="Buscar por localidad..."
+                                className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-local focus:ring-2 focus:ring-local/20 text-sm bg-white transition-all min-w-[200px]"
+                                value={localidadNombre}
+                                onChange={(e) => setLocalidadNombre(e.target.value)}
+                            />
+                            
+                            <div className="flex gap-2">
                                 <button
-                                    type="button"
-                                    onClick={clearSearch}
-                                    className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors flex-1 sm:flex-none"
+                                    type="submit"
+                                    className="px-4 py-2 bg-local text-white text-sm font-medium rounded-lg hover:bg-local-600 transition-colors flex-1 sm:flex-none"
                                 >
-                                    Limpiar
+                                    Buscar
                                 </button>
-                            )}
+                                {hasActiveFilters && (
+                                    <button
+                                        type="button"
+                                        onClick={clearSearch}
+                                        className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors flex-1 sm:flex-none"
+                                    >
+                                        Limpiar
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </form>
                 </div>
                 
+                {/* Active Filters Tags */}
+                {hasActiveFilters && (
+                    <div className="mb-4 flex flex-wrap gap-2">
+                        {search && (
+                            <span className="inline-flex items gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                Búsqueda: {search}
+                                <button onClick={() => { setSearch(''); handleSearch(new Event('submit') as any); }} className="ml-1 hover:text-blue-600">×</button>
+                            </span>
+                        )}
+                        {localidadNombre && (
+                            <span className="inline-flex items gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                Localidad: {localidadNombre}
+                                <button onClick={() => { setLocalidadNombre(''); handleSearch(new Event('submit') as any); }} className="ml-1 hover:text-green-600">×</button>
+                            </span>
+                        )}
+                    </div>
+                )}
+                
                 {contactosData.length === 0 ? (
                     <EmptyState 
-                        hasFilters={!!search}
+                        hasFilters={hasActiveFilters}
                         onClearFilters={clearSearch}
                         message="No hay contactos disponibles"
                         suggestion="Los leads que se convierten en clientes aparecerán aquí"
@@ -264,6 +326,11 @@ export default function Contactos({
                                                 </span>
                                             </div>
                                             
+                                            {/* Localidad en móvil */}
+                                            <div className="mt-2 text-xs text-gray-500">
+                                                📍 {getLocalidadDisplay(contacto)}
+                                            </div>
+                                            
                                             {contacto.empresa && (
                                                 <div className="mt-2 p-2 bg-gray-50 rounded">
                                                     <p className="text-xs font-medium text-gray-700">Empresa:</p>
@@ -286,7 +353,7 @@ export default function Contactos({
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-1 text-xs bg-amber-50 px-2 py-1 rounded-full">
-                                                    <FileSignature className="h-3 w-3 text-amber-600" /> {/* ← Cambiado a FileSignature */}
+                                                    <FileSignature className="h-3 w-3 text-amber-600" />
                                                     <span className="font-medium text-amber-700">
                                                         {contarContratosDeLead(contacto.lead_id)} contratos
                                                     </span>
@@ -331,6 +398,9 @@ export default function Contactos({
                                             Empresa
                                         </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Localidad
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Tipo
                                         </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -340,7 +410,7 @@ export default function Contactos({
                                             Comentarios
                                         </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Contratos {/* ← Cambiado de "Contratos" a "Contratos" pero con ícono diferente */}
+                                            Contratos
                                         </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Registro
@@ -377,6 +447,9 @@ export default function Contactos({
                                                     <span className="text-sm text-gray-400">Sin empresa</span>
                                                 )}
                                             </td>
+                                            <td className="px-4 py-3 text-sm text-gray-500">
+                                                {getLocalidadDisplay(contacto)}
+                                            </td>
                                             <td className="px-4 py-3">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                                     contacto.es_contacto_principal 
@@ -386,14 +459,14 @@ export default function Contactos({
                                                     {contacto.es_contacto_principal ? 'Principal' : 'Secundario'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-700">
+                                            <td className="px-4 py-3 text-sm text-gray-700 text-center">
                                                 {contarPresupuestosDeLead(contacto.lead_id)}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-700">
+                                            <td className="px-4 py-3 text-sm text-gray-700 text-center">
                                                 {contarComentariosDeLead(contacto.lead_id)}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-gray-700">
-                                                {contarContratosDeLead(contacto.lead_id)} {/* ← NUEVO */}
+                                            <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                                                {contarContratosDeLead(contacto.lead_id)}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                                 {formatDate(contacto.created)}
@@ -429,7 +502,7 @@ export default function Contactos({
                             total={total}
                             perPage={per_page}
                             baseUrl="/comercial/contactos"
-                            only={['contactos', 'comentariosPorLead', 'presupuestosPorLead', 'contratosPorLead']} // ← Agregado contratosPorLead
+                            only={['contactos', 'comentariosPorLead', 'presupuestosPorLead', 'contratosPorLead']}
                         />
                     </>
                 )}
@@ -447,7 +520,7 @@ export default function Contactos({
                 tiposComentario={tiposComentario}
                 comentariosExistentes={comentariosExistentes}
                 onSuccess={() => {
-                    router.reload({ only: ['contactos', 'comentariosPorLead', 'contratosPorLead'] }); // ← Agregado contratosPorLead
+                    router.reload({ only: ['contactos', 'comentariosPorLead', 'contratosPorLead'] });
                 }}
             />
         </AppLayout>

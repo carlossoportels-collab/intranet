@@ -269,4 +269,139 @@ class ContratoService
             ]);
         }
     }
+
+    
+/**
+ * Actualizar lead a cliente después de crear un contrato
+ */
+public function actualizarLeadACliente($leadId): void
+{
+    if (!$leadId) {
+        Log::info('No hay lead_id para actualizar', ['lead_id' => $leadId]);
+        return;
+    }
+    
+    try {
+        // Obtener el lead
+        $lead = \App\Models\Lead::find($leadId);
+        
+        if (!$lead) {
+            Log::warning('Lead no encontrado', ['lead_id' => $leadId]);
+            return;
+        }
+        
+        // Actualizar estado a GANADO (id = 7)
+        $lead->estado_lead_id = 7;
+        
+        // Marcar como cliente
+        $lead->es_cliente = true;
+        
+        $lead->save();
+        
+        Log::info('Lead actualizado a cliente', [
+            'lead_id' => $leadId,
+            'lead_nombre' => $lead->nombre_completo,
+            'estado_lead_id' => 7,
+            'es_cliente' => true
+        ]);
+        
+        // ============================================
+        // 1. ELIMINAR NOTIFICACIONES DEL LEAD
+        // ============================================
+        $eliminadasLead = \App\Models\Notificacion::where('entidad_tipo', 'lead')
+            ->where('entidad_id', $leadId)
+            ->delete();
+        
+        Log::info('Notificaciones de lead eliminadas', [
+            'lead_id' => $leadId,
+            'cantidad' => $eliminadasLead
+        ]);
+        
+        // ============================================
+        // 2. ELIMINAR NOTIFICACIONES DE COMENTARIOS DEL LEAD
+        // ============================================
+        $comentariosIds = \DB::table('comentarios')
+            ->where('lead_id', $leadId)
+            ->pluck('id')
+            ->toArray();
+        
+        $eliminadasComentarios = 0;
+        if (!empty($comentariosIds)) {
+            $eliminadasComentarios = \App\Models\Notificacion::where('entidad_tipo', 'comentario')
+                ->whereIn('entidad_id', $comentariosIds)
+                ->delete();
+            
+            Log::info('Notificaciones de comentarios eliminadas', [
+                'lead_id' => $leadId,
+                'comentarios_ids' => $comentariosIds,
+                'cantidad' => $eliminadasComentarios
+            ]);
+        }
+        
+        // ============================================
+        // 3. ELIMINAR NOTIFICACIONES DE PRESUPUESTOS DEL LEAD
+        // ============================================
+        $presupuestosIds = \DB::table('presupuestos')
+            ->where('lead_id', $leadId)
+            ->pluck('id')
+            ->toArray();
+        
+        $eliminadasPresupuestos = 0;
+        if (!empty($presupuestosIds)) {
+            $eliminadasPresupuestos = \App\Models\Notificacion::where('entidad_tipo', 'presupuesto')
+                ->whereIn('entidad_id', $presupuestosIds)
+                ->delete();
+            
+            Log::info('Notificaciones de presupuestos eliminadas', [
+                'lead_id' => $leadId,
+                'presupuestos_ids' => $presupuestosIds,
+                'cantidad' => $eliminadasPresupuestos
+            ]);
+        }
+        
+        // ============================================
+        // 4. ELIMINAR NOTIFICACIONES DE SEGUIMIENTO_PÉRDIDA (si existen)
+        // ============================================
+        $seguimientosIds = \DB::table('seguimientos_perdida')
+            ->where('lead_id', $leadId)
+            ->pluck('id')
+            ->toArray();
+        
+        $eliminadasSeguimientos = 0;
+        if (!empty($seguimientosIds)) {
+            $eliminadasSeguimientos = \App\Models\Notificacion::where('entidad_tipo', 'seguimiento_perdida')
+                ->whereIn('entidad_id', $seguimientosIds)
+                ->delete();
+            
+            Log::info('Notificaciones de seguimientos pérdida eliminadas', [
+                'lead_id' => $leadId,
+                'seguimientos_ids' => $seguimientosIds,
+                'cantidad' => $eliminadasSeguimientos
+            ]);
+        }
+        
+        // ============================================
+        // RESUMEN FINAL
+        // ============================================
+        $totalEliminadas = $eliminadasLead + $eliminadasComentarios + $eliminadasPresupuestos + $eliminadasSeguimientos;
+        
+        Log::info('✅ Todas las notificaciones eliminadas para lead convertido a cliente', [
+            'lead_id' => $leadId,
+            'lead_nombre' => $lead->nombre_completo,
+            'notificaciones_lead' => $eliminadasLead,
+            'notificaciones_comentarios' => $eliminadasComentarios,
+            'notificaciones_presupuestos' => $eliminadasPresupuestos,
+            'notificaciones_seguimientos' => $eliminadasSeguimientos,
+            'total_eliminadas' => $totalEliminadas
+        ]);
+        
+    } catch (\Exception $e) {
+        Log::error('Error al actualizar lead a cliente', [
+            'lead_id' => $leadId,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+    }
+}
+    
 }

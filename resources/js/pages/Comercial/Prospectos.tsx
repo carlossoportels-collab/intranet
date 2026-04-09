@@ -138,6 +138,7 @@ export default function Prospectos({
     if (activeFilters.estado_id) params.append('estado_id', activeFilters.estado_id);
     if (activeFilters.origen_id) params.append('origen_id', activeFilters.origen_id);
     if (activeFilters.prefijo_id) params.append('prefijo_id', activeFilters.prefijo_id);
+    if (activeFilters.localidad_nombre) params.append('localidad_nombre', activeFilters.localidad_nombre); 
     if (activeFilters.fecha_inicio) params.append('fecha_inicio', activeFilters.fecha_inicio);
     if (activeFilters.fecha_fin) params.append('fecha_fin', activeFilters.fecha_fin);
     
@@ -221,6 +222,8 @@ export default function Prospectos({
             onEstadoChange={(value) => updateFilter('estado_id', value)}
             origenValue={activeFilters.origen_id}
             onOrigenChange={(value) => updateFilter('origen_id', value)}
+            localidadNombreValue={activeFilters.localidad_nombre}
+            onLocalidadNombreChange={(value) => updateFilter('localidad_nombre', value)}
             prefijoValue={activeFilters.prefijo_id}
             onPrefijoChange={(value) => updateFilter('prefijo_id', value)}
             fechaInicio={activeFilters.fecha_inicio}

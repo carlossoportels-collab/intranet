@@ -73,7 +73,7 @@ class LeadController extends Controller
         // Para leads con tipo 'recontacto' - usar modal de seguimiento de leads perdidos
         if ($estadoTipo === 'final_negativo' || $estadoTipo === 'recontacto') {
             // Tipos de comentario para leads perdidos/seguimiento
-            $tiposComentarioSeguimiento = TipoComentario::where('aplica_a', 'lead_perdido')
+            $tiposComentarioSeguimiento = TipoComentario::where('aplica_a', 'recontacto')
                 ->where('es_activo', 1)
                 ->orderBy('nombre')
                 ->get();

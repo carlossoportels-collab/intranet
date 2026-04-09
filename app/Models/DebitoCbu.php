@@ -80,7 +80,7 @@ class DebitoCbu extends Model
      */
     public function creadoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(Usuario::class, 'created_by');
     }
 
     /**
@@ -88,7 +88,7 @@ class DebitoCbu extends Model
      */
     public function modificadoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'modified_by');
+        return $this->belongsTo(Usuario::class, 'modified_by');
     }
 
     /**
@@ -96,7 +96,7 @@ class DebitoCbu extends Model
      */
     public function eliminadoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'deleted_by');
+        return $this->belongsTo(Usuario::class, 'deleted_by');
     }
 
     /**

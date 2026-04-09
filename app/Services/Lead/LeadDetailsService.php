@@ -194,14 +194,100 @@ class LeadDetailsService
             ->values();
     }
 
-    public function getLeadNotifications(int $leadId, int $usuarioId): Collection
-    {
-        return Notificacion::where('entidad_tipo', 'lead')
-            ->where('entidad_id', $leadId)
-            ->where('usuario_id', $usuarioId)
-            ->orderBy('fecha_notificacion', 'desc')
-            ->get();
-    }
+public function getLeadNotifications(int $leadId, int $usuarioId): Collection
+{
+    $ahora = Carbon::now();
+    
+    // Obtener notificaciones directas del lead (futuras)
+    $notificacionesLead = Notificacion::where('entidad_tipo', 'lead')
+        ->where('entidad_id', $leadId)
+        ->where('usuario_id', $usuarioId)
+        ->whereNull('deleted_at')
+        ->where('fecha_notificacion', '>', $ahora)  // 🔥 SOLO FUTURAS
+        ->orderBy('fecha_notificacion', 'asc')      // 🔥 MÁS CERCANAS PRIMERO
+        ->get()
+        ->map(function ($notif) use ($ahora) {
+            $notif->leida = (bool) $notif->leida;
+            $fechaNotif = Carbon::parse($notif->fecha_notificacion);
+            $notif->dias_faltantes = $ahora->diffInDays($fechaNotif, false);
+            return $notif;
+        });
+    
+    // Obtener notificaciones de comentarios asociados a este lead (futuras)
+    $notificacionesComentarios = Notificacion::where('entidad_tipo', 'comentario')
+        ->whereIn('entidad_id', function($query) use ($leadId) {
+            $query->select('id')
+                ->from('comentarios')
+                ->where('lead_id', $leadId)
+                ->whereNull('deleted_at');
+        })
+        ->where('usuario_id', $usuarioId)
+        ->whereNull('deleted_at')
+        ->where('fecha_notificacion', '>', $ahora)  // 🔥 SOLO FUTURAS
+        ->orderBy('fecha_notificacion', 'asc')      // 🔥 MÁS CERCANAS PRIMERO
+        ->get()
+        ->map(function ($notif) use ($ahora) {
+            $notif->leida = (bool) $notif->leida;
+            $fechaNotif = Carbon::parse($notif->fecha_notificacion);
+            $notif->dias_faltantes = $ahora->diffInDays($fechaNotif, false);
+            
+            // Enriquecer con datos del lead
+            $comentario = \DB::table('comentarios')
+                ->select('comentarios.lead_id', 'leads.nombre_completo')
+                ->join('leads', 'comentarios.lead_id', '=', 'leads.id')
+                ->where('comentarios.id', $notif->entidad_id)
+                ->first();
+                
+            if ($comentario) {
+                $notif->lead_nombre = $comentario->nombre_completo;
+                $notif->lead_id = $comentario->lead_id;
+            }
+            
+            return $notif;
+        });
+    
+    // Combinar ambos tipos y ordenar por fecha (más cercana primero)
+    $todas = $notificacionesLead->concat($notificacionesComentarios)
+        ->sortBy('fecha_notificacion')
+        ->values();
+    
+    return $todas;
+}
+
+// Método adicional si necesitas historial completo (opcional)
+public function getAllLeadNotifications(int $leadId, int $usuarioId): Collection
+{
+    $notificacionesLead = Notificacion::where('entidad_tipo', 'lead')
+        ->where('entidad_id', $leadId)
+        ->where('usuario_id', $usuarioId)
+        ->whereNull('deleted_at')
+        ->orderBy('fecha_notificacion', 'desc')
+        ->get()
+        ->map(function ($notif) {
+            $notif->leida = (bool) $notif->leida;
+            return $notif;
+        });
+    
+    $notificacionesComentarios = Notificacion::where('entidad_tipo', 'comentario')
+        ->whereIn('entidad_id', function($query) use ($leadId) {
+            $query->select('id')
+                ->from('comentarios')
+                ->where('lead_id', $leadId)
+                ->whereNull('deleted_at');
+        })
+        ->where('usuario_id', $usuarioId)
+        ->whereNull('deleted_at')
+        ->orderBy('fecha_notificacion', 'desc')
+        ->get()
+        ->map(function ($notif) {
+            $notif->leida = (bool) $notif->leida;
+            return $notif;
+        });
+    
+    return $notificacionesLead->concat($notificacionesComentarios)
+        ->sortByDesc('fecha_notificacion')
+        ->values();
+}
 
     public function getStateTransitionTimes(int $leadId): array
     {

@@ -14,7 +14,7 @@ class Kernel extends HttpKernel
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         // 🔥 AGREGAR AQUÍ EL MIDDLEWARE NOCACHE
-        \App\Http\Middleware\NoCache::class,
+        //\App\Http\Middleware\NoCache::class,
     ];
 
     protected $middlewareGroups = [

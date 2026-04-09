@@ -31,24 +31,31 @@ class ContactosController extends Controller
         $usuario = auth()->user();
         
         // Base query para contactos (empresa_contactos con lead asociado)
-        $contactosQuery = EmpresaContacto::with(['lead', 'empresa'])
-            ->where('es_activo', 1)
-            ->whereNull('deleted_at');
+        $contactosQuery = EmpresaContacto::with([
+            'lead', 
+            'lead.localidad.provincia',
+            'empresa'
+        ])->where('es_activo', 1)
+        ->whereNull('deleted_at');
         
-      
+        // 🔥 FILTRO DE LOCALIDAD - DEBE IR ANTES DE PAGINAR
+        if ($request->has('localidad_nombre') && $request->localidad_nombre) {
+            $contactosQuery->whereHas('lead.localidad', function ($query) use ($request) {
+                $query->where('nombre', 'like', '%' . $request->localidad_nombre . '%');
+            });
+        }
+        
         // Para contactos, filtramos a través de las empresas
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
-                // Primero obtener empresas con esos prefijos
                 $empresasIds = DB::table('empresas')
                     ->whereIn('prefijo_id', $prefijosUsuario)
                     ->whereNull('deleted_at')
                     ->pluck('id')
                     ->toArray();
                 
-                // Luego filtrar contactos por esas empresas
                 if (!empty($empresasIds)) {
                     $contactosQuery->whereIn('empresa_id', $empresasIds);
                 } else {
@@ -59,7 +66,7 @@ class ContactosController extends Controller
             }
         }
         
-        // Aplicar búsqueda si existe
+        // Aplicar búsqueda por nombre/email/empresa
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $contactosQuery->where(function ($query) use ($search) {
@@ -74,7 +81,7 @@ class ContactosController extends Controller
             });
         }
         
-        // Ordenar por fecha de creación (más recientes primero)
+        // Ordenar y paginar (AHORA SÍ, después de todos los filtros)
         $contactos = $contactosQuery->orderBy('created', 'desc')
             ->paginate(15)
             ->withQueryString();
@@ -85,7 +92,14 @@ class ContactosController extends Controller
             ->where('es_contacto_principal', 1)
             ->whereNull('deleted_at');
         
-        // Aplicar los mismos filtros de permisos
+        // Aplicar filtro de localidad también al conteo de principales
+        if ($request->has('localidad_nombre') && $request->localidad_nombre) {
+            $contactosPrincipalesQuery->whereHas('lead.localidad', function ($query) use ($request) {
+                $query->where('nombre', 'like', '%' . $request->localidad_nombre . '%');
+            });
+        }
+        
+        // Aplicar los mismos filtros de permisos a principales
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
@@ -106,6 +120,21 @@ class ContactosController extends Controller
             }
         }
         
+        // Aplicar búsqueda también a principales
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $contactosPrincipalesQuery->where(function ($query) use ($search) {
+                $query->whereHas('lead', function ($q) use ($search) {
+                    $q->where('nombre_completo', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('telefono', 'like', "%{$search}%");
+                })->orWhereHas('empresa', function ($q) use ($search) {
+                    $q->where('nombre_fantasia', 'like', "%{$search}%")
+                      ->orWhere('razon_social', 'like', "%{$search}%");
+                });
+            });
+        }
+        
         $contactosPrincipales = $contactosPrincipalesQuery->count();
         
         // Obtener los prefijos asignados al usuario para mostrar en la vista
@@ -123,14 +152,27 @@ class ContactosController extends Controller
         $comentariosPorLead = $this->filterService->getConteoComentarios($leadIds);
         $presupuestosPorLead = $this->filterService->getConteoPresupuestos($leadIds);
         $contratosPorLead = $this->getConteoContratos($leadIds);
-        
+
+        $localidades = \App\Models\Localidad::with('provincia')
+            ->where('activo', 1)
+            ->orderBy('nombre')
+            ->get()
+            ->map(function ($localidad) {
+                return [
+                    'id' => $localidad->id,
+                    'nombre' => $localidad->nombre,
+                    'provincia_nombre' => $localidad->provincia?->nombre,
+                    'nombre_completo' => $localidad->nombre_completo,
+                ];
+            });
+    
         return Inertia::render('Comercial/Contactos', [
             'contactos' => $contactos,
             'estadisticas' => [
                 'total' => $contactos->total(),
                 'principales' => $contactosPrincipales,
             ],
-            'filters' => $request->only(['search']),
+            'filters' => $request->only(['search', 'localidad_nombre']), // ← Cambiado de localidad_id a localidad_nombre
             'usuario' => [
                 've_todas_cuentas' => (bool) $usuario->ve_todas_cuentas,
                 'rol_id' => $usuario->rol_id,
@@ -144,9 +186,9 @@ class ContactosController extends Controller
             'comentariosPorLead' => $comentariosPorLead,
             'presupuestosPorLead' => $presupuestosPorLead,
             'contratosPorLead' => $contratosPorLead,
+            'localidades' => $localidades,
         ]);
     }
-    
     /**
      * Mostrar un contacto específico
      */

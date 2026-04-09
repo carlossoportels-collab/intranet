@@ -16,7 +16,15 @@ class CheckUsuarioActivo
             if ($usuario->activo != 1) {
                 Auth::logout();
                 $request->session()->invalidate();
-                $request->session()->regenerateToken();
+                
+                // 🔥 Solo regenerar token si NO es AJAX/JSON
+                if (!$request->ajax() && !$request->wantsJson()) {
+                    $request->session()->regenerateToken();
+                }
+                
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['error' => 'Usuario inactivo'], 403);
+                }
                 
                 return redirect()->route('login')
                     ->withErrors(['acceso' => 'Usuario inactivo.']);

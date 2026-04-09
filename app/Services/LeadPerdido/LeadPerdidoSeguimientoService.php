@@ -53,13 +53,6 @@ class LeadPerdidoSeguimientoService
 
             // 2. Crear notificaciones si corresponde
             if ($data->creaRecordatorio && $data->fechaRecordatorio) {
-                $this->notificationService->crearNotificacionSeguimiento(
-                    $comentario,
-                    $tipoComentario,
-                    $data->fechaRecordatorio,
-                    $data->usuarioId
-                );
-                $mensaje .= ' con recordatorio';
 
                 // Eliminar notificaciones futuras existentes
                 $this->notificationService->eliminarNotificacionesRecontactoFuturas(
@@ -68,7 +61,7 @@ class LeadPerdidoSeguimientoService
                     $comentario->id
                 );
 
-                // Crear notificación de recontacto específica si no es rechazo definitivo
+                // ✅ SOLO crear notificación de recontacto (si no es rechazo definitivo)
                 if ($tipoComentario->nombre !== 'Rechazo definitivo') {
                     $this->notificationService->crearNotificacionRecontacto(
                         $lead,
@@ -76,7 +69,7 @@ class LeadPerdidoSeguimientoService
                         $data->usuarioId,
                         $comentario->id
                     );
-                    $mensaje .= ' y notificación de recontacto programada';
+                    $mensaje .= ' con recordatorio de recontacto programado';
                 }
             }
 

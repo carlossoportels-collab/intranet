@@ -166,7 +166,7 @@ const LeadHeader: React.FC<LeadHeaderProps> = ({
             className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
           >
             <MessageSquare className="h-4 w-4" />
-            <span className="hidden sm:inline">Seguimiento</span>
+            <span className="hidden sm:inline">Comentario</span>
           </button>
           
           <button

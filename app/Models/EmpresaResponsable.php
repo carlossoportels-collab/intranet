@@ -49,17 +49,17 @@ class EmpresaResponsable extends Model
     
     public function creadoPor()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(Usuario::class, 'created_by');
     }
     
     public function modificadoPor()
     {
-        return $this->belongsTo(User::class, 'modified_by');
+        return $this->belongsTo(Usuario::class, 'modified_by');
     }
     
     public function eliminadoPor()
     {
-        return $this->belongsTo(User::class, 'deleted_by');
+        return $this->belongsTo(Usuario::class, 'deleted_by');
     }
     
     // Scopes

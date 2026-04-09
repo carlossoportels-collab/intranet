@@ -48,6 +48,7 @@ use App\Http\Controllers\Config\Parametros\OrigenProspectoController;
 use App\Http\Controllers\Config\Parametros\RubrosController;
 use App\Http\Controllers\Config\Parametros\TerminosCondicionesController;
 use App\Http\Controllers\Config\TarifasController;
+use App\Http\Controllers\Config\GestionAdminController;
 use App\Http\Controllers\Config\PromocionController;
 use App\Http\Controllers\Config\Usuarios\UsuariosSistemaController;
 use App\Http\Controllers\Config\Usuarios\RolesPermisosController;
@@ -68,8 +69,11 @@ use App\Http\Controllers\RRHH\Personal\DatosPersonalesController;
 use App\Http\Controllers\RRHH\Personal\LicenciasController;
 
 // Estadísticas
-use App\Http\Controllers\Estadisticas\ComercialGrupalController;
+use App\Http\Controllers\Estadisticas\EstadisticasGeneralesController;
 use App\Http\Controllers\Estadisticas\ComercialIndividualController;
+use App\Http\Controllers\Estadisticas\ComercialGrupalController;
+use App\Http\Controllers\Estadisticas\SeguimientoAdsController;
+
 
 // Notificaciones
 use App\Http\Controllers\NotificacionController;
@@ -171,7 +175,7 @@ Route::prefix('temp')->name('temp.')->group(function () {
 // RUTAS PROTEGIDAS (requieren autenticación)
 // ============================================
 // Route::middleware(['auth', 'usuario.activo'])->group(function () {
-    Route::middleware(['auth'])->group(function () {
+    Route::middleware(['web','auth'])->group(function () {
     // ========== RUTAS PRINCIPALES ==========
     Route::get('/welcome', [LoginController::class, 'welcome'])->name('welcome');
     Route::get('/', [DashboardController::class, 'index'])->name('home');
@@ -365,6 +369,14 @@ Route::prefix('temp')->name('temp.')->group(function () {
                 Route::get('/productos/tipo/{tipo}', [PromocionController::class, 'getProductosPorTipo'])->name('productos-por-tipo');
             });
         });
+
+        // Gestion-admin
+        Route::prefix('gestion-admin')->name('gestion-admin.')->group(function () {
+            Route::get('/', [GestionAdminController::class, 'index'])->name('index');
+            Route::post('/cargar', [GestionAdminController::class, 'cargar'])->name('cargar');
+            Route::get('/comparar', [GestionAdminController::class, 'comparar'])->name('comparar');
+            Route::post('/aplicar-cambios', [GestionAdminController::class, 'aplicarCambios'])->name('aplicar-cambios');
+        });
                             
         // Usuarios
         Route::prefix('usuarios')->name('usuarios.')->group(function () {
@@ -438,11 +450,31 @@ Route::prefix('temp')->name('temp.')->group(function () {
         });
     });
 
-    // ========== ESTADÍSTICAS (solo usuarios 3 y 5) ==========
-    Route::prefix('estadisticas')->name('estadisticas.')->middleware('usuario:3,5')->group(function () {
-        Route::get('/comercial-grupal', [ComercialGrupalController::class, 'index'])->name('comercial-grupal');
-        Route::get('/comercial-individual/{id}', [ComercialIndividualController::class, 'show'])->name('comercial-individual');
+    // ========== ESTADÍSTICAS ==========
+    Route::prefix('estadisticas')->name('estadisticas.')->group(function () {
+        // Estadísticas generales/grupales (requiere permiso grupal)
+        Route::get('/generales', [EstadisticasGeneralesController::class, 'index'])
+            ->name('generales')
+            ->middleware('permiso:ver_estadisticas_grupales');
+        
+        // Lista de comerciales (requiere permiso grupal)
+        Route::get('/comerciales', [ComercialGrupalController::class, 'index'])
+            ->name('comerciales')
+            ->middleware('permiso:ver_estadisticas_grupales');
+        
+        // Estadísticas individuales por comercial (requiere permiso individual)
+        Route::get('/comercial/{id}', [ComercialIndividualController::class, 'show'])
+            ->name('comercial.individual')
+            ->middleware('permiso:ver_estadisticas_individuales');
+        
+        // Seguimiento ADS (solo usuario ID 7)
+        Route::get('/seguimiento-ads', [SeguimientoAdsController::class, 'index'])
+            ->name('seguimiento-ads');
+        
+        Route::get('/seguimiento-ads/lead/{id}', [SeguimientoAdsController::class, 'showLead'])
+            ->name('seguimiento-ads.lead');
     });
+    
 
     // ========== NOTIFICACIONES ==========
     Route::prefix('notificaciones')->name('notificaciones.')->group(function () {
@@ -492,7 +524,7 @@ Route::get('/storage/presupuestos_legacy/{filename}', function ($filename) {
 // ============================================
 // ENDPOINTS API (con auth)
 // ============================================
-Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
+Route::middleware(['web','auth'])->prefix('api')->name('api.')->group(function () {
     Route::get('/personal/buscar', [DatosPersonalesController::class, 'buscar'])->name('personal.buscar');
     Route::get('/personal/{id}', function ($id) {
         $personal = App\Models\Personal::find($id);

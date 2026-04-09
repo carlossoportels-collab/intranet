@@ -1,4 +1,5 @@
-// SidebarNav.tsx - Versión con permisos y filtrado por usuarios
+// SidebarNav.tsx - Versión corregida con Estadísticas como sección independiente
+
 import { Link, usePage } from '@inertiajs/react';
 import {
     ChevronDown, ChevronRight,
@@ -6,14 +7,14 @@ import {
     Settings, Users, Tag,
     Briefcase, FileCheck, Bell, Calendar,
     CreditCard, Package,
-    UserCog, FileQuestion, Megaphone,
+    UserCog, FileQuestion, Database,
     Cog, CreditCard as CreditCardIcon,
     Lightbulb, Target, Layers,
     Cake, FileSignature, User, Wrench,
     Briefcase as BriefcaseIcon, Shield,
     Folder, BarChart,
     Eye, Search, Receipt,
-    Phone, Mail, ArrowRightLeft
+    Phone, Mail, ArrowRightLeft, PieChart
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
@@ -24,6 +25,7 @@ interface SidebarNavProps {
     auth?: {
         user?: {
             id: number;
+            rol_id?: number;
             rol_nombre: string;
             permisos?: string[];
             ve_todas_cuentas?: boolean;
@@ -70,9 +72,9 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
         localStorage.setItem('sidebar_expanded_items', JSON.stringify(expandedItems));
     }, [expandedItems]);
 
-    // Sincronizar expansión con la ruta actual para que el menú "nazca" abierto donde corresponde
+    // Sincronizar expansión con la ruta actual
     useEffect(() => {
-        const currentPath = url.split('?')[0]; // Limpiamos query params para comparar
+        const currentPath = url.split('?')[0];
         
         const findActivePath = (items: NavItem[]): string[] => {
             for (const item of items) {
@@ -95,7 +97,6 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
         }
     }, [url]);
 
-    // Función de Acordeón: Al abrir un nivel 0, cerramos el resto
     const toggleItem = (id: string, level: number) => {
         setExpandedItems(prev => {
             const isOpening = !prev[id];
@@ -103,7 +104,6 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
 
             const nextState: Record<string, boolean> = { ...prev };
             
-            // Si es nivel principal, cerramos todos los demás principales
             if (level === 0) {
                 navigation.forEach(item => {
                     if (item.id !== id) nextState[item.id] = false;
@@ -116,10 +116,19 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
 
     const userData = auth?.user;
     const permisos = userData?.permisos || [];
+    const rolId = userData?.rol_id;
 
     const tienePermiso = (permisoRequerido?: string): boolean => {
         if (!permisoRequerido) return true;
         return permisos.includes(permisoRequerido);
+    };
+
+    const puedeVerEstadisticas = (): boolean => {
+        // Usuarios con rol 3 o 5 pueden ver estadísticas
+        // También pueden ver si tienen los permisos específicos
+        return [3, 5].includes(rolId || 0) || 
+               tienePermiso('ver_estadisticas_grupales') || 
+               tienePermiso('ver_estadisticas_individuales');
     };
 
     const navigation: NavItem[] = [
@@ -143,7 +152,8 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                     ]
                 },
                 { id: 'gestion-tarifas', name: 'Gestión de Tarifas', icon: <Tag size={14} />, href: '/config/tarifas', permiso: 'gestionar_tarifas' },
-                { id: 'gestion-promociones', name: 'Gestión de Promociones', icon: <Tag size={14} />, href: '/config/promociones', permiso: 'gestionar_promociones' },
+                { id: 'gestion-promociones', name: 'Gestión de Promociones', icon: <CreditCard size={14} />, href: '/config/promociones', permiso: 'gestionar_promociones' },
+                { id: 'gestion-admin', name: 'Gestión Admin', href: '/config/gestion-admin', icon: <Database size={12} />, permiso: 'gestion_admin',visibleForUsers: [2]   },
                 {
                     id: 'gestion-usuarios',
                     name: 'Gestión de Usuarios',
@@ -220,11 +230,50 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                         { id: 'equipo-tecnico', name: 'Técnico', href: '/rrhh/equipos/tecnico', icon: <Wrench size={12} />, permiso: 'gestionar_equipo_tecnico' },
                     ]
                 }
+            
             ]
+            
         }
     ];
+    
 
-const filterNavItems = (items: NavItem[]): NavItem[] => {
+    // Agregar sección de Estadísticas SOLO si el usuario puede verlas
+    if (puedeVerEstadisticas()) {
+        navigation.push({
+            id: 'estadisticas',
+    name: 'Estadísticas',
+    icon: <BarChart size={16} />,
+    children: [
+        { 
+            id: 'estadisticas-generales', 
+            name: 'Estadísticas Grupales', 
+            href: '/estadisticas/generales', 
+            icon: <PieChart size={14} />, 
+            permiso: 'ver_estadisticas_grupales',
+            visibleForUsers: [2]  
+        },
+        { 
+            id: 'estadisticas-comerciales', 
+            name: 'Rendimiento Comercial', 
+            href: '/estadisticas/comerciales', 
+            icon: <Users size={14} />, 
+            permiso: 'ver_estadisticas_grupales',
+            visibleForUsers: [2] 
+        },
+        // Solo visible para usuario ID 7
+        { 
+            id: 'seguimiento-ads', 
+            name: 'Seguimiento ADS', 
+            href: '/estadisticas/seguimiento-ads', 
+            icon: <Target size={14} />,
+            visibleForUsers: [2]
+                },
+                
+            ]
+        });
+    }
+
+    const filterNavItems = (items: NavItem[]): NavItem[] => {
         return items.filter(item => {
             // 1. Lógica específica para el ítem de Transferencias
             if (item.id === 'transferencias') {
@@ -232,13 +281,10 @@ const filterNavItems = (items: NavItem[]): NavItem[] => {
                 const isComercial = userData?.rol_id === 5;
                 const prefijoId = userData?.comercial?.prefijo_id;
 
-                // SI ES ADMIN: Siempre ve el ítem.
-                // SI ES COMERCIAL: Solo lo ve si es prefijo 9.
                 if (!isAdmin) {
                     if (isComercial && prefijoId !== 9) {
                         return false;
                     }
-                    // Si no es admin ni comercial autorizado, ocultar
                     if (!isComercial) return false; 
                 }
             }
@@ -272,7 +318,6 @@ const filterNavItems = (items: NavItem[]): NavItem[] => {
         });
     };
 
-    // Determina si un item está activo por URL exacta
     const isItemActive = (item: NavItem): boolean => {
         const currentPath = url.split('?')[0];
         if (item.href) return currentPath === item.href;
@@ -285,15 +330,9 @@ const filterNavItems = (items: NavItem[]): NavItem[] => {
         const isExpanded = expandedItems[item.id];
         const isActive = isItemActive(item);
 
-        // Clases de indentación
         const paddingClass = level === 0 ? 'px-4' : level === 1 ? 'pl-8 pr-4' : 'pl-12 pr-4';
         
-        // --- LÓGICA DE COLORES DE ICONO SOLICITADA ---
-        // Nivel 0 (level 0) -> Siempre Naranja
-        // Niveles 1 y 2 (level > 0) -> Solo naranja si está seleccionado, sino Gris
         const iconColor = (level === 0 || isActive) ? 'text-sat' : 'text-gray-400';
-
-        // Lógica de texto
         const textColor = isActive 
             ? 'text-sat font-bold' 
             : (level === 0 ? 'text-white font-semibold' : 'text-gray-300');
@@ -336,10 +375,12 @@ const filterNavItems = (items: NavItem[]): NavItem[] => {
         );
     };
 
+    const filteredNavigation = filterNavItems([...navigation]);
+
     return (
         <nav className={`${className} select-none`}>
             <div className="space-y-0.5">
-                {filterNavItems([...navigation]).map(item => renderNavItem(item))}
+                {filteredNavigation.map(item => renderNavItem(item))}
             </div>
         </nav>
     );

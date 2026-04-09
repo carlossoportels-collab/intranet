@@ -22,6 +22,7 @@ export interface Localidad {
     provincia: string;
     codigo_postal: string;
     provincia_id?: number; // Para el formulario de edición
+    nombre_completo?: string;
 }
 
 export interface Rubro {
@@ -77,7 +78,11 @@ export interface Lead {
         id: number;
         nombre: string;
         provincia_id: number;
-        provincia?: string;
+        provincia?: {
+        id: number;
+        nombre: string;
+        } ; // ← Permitir ambos: objeto o string
+        codigo_postal?: string;
     };
     rubro?: {
         id: number;

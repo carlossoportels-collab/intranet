@@ -53,7 +53,7 @@ class ProspectosController extends Controller
         }
         
         // Aplicar filtros
-        $filters = $request->only(['search', 'estado_id', 'origen_id', 'fecha_inicio', 'fecha_fim']);
+        $filters = $request->only(['search', 'estado_id', 'origen_id', 'localidad_nombre', 'fecha_inicio', 'fecha_fim']);
         $this->filterService->aplicarFiltros($query, $filters);
         
         // Aplicar permisos de prefijos (usando el trait)

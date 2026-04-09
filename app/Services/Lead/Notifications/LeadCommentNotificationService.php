@@ -217,11 +217,11 @@ class LeadCommentNotificationService
     private function determinarPrioridad(int $dias): string
     {
         if ($dias <= 2) {
-            return 'urgente';
-        } elseif ($dias <= 7) {
             return 'alta';
-        } else {
+        } elseif ($dias <= 14) {
             return 'normal';
+        } else {
+            return 'baja';
         }
     }
 }

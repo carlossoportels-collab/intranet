@@ -75,53 +75,63 @@ class LeadPerdidoNotificationService
         }
     }
 
-    /**
-     * Crear notificación de recontacto para lead perdido
-     */
-    public function crearNotificacionRecontacto(
-        Lead $lead,
-        string $fechaRecontacto,
-        int $usuarioId,
-        int $comentarioId
-    ): bool {
-        try {
-            $fechaRecontactoObj = \Carbon\Carbon::parse($fechaRecontacto);
-            $diasFaltantes = now()->diffInDays($fechaRecontactoObj, false);
+/**
+ * Crear notificación de recontacto para lead perdido
+ */
+public function crearNotificacionRecontacto(
+    Lead $lead,
+    string $fechaRecontacto,
+    int $usuarioId,
+    int $comentarioId
+): bool {
+    try {
+        $fechaRecontactoObj = \Carbon\Carbon::parse($fechaRecontacto);
+        $diasFaltantes = now()->diffInDays($fechaRecontactoObj, false);
 
-            if ($diasFaltantes <= 0) {
-                Log::warning('Fecha de recontacto no es futura');
-                return false;
-            }
-
-            $prioridad = match(true) {
-                $diasFaltantes <= 3 => 'urgente',
-                $diasFaltantes <= 7 => 'alta',
-                $diasFaltantes <= 14 => 'normal',
-                default => 'baja'
-            };
-
-            DB::table('notificaciones')->insert([
-                'usuario_id' => $usuarioId,
-                'titulo' => 'Recontacto de lead perdido',
-                'mensaje' => "Lead: {$lead->nombre_completo} - Fecha: {$fechaRecontactoObj->format('d/m/Y')}",
-                'tipo' => 'lead_posible_recontacto',
-                'entidad_tipo' => 'comentario',
-                'entidad_id' => $comentarioId,
-                'leida' => false,
-                'fecha_notificacion' => $fechaRecontactoObj,
-                'prioridad' => $prioridad,
-                'created' => now()
-            ]);
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('Error al crear notificación de recontacto:', [
-                'lead_id' => $lead->id,
-                'error' => $e->getMessage()
-            ]);
+        if ($diasFaltantes <= 0) {
+            Log::warning('Fecha de recontacto no es futura');
             return false;
         }
+
+        $prioridad = match(true) {
+            $diasFaltantes <= 3 => 'alta',
+            $diasFaltantes <= 7 => 'normal',
+            $diasFaltantes <= 14 => 'normal',
+            default => 'baja'
+        };
+
+        // Obtener el tipo de comentario para personalizar el título
+        $comentario = Comentario::with('tipoComentario')->find($comentarioId);
+        $tipoNombre = $comentario?->tipoComentario?->nombre ?? 'Seguimiento';
+
+        DB::table('notificaciones')->insert([
+            'usuario_id' => $usuarioId,
+            'titulo' => "Recontacto: {$tipoNombre}",
+            'mensaje' => substr($comentario?->comentario ?? 'Recordatorio de recontacto', 0, 150),
+            'tipo' => 'lead_posible_recontacto',
+            'entidad_tipo' => 'comentario',
+            'entidad_id' => $comentarioId,
+            'leida' => false,
+            'fecha_notificacion' => $fechaRecontactoObj,
+            'prioridad' => $prioridad,
+            'created' => now()
+        ]);
+
+        Log::info('Notificación de recontacto creada', [
+            'comentario_id' => $comentarioId,
+            'lead_id' => $lead->id,
+            'fecha_recontacto' => $fechaRecontacto
+        ]);
+
+        return true;
+    } catch (\Exception $e) {
+        Log::error('Error al crear notificación de recontacto:', [
+            'lead_id' => $lead->id,
+            'error' => $e->getMessage()
+        ]);
+        return false;
     }
+}
 
     /**
      * Eliminar todas las notificaciones pendientes de un lead

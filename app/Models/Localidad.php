@@ -24,6 +24,7 @@ class Localidad extends Model
         'created' => 'datetime'
     ];
     
+    protected $with = ['provincia'];
     protected $appends = ['nombre_completo'];
     
     public function provincia()

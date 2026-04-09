@@ -18,6 +18,7 @@ interface ActiveFiltersProps {
     estado_id: string;
     origen_id: string;
     prefijo_id: string;
+    localidad_nombre: string;
     fecha_inicio: string;
     fecha_fin: string;
   };
@@ -84,6 +85,12 @@ const ActiveFilters: React.FC<ActiveFiltersProps> = ({
       label: 'Comercial', 
       value: filters.prefijo_id,
       displayValue: getPrefijoDisplay(filters.prefijo_id)
+    },
+    { 
+      key: 'localidad_nombre', 
+      label: 'Localidad', 
+      value: filters.localidad_nombre,
+      displayValue: filters.localidad_nombre
     },
     ...(filters.fecha_inicio && filters.fecha_fin ? [{
       key: 'fecha',

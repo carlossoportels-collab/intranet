@@ -1,6 +1,6 @@
 // resources/js/components/leads/tabs/ComentariosTab.tsx
 
-import { MessageSquare, User, Clock, Tag } from 'lucide-react';
+import { MessageSquare, User, Clock, Tag, Plus } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import Pagination from '@/components/ui/Pagination';
 import { usePagination } from '@/hooks/usePagination';
@@ -68,10 +68,10 @@ const ComentariosTab: React.FC<ComentariosTabProps> = ({
         </p>
         <button
           onClick={onNuevoComentario}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm transition-colors"
         >
-          <MessageSquare className="h-4 w-4" />
-          Agregar primer comentario
+          <Plus className="h-4 w-4" />
+          Agregar comentario
         </button>
       </div>
     );
@@ -83,6 +83,14 @@ const ComentariosTab: React.FC<ComentariosTabProps> = ({
         <h3 className="text-lg font-semibold text-gray-900">
           Comentarios y Seguimientos ({total})
         </h3>
+        <button
+          onClick={onNuevoComentario}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">Nuevo comentario</span>
+          <span className="sm:hidden">Nuevo</span>
+        </button>
       </div>
 
       {/* Lista de comentarios paginada */}

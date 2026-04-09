@@ -1,9 +1,9 @@
 // resources/js/Pages/Comercial/Leads/Show.tsx
+
 import { Head, router } from '@inertiajs/react';
 import { User, MessageSquare, Bell, TrendingUp, FileText, FileSignature } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
-import AltaEmpresaModal from '@/components/empresa/AltaEmpresaModal';
 import LeadHeader from '@/components/leads/LeadHeader';
 import LeadStatsCards from '@/components/leads/LeadStatsCards';
 import LeadTabs, { Tab } from '@/components/leads/LeadTabs';
@@ -15,7 +15,7 @@ import PresupuestosUnificadosTab from '@/components/leads/tabs/PresupuestosUnifi
 import ContratosTab from '@/components/leads/tabs/ContratosTab'; 
 import TiemposTab from '@/components/leads/tabs/TiemposTab';
 import EditarLeadModal from '@/components/Modals/EditarLeadModal';
-import NuevoComentarioModal from '@/components/Modals/NuevoComentarioModal';
+import LeadCommentModalSelector from '@/components/leads/LeadCommentModalSelector';
 import { useLeadModals } from '@/hooks/useLeadModal';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -97,16 +97,8 @@ export default function Show({
   const [activeTab, setActiveTab] = useState('informacion');
   const { modals, abrirModal, cerrarModales } = useLeadModals();
   
-  // Estado para el modal de alta de empresa
-  const [altaEmpresaModal, setAltaEmpresaModal] = useState<{
-    isOpen: boolean;
-    presupuestoId: number | null;
-    lead: Lead | null;
-  }>({
-    isOpen: false,
-    presupuestoId: null,
-    lead: null
-  });
+  // Solo el estado para el modal selector de comentarios
+  const [modalSelectorOpen, setModalSelectorOpen] = useState(false);
 
   const puedeVerTiempos = auth.user.ve_todas_cuentas === true || auth.user.rol_id !== 5;
 
@@ -146,7 +138,7 @@ export default function Show({
   if (estadisticas.total_notificaciones > 0) {
     tabs.push({ 
       id: 'notificaciones', 
-      label: 'Notificaciones', 
+      label: 'Recordatorios', 
       icon: <Bell className="h-4 w-4" />, 
       count: estadisticas.total_notificaciones 
     });
@@ -162,7 +154,7 @@ export default function Show({
     });
   }
 
-    // Contratos unificados (solo si hay alguno) ← NUEVO
+  // Contratos unificados (solo si hay alguno)
   if (estadisticas.total_contratos > 0) {
     tabs.push({ 
       id: 'contratos', 
@@ -172,22 +164,9 @@ export default function Show({
     });
   }
 
-  // Función para abrir el modal de alta de empresa
-  const handleAbrirAltaEmpresa = (presupuestoId: number, lead: Lead) => {
-    setAltaEmpresaModal({
-      isOpen: true,
-      presupuestoId,
-      lead
-    });
-  };
-
-  // Función para cerrar el modal de alta de empresa
-  const handleCloseAltaEmpresaModal = () => {
-    setAltaEmpresaModal({
-      isOpen: false,
-      presupuestoId: null,
-      lead: null
-    });
+  // Función para manejar nuevo comentario
+  const handleNuevoComentario = () => {
+    setModalSelectorOpen(true);
   };
 
   // Asegurar que el activeTab sea válido
@@ -203,43 +182,54 @@ export default function Show({
       case 'informacion':
         return <InfoTab lead={lead} />;
       case 'notas':
-        return <NotasTab notas={notas} onNuevoComentario={() => abrirModal('nuevoComentario', lead)} />;
+        return <NotasTab notas={notas} onNuevoComentario={handleNuevoComentario} />;
       case 'comentarios':
         return (
           <ComentariosTab 
             comentarios={comentarios} 
-            onNuevoComentario={() => abrirModal('nuevoComentario', lead)}
+            onNuevoComentario={handleNuevoComentario}
             total={estadisticas.total_comentarios}
           />
         );
       case 'tiempos':
         return <TiemposTab leadId={lead.id} puedeVer={puedeVerTiempos} />;
       case 'notificaciones':
-        return <NotificacionesTab notificaciones={notificaciones} />;
+  // Filtrar solo las notificaciones programadas (futuras) para este lead
+      const notificacionesFuturas = notificaciones.filter(notif => {
+        const fechaNotif = new Date(notif.fecha_notificacion);
+        const ahora = new Date();
+        return fechaNotif > ahora;
+      });
+      
+      return (
+        <NotificacionesTab 
+          notificaciones={notificacionesFuturas}
+          leadId={lead.id}
+        />
+      );
       case 'presupuestos':
-              return (
-                <PresupuestosUnificadosTab 
-                  presupuestosNuevos={presupuestos_nuevos}
-                  presupuestosLegacy={presupuestos_legacy}
-                  lead={lead}
-                  origenes={origenes}
-                  rubros={rubros}
-                  provincias={provincias}
-                  onAltaEmpresa={handleAbrirAltaEmpresa}
-                />
-              );
-            case 'contratos': // ← NUEVO
-              return (
-                <ContratosTab
-                  contratosNuevos={contratos_nuevos}
-                  contratosLegacy={contratos_legacy}
-                  lead={lead}
-                />
-              );
-            default:
-              return null;
-          }
-        };
+        return (
+          <PresupuestosUnificadosTab 
+            presupuestosNuevos={presupuestos_nuevos}
+            presupuestosLegacy={presupuestos_legacy}
+            lead={lead}
+            origenes={origenes}
+            rubros={rubros}
+            provincias={provincias}
+          />
+        );
+      case 'contratos':
+        return (
+          <ContratosTab
+            contratosNuevos={contratos_nuevos}
+            contratosLegacy={contratos_legacy}
+            lead={lead}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <AppLayout title={`Lead #${lead.id} - ${lead.nombre_completo}`}>
@@ -250,25 +240,17 @@ export default function Show({
           <LeadHeader
             lead={lead}
             onEditar={() => abrirModal('editar', lead)}
-            onNuevoComentario={() => abrirModal('nuevoComentario', lead)}
+            onNuevoComentario={handleNuevoComentario}
             tiposComentario={tiposComentario}
             estadosLead={estadosLead}
             comentariosExistentes={comentarios.length}
             seguimientoPerdida={lead.seguimientoPerdida}
             tiposComentarioSeguimiento={tiposComentarioSeguimiento || []}
-            estadosLeadSeguimiento={estadosLead}
+            estadosLeadSeguimiento={estadosLeadSeguimiento || []}
           />
         </div>
 
-        {/* Stats Cards */}
-        {(estadisticas.total_notas > 0 || 
-          estadisticas.total_comentarios > 0 || 
-          estadisticas.total_notificaciones > 0 || 
-          estadisticas.total_presupuestos > 0) && (
-          <div className="mb-4 sm:mb-6 w-full">
-            <LeadStatsCards estadisticas={estadisticas} />
-          </div>
-        )}
+       
 
         {/* Solo mostrar tabs si hay más de 1 */}
         {tabs.length > 1 && (
@@ -286,6 +268,7 @@ export default function Show({
         </div>
       </div>
 
+      {/* Modales */}
       <EditarLeadModal
         isOpen={modals.editar}
         onClose={cerrarModales}
@@ -300,15 +283,22 @@ export default function Show({
         }}
       />
 
-      <AltaEmpresaModal
-        isOpen={altaEmpresaModal.isOpen}
-        onClose={handleCloseAltaEmpresaModal}
-        presupuestoId={altaEmpresaModal.presupuestoId}
-        lead={altaEmpresaModal.lead}
-        origenes={origenes}
-        rubros={rubros}
-        provincias={provincias}
+      <LeadCommentModalSelector
+        isOpen={modalSelectorOpen}
+        onClose={() => setModalSelectorOpen(false)}
+        lead={lead}
+        tiposComentario={tiposComentario}
+        estadosLead={estadosLead}
+        comentariosExistentes={comentarios.length}
+        onSuccess={() => {
+          router.reload({ only: ['lead', 'comentarios', 'estadisticas'] });
+          setModalSelectorOpen(false);
+        }}
+        seguimiento={lead.seguimientoPerdida}
+        tiposComentarioSeguimiento={tiposComentarioSeguimiento || []}
+        estadosLeadSeguimiento={estadosLeadSeguimiento || []}
       />
+      
     </AppLayout>
   );
 }

@@ -372,8 +372,7 @@ export default function AltaEmpresaModal({
         
     }, [propLead, propDatosExistentes, propPasoInicial, esComercial, usuario]);
 
-    // ... resto del código igual (useEffects, validarPaso, guardarLead, guardarContacto, guardarEmpresa, handlers, render) ...
-    // Mantén todo lo demás igual, solo asegúrate de que en los onChange de los selects se use Number() o toNumberOrEmpty
+
 
     // ============================================
     // EFECTO PARA CARGAR SELECTS

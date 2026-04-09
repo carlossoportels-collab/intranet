@@ -7,19 +7,19 @@ use App\Models\Lead;
 use App\Models\EstadoLead;
 use App\Models\Prefijo;
 use App\Models\Comercial;
-use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
+use App\Traits\HasPermisosService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
 class LeadFilterService
 {
-    use HasPermisosService; // 🔥 AGREGAR TRAIT
+    use HasPermisosService;
 
     private array $estadosExcluirIds;
     
     public function __construct()
     {
-        $this->initializePermisoService(); // 🔥 INICIALIZAR
+        $this->initializePermisoService();
         $this->estadosExcluirIds = $this->getEstadosExcluirIds();
     }
     
@@ -34,7 +34,14 @@ class LeadFilterService
     public function getQueryBase(): \Illuminate\Database\Eloquent\Builder
     {
         return Lead::query()
-            ->with(['origen', 'estadoLead', 'localidad.provincia', 'rubro', 'comercial.personal', 'notas.usuario.personal'])
+            ->with([
+                'origen', 
+                'estadoLead', 
+                'localidad.provincia', 
+                'rubro', 
+                'prefijo.comercial.personal',  // ← Cambiar 'comercial.personal' por esto
+                'notas.usuario.personal'
+            ])
             ->where('es_cliente', 0)
             ->whereNotIn('estado_lead_id', $this->estadosExcluirIds);
     }
@@ -61,8 +68,17 @@ class LeadFilterService
             $query->where('origen_id', $filters['origen_id']);
         }
 
+        // Filtro por prefijo
         if (!empty($filters['prefijo_id'])) {
             $this->aplicarFiltroPrefijo($query, $filters['prefijo_id']);
+        }
+        
+        // 🔥 NUEVO: Filtro por nombre de localidad (búsqueda LIKE)
+        if (!empty($filters['localidad_nombre'])) {
+            $searchTerm = $filters['localidad_nombre'];
+            $query->whereHas('localidad', function ($q) use ($searchTerm) {
+                $q->where('nombre', 'like', "%{$searchTerm}%");
+            });
         }
         
         // Filtro por fecha
@@ -82,7 +98,6 @@ class LeadFilterService
     
     public function getComercialesActivos($usuario): Collection
     {
-        
         $query = Comercial::with('personal')
             ->where('activo', 1);
         
@@ -102,7 +117,6 @@ class LeadFilterService
         // Log del primer comercial para ver qué datos tiene
         if ($resultados->isNotEmpty()) {
             $primerComercial = $resultados->first();
-            
         }
         
         $mapeados = $resultados->map(function ($comercial) {

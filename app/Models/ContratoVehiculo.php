@@ -49,7 +49,7 @@ class ContratoVehiculo extends Model
      */
     public function eliminadoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'deleted_by');
+        return $this->belongsTo(Usuario::class, 'deleted_by');
     }
 
     /**
