@@ -1,7 +1,7 @@
 // resources/js/Pages/Comercial/Leads/Show.tsx
 
-import { Head, router } from '@inertiajs/react';
-import { User, MessageSquare, Bell, TrendingUp, FileText, FileSignature } from 'lucide-react';
+import { Head, router, usePage  } from '@inertiajs/react';
+import { User, MessageSquare, Bell, TrendingUp, FileText, FileSignature, ArrowLeft } from 'lucide-react'; // ✅ Agregar ArrowLeft
 import React, { useState, useEffect } from 'react';
 
 import LeadHeader from '@/components/leads/LeadHeader';
@@ -17,6 +17,7 @@ import TiemposTab from '@/components/leads/tabs/TiemposTab';
 import EditarLeadModal from '@/components/Modals/EditarLeadModal';
 import LeadCommentModalSelector from '@/components/leads/LeadCommentModalSelector';
 import { useLeadModals } from '@/hooks/useLeadModal';
+import { useProspectosFilters } from '@/hooks/useProspectosFilters'; // ✅ Importar hook
 import AppLayout from '@/layouts/app-layout';
 import {
   Lead,
@@ -96,11 +97,66 @@ export default function Show({
 }: PageProps) {
   const [activeTab, setActiveTab] = useState('informacion');
   const { modals, abrirModal, cerrarModales } = useLeadModals();
-  
-  // Solo el estado para el modal selector de comentarios
   const [modalSelectorOpen, setModalSelectorOpen] = useState(false);
 
   const puedeVerTiempos = auth.user.ve_todas_cuentas === true || auth.user.rol_id !== 5;
+  
+  // ✅ Hook para volver a la lista preservando filtros
+  const { goBackToList } = useProspectosFilters({});
+
+const { url } = usePage();
+
+const handleBack = () => {
+  const referrer = document.referrer;
+  
+  // Si venimos de prospectos, restaurar filtros
+  if (referrer.includes('/comercial/prospectos')) {
+    const savedFilters = sessionStorage.getItem('prospectos_filters');
+    const returnUrl = sessionStorage.getItem('prospectos_filters_return_url');
+    
+    if (returnUrl && savedFilters) {
+      sessionStorage.removeItem('prospectos_filters_return_url');
+      router.visit(returnUrl, {
+        preserveState: true,
+        preserveScroll: true
+      });
+      return;
+    }
+  }
+  
+  // Si venimos de contactos, restaurar filtros
+  if (referrer.includes('/comercial/contactos')) {
+    const savedFilters = sessionStorage.getItem('contactos_filters');
+    const returnUrl = sessionStorage.getItem('contactos_filters_return_url');
+    
+    if (returnUrl && savedFilters) {
+      sessionStorage.removeItem('contactos_filters_return_url');
+      router.visit(returnUrl, {
+        preserveState: true,
+        preserveScroll: true
+      });
+      return;
+    }
+  }
+  
+  // Si venimos de leads perdidos, restaurar filtros
+  if (referrer.includes('/comercial/leads-perdidos')) {
+    const savedFilters = sessionStorage.getItem('leads_perdidos_filters');
+    const returnUrl = sessionStorage.getItem('leads_perdidos_filters_return_url');
+    
+    if (returnUrl && savedFilters) {
+      sessionStorage.removeItem('leads_perdidos_filters_return_url');
+      router.visit(returnUrl, {
+        preserveState: true,
+        preserveScroll: true
+      });
+      return;
+    }
+  }
+  
+  // Fallback: volver atrás en el historial
+  window.history.back();
+};
 
   // Construir tabs condicionalmente
   const tabs: Tab[] = [
@@ -194,19 +250,18 @@ export default function Show({
       case 'tiempos':
         return <TiemposTab leadId={lead.id} puedeVer={puedeVerTiempos} />;
       case 'notificaciones':
-  // Filtrar solo las notificaciones programadas (futuras) para este lead
-      const notificacionesFuturas = notificaciones.filter(notif => {
-        const fechaNotif = new Date(notif.fecha_notificacion);
-        const ahora = new Date();
-        return fechaNotif > ahora;
-      });
-      
-      return (
-        <NotificacionesTab 
-          notificaciones={notificacionesFuturas}
-          leadId={lead.id}
-        />
-      );
+        const notificacionesFuturas = notificaciones.filter(notif => {
+          const fechaNotif = new Date(notif.fecha_notificacion);
+          const ahora = new Date();
+          return fechaNotif > ahora;
+        });
+        
+        return (
+          <NotificacionesTab 
+            notificaciones={notificacionesFuturas}
+            leadId={lead.id}
+          />
+        );
       case 'presupuestos':
         return (
           <PresupuestosUnificadosTab 
@@ -236,11 +291,13 @@ export default function Show({
       <Head title={`Lead #${lead.id} - ${lead.nombre_completo}`} />
       
       <div className="w-full px-2 sm:px-4 py-3 sm:py-6">
+
         <div className="mb-4 sm:mb-6">
           <LeadHeader
             lead={lead}
             onEditar={() => abrirModal('editar', lead)}
             onNuevoComentario={handleNuevoComentario}
+            onVolver={handleBack}
             tiposComentario={tiposComentario}
             estadosLead={estadosLead}
             comentariosExistentes={comentarios.length}
@@ -249,8 +306,6 @@ export default function Show({
             estadosLeadSeguimiento={estadosLeadSeguimiento || []}
           />
         </div>
-
-       
 
         {/* Solo mostrar tabs si hay más de 1 */}
         {tabs.length > 1 && (
@@ -298,7 +353,6 @@ export default function Show({
         tiposComentarioSeguimiento={tiposComentarioSeguimiento || []}
         estadosLeadSeguimiento={estadosLeadSeguimiento || []}
       />
-      
     </AppLayout>
   );
 }

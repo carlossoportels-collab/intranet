@@ -1,7 +1,8 @@
 // resources/js/Pages/Config/GestionAdmin.tsx
 
 import { useState } from 'react';
-import { router } from '@inertiajs/react';
+import axios from 'axios';
+
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,7 +40,18 @@ interface EmpresaActualizar {
         valor_nuevo: string | null;
     }>;
 }
-
+interface CargarResponse {
+    success: boolean;
+    message?: string;
+    error?: string;
+    stats?: {
+        empresas: number;
+        vehiculos: number;
+        accesorios: number;
+        abonos: number;
+        total_filas: number;
+    };
+}
 interface VehiculoAgregar {
     codigoalfa: string;
     prefijo_codigo: string | null;
@@ -134,34 +146,40 @@ export default function GestionAdmin({
     const [aplicando, setAplicando] = useState(false);
     const toast = useToast();
 
-    const handleCargar = async () => {
-        if (!archivo) return;
+const handleCargar = async () => {
+    if (!archivo) return;
+    
+    setCargando(true);
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    
+    try {
+        const response = await axios.post<CargarResponse>('/config/gestion-admin/cargar', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+            },
+            withCredentials: true
+        });
         
-        setCargando(true);
-        const formData = new FormData();
-        formData.append('archivo', archivo);
-        
-        try {
-            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const response = await fetch('/config/gestion-admin/cargar', {
-                method: 'POST',
-                body: formData,
-                headers: { 'X-CSRF-TOKEN': token || '' }
-            });
-            const data = await response.json();
-            
-            if (data.success) {
-                toast?.success(data.message);
-                setTimeout(() => window.location.reload(), 1500);
-            } else {
-                toast?.error(data.error);
-            }
-        } catch (error) {
-            toast?.error('Error al cargar');
-        } finally {
-            setCargando(false);
+        if (response.data.success) {
+            toast?.success(response.data.message || 'Carga completada');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            toast?.error(response.data.error || 'Error al cargar');
         }
-    };
+    } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 419) {
+            toast?.error('Sesión expirada. Recargando página...');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            console.error('Error:', error);
+            toast?.error('Error al cargar el archivo');
+        }
+    } finally {
+        setCargando(false);
+    }
+};
 
     const handleComparar = async () => {
         setComparando(true);

@@ -1,4 +1,4 @@
-// SidebarNav.tsx - Versión corregida con Estadísticas como sección independiente
+// resources/js/components/layout/SidebarNav.tsx
 
 import { Link, usePage } from '@inertiajs/react';
 import {
@@ -17,7 +17,6 @@ import {
     Phone, Mail, ArrowRightLeft, PieChart
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
-import { router } from '@inertiajs/react';
 
 interface SidebarNavProps {
     className?: string;
@@ -52,10 +51,10 @@ interface NavItem {
     parentId?: string | null;
 }
 
-export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
+export default function SidebarNav({ className = '', collapsed = false, auth }: SidebarNavProps) {
     const { url } = usePage();
 
-    // Cargar estado expandido desde localStorage al inicializar
+    // Cargar estado expandido desde localStorage
     const loadExpandedFromStorage = (): Record<string, boolean> => {
         try {
             const stored = localStorage.getItem('sidebar_expanded_items');
@@ -72,8 +71,10 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
         localStorage.setItem('sidebar_expanded_items', JSON.stringify(expandedItems));
     }, [expandedItems]);
 
-    // Sincronizar expansión con la ruta actual
+    // Sincronizar expansión con la ruta actual (solo cuando no está colapsado)
     useEffect(() => {
+        if (collapsed) return;
+        
         const currentPath = url.split('?')[0];
         
         const findActivePath = (items: NavItem[]): string[] => {
@@ -87,7 +88,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             return [];
         };
 
-        const activeIds = findActivePath(navigation);
+        const activeIds = findActivePath(filteredNavigation);
         if (activeIds.length > 0) {
             setExpandedItems(prev => {
                 const newExpanded = { ...prev };
@@ -95,9 +96,11 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                 return newExpanded;
             });
         }
-    }, [url]);
+    }, [url, collapsed]);
 
     const toggleItem = (id: string, level: number) => {
+        if (collapsed) return;
+        
         setExpandedItems(prev => {
             const isOpening = !prev[id];
             if (!isOpening) return { ...prev, [id]: false };
@@ -105,7 +108,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
             const nextState: Record<string, boolean> = { ...prev };
             
             if (level === 0) {
-                navigation.forEach(item => {
+                filteredNavigation.forEach(item => {
                     if (item.id !== id) nextState[item.id] = false;
                 });
             }
@@ -124,8 +127,6 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
     };
 
     const puedeVerEstadisticas = (): boolean => {
-        // Usuarios con rol 3 o 5 pueden ver estadísticas
-        // También pueden ver si tienen los permisos específicos
         return [3, 5].includes(rolId || 0) || 
                tienePermiso('ver_estadisticas_grupales') || 
                tienePermiso('ver_estadisticas_individuales');
@@ -153,7 +154,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                 },
                 { id: 'gestion-tarifas', name: 'Gestión de Tarifas', icon: <Tag size={14} />, href: '/config/tarifas', permiso: 'gestionar_tarifas' },
                 { id: 'gestion-promociones', name: 'Gestión de Promociones', icon: <CreditCard size={14} />, href: '/config/promociones', permiso: 'gestionar_promociones' },
-                { id: 'gestion-admin', name: 'Gestión Admin', href: '/config/gestion-admin', icon: <Database size={12} />, permiso: 'gestion_admin',visibleForUsers: [2]   },
+                { id: 'gestion-admin', name: 'Gestión Admin', href: '/config/gestion-admin', icon: <Database size={12} />, permiso: 'gestion_admin', visibleForUsers: [2] },
                 {
                     id: 'gestion-usuarios',
                     name: 'Gestión de Usuarios',
@@ -193,7 +194,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                         { id: 'certificados-flota', name: 'Certificados', href: '/comercial/cuentas/certificados', icon: <FileCheck size={12} />, permiso: 'ver_certificados_flota' },
                         { id: 'cambio-titularidad', name: 'Cambio Titularidad', href: '/comercial/cuentas/cambio-titularidad', icon: <User size={12} />, permiso: 'gestionar_cambio_titularidad' },
                         { id: 'cambio-razon-social', name: 'Cambio RS', href: '/comercial/cuentas/cambio-razon-social', icon: <Building size={12} />, permiso: 'gestionar_cambio_razon_social' },
-                        { id: 'transferencias', name: 'Transferencias', href: '/comercial/cuentas/transferencias', icon: <ArrowRightLeft size={12} />, permiso: 'gestionar_transferencias', visibleForUsers:[14 ]},
+                        { id: 'transferencias', name: 'Transferencias', href: '/comercial/cuentas/transferencias', icon: <ArrowRightLeft size={12} />, permiso: 'gestionar_transferencias', visibleForUsers: [14] },
                     ]
                 },
                 { id: 'contratos', name: 'Contratos', href: '/comercial/contratos', icon: <FileText size={14} />, permiso: 'ver_contratos' },
@@ -230,52 +231,47 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                         { id: 'equipo-tecnico', name: 'Técnico', href: '/rrhh/equipos/tecnico', icon: <Wrench size={12} />, permiso: 'gestionar_equipo_tecnico' },
                     ]
                 }
-            
             ]
-            
         }
     ];
-    
 
-    // Agregar sección de Estadísticas SOLO si el usuario puede verlas
+    // Agregar sección de Estadísticas
     if (puedeVerEstadisticas()) {
         navigation.push({
             id: 'estadisticas',
-    name: 'Estadísticas',
-    icon: <BarChart size={16} />,
-    children: [
-        { 
-            id: 'estadisticas-generales', 
-            name: 'Estadísticas Grupales', 
-            href: '/estadisticas/generales', 
-            icon: <PieChart size={14} />, 
-            permiso: 'ver_estadisticas_grupales',
-            visibleForUsers: [2]  
-        },
-        { 
-            id: 'estadisticas-comerciales', 
-            name: 'Rendimiento Comercial', 
-            href: '/estadisticas/comerciales', 
-            icon: <Users size={14} />, 
-            permiso: 'ver_estadisticas_grupales',
-            visibleForUsers: [2] 
-        },
-        // Solo visible para usuario ID 7
-        { 
-            id: 'seguimiento-ads', 
-            name: 'Seguimiento ADS', 
-            href: '/estadisticas/seguimiento-ads', 
-            icon: <Target size={14} />,
-            visibleForUsers: [2]
+            name: 'Estadísticas',
+            icon: <BarChart size={16} />,
+            children: [
+                { 
+                    id: 'estadisticas-generales', 
+                    name: 'Estadísticas Grupales', 
+                    href: '/estadisticas/generales', 
+                    icon: <PieChart size={14} />, 
+                    permiso: 'ver_estadisticas_grupales',
+                    visibleForUsers: [2]  
                 },
-                
+                { 
+                    id: 'estadisticas-comerciales', 
+                    name: 'Rendimiento Comercial', 
+                    href: '/estadisticas/comerciales', 
+                    icon: <Users size={14} />, 
+                    permiso: 'ver_estadisticas_grupales',
+                    visibleForUsers: [2] 
+                },
+                { 
+                    id: 'seguimiento-ads', 
+                    name: 'Seguimiento ADS', 
+                    href: '/estadisticas/seguimiento-ads', 
+                    icon: <Target size={14} />,
+                    visibleForUsers: [2]
+                },
             ]
         });
     }
 
     const filterNavItems = (items: NavItem[]): NavItem[] => {
         return items.filter(item => {
-            // 1. Lógica específica para el ítem de Transferencias
+            // Lógica específica para el ítem de Transferencias
             if (item.id === 'transferencias') {
                 const isAdmin = [1, 2, 3].includes(userData?.rol_id || 0); 
                 const isComercial = userData?.rol_id === 5;
@@ -289,22 +285,18 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                 }
             }
 
-            // 2. Verificar usuarios específicos (visibleForUsers)
             if (item.id !== 'transferencias' && item.visibleForUsers && !item.visibleForUsers.includes(userData?.id || 0)) {
                 return false;
             }
             
-            // 3. Verificar roles (visibleForRoles)
             if (item.visibleForRoles && !item.visibleForRoles.includes(userData?.rol_nombre || '')) {
                 return false;
             }
             
-            // 4. Verificar permisos generales del sistema
             if (item.permiso && !tienePermiso(item.permiso)) {
                 return false;
             }
             
-            // 5. Filtrar hijos recursivamente
             if (item.children) {
                 const filteredChildren = filterNavItems([...item.children]);
                 if (filteredChildren.length > 0) {
@@ -330,8 +322,25 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
         const isExpanded = expandedItems[item.id];
         const isActive = isItemActive(item);
 
+        // Modo colapsado - mostrar solo íconos
+        if (collapsed) {
+            if (hasChildren) {
+                return null;
+            }
+            return (
+                <Link
+                    key={item.id}
+                    href={item.href || '#'}
+                    className={`flex items-center justify-center py-3 transition-all duration-200 group relative ${className}`}
+                    title={item.name}
+                >
+                    {item.icon && <span className={`text-gray-400 group-hover:text-sat transition-colors ${isActive ? 'text-sat' : ''}`}>{item.icon}</span>}
+                </Link>
+            );
+        }
+
+        // Modo expandido
         const paddingClass = level === 0 ? 'px-4' : level === 1 ? 'pl-8 pr-4' : 'pl-12 pr-4';
-        
         const iconColor = (level === 0 || isActive) ? 'text-sat' : 'text-gray-400';
         const textColor = isActive 
             ? 'text-sat font-bold' 
@@ -342,7 +351,7 @@ export default function SidebarNav({ className = '', auth }: SidebarNavProps) {
                 <div key={item.id} className="w-full">
                     <button
                         onClick={() => toggleItem(item.id, level)}
-                        className={`flex items-center justify-between w-full py-3 text-sm transition-all duration-200 group ${paddingClass}`}
+                        className={`flex items-center justify-between w-full py-2.5 text-sm transition-all duration-200 group ${paddingClass}`}
                     >
                         <div className="flex items-center">
                             {item.icon && <span className={`mr-3 transition-colors ${iconColor}`}>{item.icon}</span>}

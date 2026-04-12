@@ -1,16 +1,17 @@
 // resources/js/types/leads.ts
+
 export interface Origen {
     id: number;
     nombre: string;
     color: string;
-    icono?: string; // Opcional porque EditarLeadModal no lo usa
+    icono?: string;
 }
 
 export interface EstadoLead {
   id: number;
   nombre: string;
   color_hex: string;
-  tipo: string;  // ← Cambiar de tipo?: string a tipo: string
+  tipo: string;
   activo: boolean;
   created?: string;
   modified?: string;
@@ -21,7 +22,7 @@ export interface Localidad {
     nombre: string;
     provincia: string;
     codigo_postal: string;
-    provincia_id?: number; // Para el formulario de edición
+    provincia_id?: number;
     nombre_completo?: string;
 }
 
@@ -54,6 +55,12 @@ export interface Comercial {
     personal_id?: number;
 }
 
+export interface ConteoConFecha {
+    total: number;
+    ultimo: string | null;
+    ultimo_formateado: string | null;  // ✅ Agregar campo formateado
+}
+
 export interface Lead {
     id: number;
     prefijo_id?: number;
@@ -79,9 +86,9 @@ export interface Lead {
         nombre: string;
         provincia_id: number;
         provincia?: {
-        id: number;
-        nombre: string;
-        } ; // ← Permitir ambos: objeto o string
+            id: number;
+            nombre: string;
+        };
         codigo_postal?: string;
     };
     rubro?: {
@@ -107,7 +114,6 @@ export interface Lead {
     seguimientoPerdida?: SeguimientoPerdida;
 }
 
-// Añade esta interfaz para las notas
 export interface NotaLead {
     id: number;
     lead_id: number;
@@ -139,6 +145,7 @@ export interface TipoComentario {
     dias_recordatorio_default: number;
     es_activo: boolean;
 }
+
 export interface UsuarioData {
     ve_todas_cuentas: boolean;
     rol_id: number;

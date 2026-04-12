@@ -40,35 +40,35 @@ class GestionAdminController extends Controller
         ]);
     }
     
-    public function cargar(Request $request)
-    {
-        $request->validate([
-            'archivo' => 'required|file|mimes:csv,txt|max:102400'
+public function cargar(Request $request)
+{
+    $request->validate([
+        'archivo' => 'required|file|mimes:csv,txt|max:102400'
+    ]);
+    
+    $sessionId = Session::getId();
+    
+    try {
+        set_time_limit(600);
+        
+        $this->limpiarTodasLasCargas($sessionId);
+        
+        $stats = $this->procesarCSVCompleto($request->file('archivo'), $sessionId);
+        
+        return response()->json([
+            'success' => true,
+            'stats' => $stats,
+            'message' => "Carga completada: {$stats['empresas']} empresas, {$stats['vehiculos']} vehículos, {$stats['accesorios']} accesorios, {$stats['abonos']} abonos"
         ]);
         
-        $sessionId = Session::getId();
-        
-        try {
-            set_time_limit(600);
-            
-            $this->limpiarTodasLasCargas($sessionId);
-            
-            $stats = $this->procesarCSVCompleto($request->file('archivo'), $sessionId);
-            
-            return response()->json([
-                'success' => true,
-                'stats' => $stats,
-                'message' => "Carga completada: {$stats['empresas']} empresas, {$stats['vehiculos']} vehículos, {$stats['accesorios']} accesorios, {$stats['abonos']} abonos"
-            ]);
-            
-        } catch (\Exception $e) {
-            Log::error('Error al cargar CSV: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage()
-            ], 500);
-        }
+    } catch (\Exception $e) {
+        Log::error('Error al cargar CSV: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
     
     private function procesarCSVCompleto($archivo, $sessionId)
     {

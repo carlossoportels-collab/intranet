@@ -11,6 +11,7 @@ interface LeadHeaderProps {
   lead: Lead;
   onEditar: () => void;
   onNuevoComentario: () => void;
+  onVolver?: () => void;  // ✅ Nueva prop opcional
   tiposComentario?: any[];
   estadosLead?: any[];
   comentariosExistentes?: number;
@@ -23,6 +24,7 @@ const LeadHeader: React.FC<LeadHeaderProps> = ({
   lead,
   onEditar,
   onNuevoComentario,
+  onVolver,  // ✅ Recibir la función
   tiposComentario = [],
   estadosLead = [],
   comentariosExistentes = 0,
@@ -33,10 +35,13 @@ const LeadHeader: React.FC<LeadHeaderProps> = ({
   const [modalSelectorOpen, setModalSelectorOpen] = useState(false);
 
   const handleVolver = () => {
-    window.history.back();
+    if (onVolver) {
+      onVolver();  // ✅ Usar la función personalizada si existe
+    } else {
+      window.history.back();  // ✅ Fallback: volver atrás en el historial
+    }
   };
 
-  // Manejar apertura del modal - NO llamar a onNuevoComentario
   const handleAbrirModalComentario = () => {
     setModalSelectorOpen(true);
   };
@@ -91,7 +96,15 @@ const LeadHeader: React.FC<LeadHeaderProps> = ({
     <>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
         <div className="flex-1">
+          {/* ✅ Botón de volver para móvil */}
           <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={handleVolver}
+              className="p-1 -ml-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors sm:hidden"
+              title="Volver"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
               Lead #{lead.id}
             </h1>
@@ -109,7 +122,7 @@ const LeadHeader: React.FC<LeadHeaderProps> = ({
               {getIconoGenero()}
               {lead.nombre_completo}
             </h2>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
               <UserCheck className="h-4 w-4" />
               <div>
                   <span>Asignado a: {lead.asignado_nombre || 'Sin asignar'}</span>
@@ -145,6 +158,16 @@ const LeadHeader: React.FC<LeadHeaderProps> = ({
         
         {/* Acciones */}
         <div className="flex items-center gap-2">
+          {/* ✅ Botón de volver para desktop */}
+          <button
+            onClick={handleVolver}
+            className="hidden sm:flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm transition-colors"
+            title="Volver"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Volver</span>
+          </button>
+
           <Link
             href={`/comercial/presupuestos/create?lead_id=${lead.id}`}
             className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
@@ -167,14 +190,6 @@ const LeadHeader: React.FC<LeadHeaderProps> = ({
           >
             <MessageSquare className="h-4 w-4" />
             <span className="hidden sm:inline">Comentario</span>
-          </button>
-          
-          <button
-            onClick={handleVolver}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Volver</span>
           </button>
         </div>
       </div>

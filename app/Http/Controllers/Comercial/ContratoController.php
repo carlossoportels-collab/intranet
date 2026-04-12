@@ -1370,5 +1370,45 @@ public function guardarCotizacion(Request $request)
             }
         }
     }
-
+public function edit($id)
+{
+    $contrato = Contrato::with([
+        'lead', 
+        'lead.empresaContacto',
+        'lead.empresaContacto.tipoResponsabilidad',
+        'lead.empresaContacto.tipoDocumento',
+        'lead.empresaContacto.nacionalidad',
+        'empresa',
+        'empresa.responsables',
+        'empresa.responsables.tipoResponsabilidad',
+        'vehiculos', 
+        'debitoCbu', 
+        'debitoTarjeta',
+        'presupuesto', 
+        'estado'
+    ])->findOrFail($id);
+    
+    // Verificar permisos
+    $this->authorizePermiso(config('permisos.GESTIONAR_CONTRATOS'));
+    
+    // CORREGIDO: Usar 'es_activo' en todas las consultas
+    $tiposResponsabilidad = TipoResponsabilidad::where('es_activo', 1)->get();
+    $tiposDocumento = TipoDocumento::where('es_activo', 1)->get();  // ← 'es_activo'
+    $nacionalidades = Nacionalidad::all();
+    $categoriasFiscales = CategoriaFiscal::where('es_activo', 1)->get();  // ← 'es_activo'
+    $plataformas = Plataforma::where('es_activo', 1)->get();  // ← 'es_activo'
+    $rubros = Rubro::where('activo', 1)->get();  // Rubro usa 'activo'
+    $provincias = Provincia::where('activo', 1)->orderBy('nombre')->get();  // Provincia usa 'activo'
+    
+    return Inertia::render('Comercial/Contratos/Edit', [
+        'contrato' => $contrato,
+        'tiposResponsabilidad' => $tiposResponsabilidad,
+        'tiposDocumento' => $tiposDocumento,
+        'nacionalidades' => $nacionalidades,
+        'categoriasFiscales' => $categoriasFiscales,
+        'plataformas' => $plataformas,
+        'rubros' => $rubros,
+        'provincias' => $provincias,
+    ]);
+}
 }

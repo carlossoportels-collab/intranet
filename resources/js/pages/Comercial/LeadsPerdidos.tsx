@@ -32,7 +32,6 @@ import React, { useState, useEffect } from 'react';
 import SeguimientoLeadModal from '@/components/Modals/SeguimientoPerdidosModal';
 import AppLayout from '@/layouts/app-layout';
 
-
 // Definir tipos
 interface LeadPerdido {
   id: number;
@@ -101,40 +100,6 @@ interface Estadistica {
   total_aun_perdidos: number;
 }
 
-// Interfaces para el modal de recontacto
-interface LeadInfo {
-  id: number;
-  nombre_completo: string;
-  email?: string;
-  telefono?: string;
-  estado_lead_id?: number;
-  estado_actual_nombre?: string;
-}
-
-interface SeguimientoPerdidaInfo {
-  motivo_nombre: string;
-  posibilidades_futuras: string;
-  fecha_posible_recontacto?: string;
-  created: string;
-}
-
-interface TipoComentarioRecontacto {
-  id: number;
-  nombre: string;
-  descripcion: string;
-  aplica_a: string;
-  crea_recordatorio: boolean;
-  dias_recordatorio_default: number;
-  es_activo: boolean;
-}
-
-interface EstadoLead {
-  id: number;
-  nombre: string;
-  tipo: string;
-  color_hex?: string;
-}
-
 interface PageProps {
   auth: {
     user: any;
@@ -164,16 +129,16 @@ interface PageProps {
 
 export default function Index({ leads, motivos, estadisticas, filtros }: PageProps) {
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
-  const [busqueda, setBusqueda] = useState(filtros.search || '');
+  const [busqueda, setBusqueda] = useState(filtros?.search || '');
   const [cargando, setCargando] = useState(false);
   const [mostrarEstadisticas, setMostrarEstadisticas] = useState(true);
   const [filtrosLocales, setFiltrosLocales] = useState({
-    estado: filtros.estado || '',
-    motivo_id: filtros.motivo_id || '',
-    fecha_rechazo_desde: filtros.fecha_rechazo_desde || '',
-    fecha_rechazo_hasta: filtros.fecha_rechazo_hasta || '',
-    posibilidades_futuras: filtros.posibilidades_futuras || '',
-    con_recontacto: filtros.con_recontacto || '',
+    estado: filtros?.estado || '',
+    motivo_id: filtros?.motivo_id || '',
+    fecha_rechazo_desde: filtros?.fecha_rechazo_desde || '',
+    fecha_rechazo_hasta: filtros?.fecha_rechazo_hasta || '',
+    posibilidades_futuras: filtros?.posibilidades_futuras || '',
+    con_recontacto: filtros?.con_recontacto || '',
   });
 
   // Estados para el modal de recontacto
@@ -183,6 +148,18 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
   const [tiposComentarioSeguimiento, setTiposComentarioSeguimiento] = useState<any[]>([]);
   const [estadosLeadSeguimiento, setEstadosLeadSeguimiento] = useState<any[]>([]);
   const [cargandoModal, setCargandoModal] = useState(false);
+
+  // Valores por defecto para estadisticas (evitar undefined)
+  const stats = estadisticas || {
+    total: 0,
+    por_estado: [],
+    por_motivo: [],
+    por_mes: [],
+    tasa_recontacto: 0,
+    con_recontacto_programado: 0,
+    total_recontactados: 0,
+    total_aun_perdidos: 0,
+  };
 
   const aplicarFiltros = () => {
     const params: any = { ...filtrosLocales };
@@ -216,6 +193,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
 
   const formatearFecha = (fechaString: string) => {
     try {
+      if (!fechaString) return 'N/A';
       return new Date(fechaString).toLocaleDateString('es-ES', {
         day: '2-digit',
         month: 'short',
@@ -286,8 +264,8 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
         
         setLeadSeleccionado(data.lead);
         setSeguimientoSeleccionado(data.seguimiento);
-        setTiposComentarioSeguimiento(data.tiposComentarioSeguimiento);
-        setEstadosLeadSeguimiento(data.estadosLead);
+        setTiposComentarioSeguimiento(data.tiposComentarioSeguimiento || []);
+        setEstadosLeadSeguimiento(data.estadosLead || []);
         setModalSeguimientoOpen(true);
     } catch (error) {
         console.error('Error cargando modal de recontacto:', error);
@@ -358,7 +336,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs sm:text-sm text-gray-500">Total perdidos</p>
-                    <p className="text-xl sm:text-2xl font-bold text-gray-900">{estadisticas.total}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</p>
                   </div>
                   <AlertCircle className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
                 </div>
@@ -368,12 +346,12 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs sm:text-sm text-gray-500">Recontactados</p>
-                    <p className="text-xl sm:text-2xl font-bold text-green-600">{estadisticas.total_recontactados}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.total_recontactados}</p>
                   </div>
                   <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
                 </div>
                 <p className="text-xs text-gray-500 mt-1 sm:mt-2">
-                  {estadisticas.tasa_recontacto}% de tasa
+                  {stats.tasa_recontacto}% de tasa
                 </p>
               </div>
               
@@ -381,7 +359,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs sm:text-sm text-gray-500">Aún perdidos</p>
-                    <p className="text-xl sm:text-2xl font-bold text-red-600">{estadisticas.total_aun_perdidos}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-red-600">{stats.total_aun_perdidos}</p>
                   </div>
                   <TrendingDown className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
                 </div>
@@ -391,7 +369,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs sm:text-sm text-gray-500">Recontacto programado</p>
-                    <p className="text-xl sm:text-2xl font-bold text-amber-600">{estadisticas.con_recontacto_programado}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-amber-600">{stats.con_recontacto_programado}</p>
                   </div>
                   <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-amber-500" />
                 </div>
@@ -405,15 +383,19 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                 Distribución por estado actual
               </h3>
               <div className="space-y-2 sm:space-y-3">
-                {estadisticas.por_estado.map((item) => (
-                  <div key={item.estado} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {getBadgeEstado(item.estado, item.tipo)}
-                      <span className="text-xs sm:text-sm text-gray-600">{item.porcentaje}%</span>
+                {stats.por_estado && stats.por_estado.length > 0 ? (
+                  stats.por_estado.map((item) => (
+                    <div key={item.estado} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getBadgeEstado(item.estado, item.tipo)}
+                        <span className="text-xs sm:text-sm text-gray-600">{item.porcentaje}%</span>
+                      </div>
+                      <span className="font-medium text-sm sm:text-base">{item.total}</span>
                     </div>
-                    <span className="font-medium text-sm sm:text-base">{item.total}</span>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 text-center">No hay datos disponibles</p>
+                )}
               </div>
             </div>
           </div>
@@ -451,7 +433,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-sm sm:text-base"
                 >
                   <option value="">Todos los motivos</option>
-                  {motivos.map(motivo => (
+                  {motivos && motivos.map(motivo => (
                     <option key={motivo.id} value={motivo.id}>{motivo.nombre}</option>
                   ))}
                 </select>
@@ -541,7 +523,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
               <p className="mt-2 text-gray-600 text-sm sm:text-base">Cargando leads...</p>
             </div>
-          ) : leads.data.length === 0 ? (
+          ) : !leads || leads.data.length === 0 ? (
             <div className="p-6 sm:p-8 text-center">
               <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500 text-sm sm:text-base">
@@ -589,7 +571,6 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                   <tbody className="bg-white divide-y divide-gray-200">
                     {leads.data.map((lead) => {
                       if (!lead.seguimientoPerdida) {
-                        console.warn(`Lead ${lead.id} no tiene seguimientoPerdida`);
                         return null;
                       }
                       
@@ -701,7 +682,6 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                 <div className="divide-y divide-gray-200">
                   {leads.data.map((lead) => {
                     if (!lead.seguimientoPerdida) {
-                      console.warn(`Lead ${lead.id} no tiene seguimientoPerdida`);
                       return null;
                     }
                     
@@ -800,7 +780,7 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                 <div className="px-4 sm:px-6 py-4 border-t border-gray-200">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="text-sm text-gray-700 text-center sm:text-left">
-                      Mostrando {leads.data.length} de {leads.meta.total} leads
+                      Mostrando {leads.data.length} de {leads.meta?.total || 0} leads
                     </div>
                     
                     <div className="flex justify-center sm:justify-end">
@@ -838,8 +818,8 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
           )}
         </div>
         
-        {/* Sección de motivos más comunes - RESPONSIVE (Opción 2 mejorada) */}
-        {estadisticas.por_motivo.length > 0 && (
+        {/* Sección de motivos más comunes */}
+        {stats.por_motivo && stats.por_motivo.length > 0 && (
           <div className="mt-6 sm:mt-8 bg-white rounded-lg shadow p-4 sm:p-6">
             <h3 className="font-medium text-gray-900 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
               <PieChart className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -847,9 +827,9 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
             </h3>
             
             <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4">
-              {estadisticas.por_motivo.slice(0, 6).map((motivo) => {
-                const porcentaje = estadisticas.total > 0 
-                  ? Math.round((motivo.total / estadisticas.total) * 100) 
+              {stats.por_motivo.slice(0, 6).map((motivo) => {
+                const porcentaje = stats.total > 0 
+                  ? Math.round((motivo.total / stats.total) * 100) 
                   : 0;
                 
                 return (
@@ -861,13 +841,10 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                       <span className="text-base sm:text-lg font-bold text-red-600 whitespace-nowrap">{motivo.total}</span>
                     </div>
                     
-                    {/* Mini gráfico circular - RESPONSIVE */}
+                    {/* Mini gráfico circular */}
                     <div className="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-2 sm:mb-3">
                       <svg className="w-full h-full" viewBox="0 0 36 36">
-                        {/* Fondo */}
                         <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="3" />
-                        
-                        {/* Porcentaje */}
                         <circle
                           cx="18"
                           cy="18"
@@ -879,15 +856,13 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                           strokeLinecap="round"
                           transform="rotate(-90 18 18)"
                         />
-                        
-                        {/* Texto en el centro */}
                         <text x="18" y="18" textAnchor="middle" dy=".3em" className="text-[8px] sm:text-[10px] font-bold fill-red-600">
                           {porcentaje}%
                         </text>
                       </svg>
                     </div>
                     
-                    {/* Estadísticas detalladas - RESPONSIVE */}
+                    {/* Estadísticas detalladas */}
                     <div className="grid grid-cols-3 gap-1 sm:gap-2 text-center">
                       <div className="flex flex-col items-center">
                         <div className="text-xs text-gray-500 mb-1">Recuperados</div>
@@ -903,7 +878,6 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
                       </div>
                     </div>
                     
-                    {/* Porcentajes detallados (solo en pantallas medianas+) */}
                     <div className="hidden sm:grid grid-cols-3 gap-1 sm:gap-2 text-center mt-2">
                       <div className="text-xs text-green-600">
                         {motivo.total > 0 ? Math.round((motivo.recuperados / motivo.total) * 100) : 0}%
@@ -920,10 +894,9 @@ export default function Index({ leads, motivos, estadisticas, filtros }: PagePro
               })}
             </div>
             
-            {/* Resumen total para pantallas muy pequeñas */}
             <div className="sm:hidden mt-4 pt-3 border-t border-gray-200">
               <div className="text-xs text-gray-500 text-center">
-                Total: {estadisticas.total} leads • {estadisticas.por_motivo.length} motivos diferentes
+                Total: {stats.total} leads • {stats.por_motivo.length} motivos diferentes
               </div>
             </div>
           </div>

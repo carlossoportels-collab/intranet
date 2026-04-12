@@ -3,18 +3,21 @@ import { Eye, Edit, MessageSquare, FileText, Clock, User } from 'lucide-react';
 import React from 'react';
 
 import { BadgeEstado, BadgeOrigen } from '@/components/ui';
-import { Lead, Origen, EstadoLead, NotaLead } from '@/types/leads';
+import { Lead, Origen, EstadoLead, NotaLead, ConteoConFecha } from '@/types/leads';
+import BadgeConFecha from '@/components/ui/BadgeConFecha';
+
 
 interface LeadCardMobileProps {
   lead: Lead;
   origenes: Origen[];
   estadosLead: EstadoLead[];
-  comentariosCount: number;
-  presupuestosCount: number;
+  comentariosCount: ConteoConFecha;
+  presupuestosCount: ConteoConFecha;
   usuario: any;
   onNuevoComentario: (lead: Lead) => void;
   onVerNota: (lead: Lead) => void;
   onTiemposEstados: (lead: Lead) => void;
+  onViewDetail: (lead: Lead) => void; // ✅ NUEVA PROP
 }
 
 const LeadCardMobile: React.FC<LeadCardMobileProps> = ({
@@ -26,7 +29,8 @@ const LeadCardMobile: React.FC<LeadCardMobileProps> = ({
   usuario,
   onNuevoComentario,
   onVerNota,
-  onTiemposEstados
+  onTiemposEstados,
+  onViewDetail // ✅ NUEVA PROP
 }) => {
   const origen = origenes.find(o => o.id === lead.origen_id!);
   const estado = estadosLead.find(e => e.id === lead.estado_lead_id);
@@ -48,6 +52,10 @@ const LeadCardMobile: React.FC<LeadCardMobileProps> = ({
     } catch {
       return 'Fecha inválida';
     }
+  };
+  
+  const handleViewDetail = (e: React.MouseEvent) => {
+    onViewDetail(lead);
   };
   
   return (
@@ -97,12 +105,17 @@ const LeadCardMobile: React.FC<LeadCardMobileProps> = ({
       )}
 
       {/* Presupuestos */}
-      {presupuestosCount > 0 && (
+      {presupuestosCount.total > 0 && (  // ✅ Usar .total
         <div className="mb-3 p-2 bg-blue-50 border border-blue-100 rounded text-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 text-blue-700">
               <FileText className="w-3 h-3" />
-              <span className="font-medium">Presupuestos: {presupuestosCount}</span>
+              <span className="font-medium">Presupuestos: {presupuestosCount.total}</span>
+              {presupuestosCount.ultimo && (
+                <span className="text-xs text-blue-500 ml-1">
+                  ({new Date(presupuestosCount.ultimo).toLocaleDateString()})
+                </span>
+              )}
             </div>
             <Link 
               href={`/presupuestos?lead_id=${lead.id}`}
@@ -130,28 +143,31 @@ const LeadCardMobile: React.FC<LeadCardMobileProps> = ({
             Registro: {formatDate(lead.created)}
           </span>
           <div className="flex gap-2">
-            {presupuestosCount > 0 && (
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded inline-flex items-center gap-1">
-                <FileText className="w-3 h-3" />
-                {presupuestosCount}
-              </span>
+            {presupuestosCount && presupuestosCount.total > 0 && (
+              <BadgeConFecha
+                type="presupuestos"
+                count={presupuestosCount.total}
+                lastDate={presupuestosCount.ultimo}
+              />
             )}
-            {comentariosCount > 0 && (
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded inline-flex items-center gap-1">
-                <MessageSquare className="w-3 h-3" />
-                {comentariosCount}
-              </span>
+            {comentariosCount && comentariosCount.total > 0 && (
+              <BadgeConFecha
+                type="comentarios"
+                count={comentariosCount.total}
+                lastDate={comentariosCount.ultimo}
+              />
             )}
           </div>
         </div>
         <div className="flex space-x-2">
-          <Link 
-            href={`/comercial/leads/${lead.id}`}
+          {/* ✅ CAMBIADO: usar onViewDetail en lugar de Link directo */}
+          <button 
+            onClick={handleViewDetail}
             className="text-blue-600 hover:text-blue-800 p-1"
             title="Ver detalles"
           >
             <Eye className="h-4 w-4" />
-          </Link>
+          </button>
           
           <button 
             type="button"

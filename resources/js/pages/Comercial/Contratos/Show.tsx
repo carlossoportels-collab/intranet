@@ -1,7 +1,7 @@
 // resources/js/Pages/Comercial/Contratos/Show.tsx
 
 import { Head, router } from '@inertiajs/react';
-import { ArrowLeft, FileText, Calendar, User, Building, Truck, CreditCard, Download, ChevronDown, ChevronUp, Mail, Send, Building2 } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, User, Building, Edit, Truck, CreditCard, Download, ChevronDown, ChevronUp, Mail, Send, Building2 } from 'lucide-react';
 import React, { useState } from 'react';
 import EnviarContratoEmailModal from '@/components/Modals/Emails/EnviarContratoEmailModal';
 import EnviarEmailAdministracionModal from '@/components/Modals/Emails/EnviarEmailAdministracionModal';
@@ -27,6 +27,7 @@ export default function ContratoShow({ contrato }: Props) {
     const [generandoPDF, setGenerandoPDF] = useState(false);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [mostrarVistaPDF, setMostrarVistaPDF] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
 
     const [showMobileDetails, setShowMobileDetails] = useState<Record<string, boolean>>({
         cliente: false,
@@ -104,7 +105,9 @@ export default function ContratoShow({ contrato }: Props) {
             });
         }
     };
-
+    const handleEdit = () => {
+            router.visit(`/comercial/contratos/${contrato.id}/edit`);
+        };
     const toggleMobileSection = (section: string) => {
         setShowMobileDetails(prev => ({
             ...prev,
@@ -168,6 +171,13 @@ const getTipoOperacionBadge = () => {
                     </div>
                     
                     <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                                onClick={handleEdit}
+                                className="px-3 sm:px-4 py-2 bg-yellow-600 text-white text-sm sm:text-base rounded-md hover:bg-yellow-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Edit className="h-4 w-4" />
+                                <span className="sm:inline">Editar</span>
+                            </button>
                         <button
                             onClick={handleVerPDF}
                             className="px-3 sm:px-4 py-2 bg-blue-600 text-white text-sm sm:text-base rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"

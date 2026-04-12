@@ -8,7 +8,7 @@ import React, { useState, useCallback } from 'react';
 import ClienteComentarioModal from '@/components/Modals/ClienteComentarioModal';
 import { Pagination, EmptyState } from '@/components/ui';
 import AppLayout from '@/layouts/app-layout';
-import { TipoComentario } from '@/types/leads';
+import { TipoComentario, ConteoConFecha } from '@/types/leads';
 
 interface Lead {
     id: number;
@@ -67,8 +67,8 @@ interface Props {
         personal_id: number;
         nombre_completo?: string;
     };
-    comentariosPorLead?: Record<number, number>;
-    presupuestosPorLead?: Record<number, number>;
+    comentariosPorLead?: Record<number, ConteoConFecha>;
+    presupuestosPorLead?: Record<number, ConteoConFecha>;
     contratosPorLead?: Record<number, number>;
 }
 
@@ -133,7 +133,7 @@ export default function Contactos({
             
             const tipos = await response.json();
             setTiposComentario(Array.isArray(tipos) ? tipos : []);
-            setComentariosExistentes(comentariosPorLead[contact.lead_id] || 0);
+            setComentariosExistentes(comentariosPorLead[contact.lead_id]?.total || 0);
             setShowComentarioModal(true);
         } catch (error) {
             console.error('Error cargando tipos de comentario:', error);
@@ -148,11 +148,11 @@ export default function Contactos({
     }, []);
     
     const contarComentariosDeLead = useCallback((leadId: number): number => {
-        return comentariosPorLead[leadId] || 0;
+        return comentariosPorLead[leadId]?.total || 0;
     }, [comentariosPorLead]);
     
     const contarPresupuestosDeLead = useCallback((leadId: number): number => {
-        return presupuestosPorLead[leadId] || 0;
+        return presupuestosPorLead[leadId]?.total || 0;
     }, [presupuestosPorLead]);
     
     const contarContratosDeLead = useCallback((leadId: number): number => {
@@ -304,86 +304,101 @@ export default function Contactos({
                     <>
                         {/* Versión móvil */}
                         <div className="md:hidden space-y-4">
-                            {contactosData.map((contacto) => (
-                                <div key={contacto.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                    <div className="flex items-start gap-3 mb-3">
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-semibold text-gray-900">
-                                                        {contacto.lead?.nombre_completo || 'Sin nombre'}
-                                                    </h3>
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        {contacto.lead?.email || 'Sin email'} • {contacto.lead?.telefono || 'Sin teléfono'}
-                                                    </p>
-                                                </div>
-                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                                    contacto.es_contacto_principal 
-                                                        ? 'bg-purple-100 text-purple-800' 
-                                                        : 'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                    {contacto.es_contacto_principal ? 'Principal' : 'Secundario'}
-                                                </span>
-                                            </div>
-                                            
-                                            {/* Localidad en móvil */}
-                                            <div className="mt-2 text-xs text-gray-500">
-                                                📍 {getLocalidadDisplay(contacto)}
-                                            </div>
-                                            
-                                            {contacto.empresa && (
-                                                <div className="mt-2 p-2 bg-gray-50 rounded">
-                                                    <p className="text-xs font-medium text-gray-700">Empresa:</p>
-                                                    <p className="text-sm text-gray-900">{contacto.empresa.nombre_fantasia || 'Sin nombre'}</p>
-                                                    <p className="text-xs text-gray-500 truncate">{contacto.empresa.razon_social}</p>
-                                                </div>
-                                            )}
-                                            
-                                            <div className="flex items-center gap-3 mt-3">
-                                                <div className="flex items-center gap-1 text-xs bg-blue-50 px-2 py-1 rounded-full">
-                                                    <FileText className="h-3 w-3 text-blue-600" />
-                                                    <span className="font-medium text-blue-700">
-                                                        {contarPresupuestosDeLead(contacto.lead_id)} presupuestos
+                            {contactosData.map((contacto) => {
+                                const presupuestoData = presupuestosPorLead[contacto.lead_id];
+                                const comentarioData = comentariosPorLead[contacto.lead_id];
+                                
+                                return (
+                                    <div key={contacto.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                        <div className="flex items-start gap-3 mb-3">
+                                            <div className="flex-1">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h3 className="font-semibold text-gray-900">
+                                                            {contacto.lead?.nombre_completo || 'Sin nombre'}
+                                                        </h3>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            {contacto.lead?.email || 'Sin email'} • {contacto.lead?.telefono || 'Sin teléfono'}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                                        contacto.es_contacto_principal 
+                                                            ? 'bg-purple-100 text-purple-800' 
+                                                            : 'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                        {contacto.es_contacto_principal ? 'Principal' : 'Secundario'}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-1 text-xs bg-green-50 px-2 py-1 rounded-full">
-                                                    <MessageSquare className="h-3 w-3 text-green-600" />
-                                                    <span className="font-medium text-green-700">
-                                                        {contarComentariosDeLead(contacto.lead_id)} comentarios
-                                                    </span>
+                                                
+                                                {/* Localidad en móvil */}
+                                                <div className="mt-2 text-xs text-gray-500">
+                                                    📍 {getLocalidadDisplay(contacto)}
                                                 </div>
-                                                <div className="flex items-center gap-1 text-xs bg-amber-50 px-2 py-1 rounded-full">
-                                                    <FileSignature className="h-3 w-3 text-amber-600" />
-                                                    <span className="font-medium text-amber-700">
-                                                        {contarContratosDeLead(contacto.lead_id)} contratos
-                                                    </span>
+                                                
+                                                {contacto.empresa && (
+                                                    <div className="mt-2 p-2 bg-gray-50 rounded">
+                                                        <p className="text-xs font-medium text-gray-700">Empresa:</p>
+                                                        <p className="text-sm text-gray-900">{contacto.empresa.nombre_fantasia || 'Sin nombre'}</p>
+                                                        <p className="text-xs text-gray-500 truncate">{contacto.empresa.razon_social}</p>
+                                                    </div>
+                                                )}
+                                                
+                                                <div className="flex flex-wrap items-center gap-3 mt-3">
+                                                    <div className="flex items-center gap-1 text-xs bg-blue-50 px-2 py-1 rounded-full">
+                                                        <FileText className="h-3 w-3 text-blue-600" />
+                                                        <span className="font-medium text-blue-700">
+                                                            {contarPresupuestosDeLead(contacto.lead_id)} presupuestos
+                                                        </span>
+                                                        {presupuestoData?.ultimo_formateado && (
+                                                            <span className="text-xs text-blue-500 ml-1">
+                                                                ({presupuestoData.ultimo_formateado})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-xs bg-green-50 px-2 py-1 rounded-full">
+                                                        <MessageSquare className="h-3 w-3 text-green-600" />
+                                                        <span className="font-medium text-green-700">
+                                                            {contarComentariosDeLead(contacto.lead_id)} comentarios
+                                                        </span>
+                                                        {comentarioData?.ultimo_formateado && (
+                                                            <span className="text-xs text-green-500 ml-1">
+                                                                ({comentarioData.ultimo_formateado})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-xs bg-amber-50 px-2 py-1 rounded-full">
+                                                        <FileSignature className="h-3 w-3 text-amber-600" />
+                                                        <span className="font-medium text-amber-700">
+                                                            {contarContratosDeLead(contacto.lead_id)} contratos
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            
-                                            <div className="mt-2 text-xs text-gray-500">
-                                                Registro: {formatDate(contacto.created)}
-                                            </div>
-                                            
-                                            <div className="flex flex-wrap gap-3 mt-3 pt-2 border-t border-gray-100">
-                                                <button
-                                                    onClick={() => router.get(`/comercial/leads/${contacto.lead_id}`)}
-                                                    className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm px-2 py-1 hover:bg-blue-50 rounded transition-colors"
-                                                >
-                                                    <Eye className="h-4 w-4 mr-1" />
-                                                    Detalles
-                                                </button>
-                                                <button
-                                                    onClick={() => handleOpenComentario(contacto)}
-                                                    className="inline-flex items-center text-green-600 hover:text-green-800 text-sm px-2 py-1 hover:bg-green-50 rounded transition-colors"
-                                                >
-                                                    <MessageSquare className="h-4 w-4 mr-1" />
-                                                    Seguimiento
-                                                </button>
+                                                
+                                                <div className="mt-2 text-xs text-gray-500">
+                                                    Registro: {formatDate(contacto.created)}
+                                                </div>
+                                                
+                                                <div className="flex flex-wrap gap-3 mt-3 pt-2 border-t border-gray-100">
+                                                    <button
+                                                        onClick={() => router.get(`/comercial/leads/${contacto.lead_id}`)}
+                                                        className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm px-2 py-1 hover:bg-blue-50 rounded transition-colors"
+                                                    >
+                                                        <Eye className="h-4 w-4 mr-1" />
+                                                        Detalles
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleOpenComentario(contacto)}
+                                                        className="inline-flex items-center text-green-600 hover:text-green-800 text-sm px-2 py-1 hover:bg-green-50 rounded transition-colors"
+                                                    >
+                                                        <MessageSquare className="h-4 w-4 mr-1" />
+                                                        Seguimiento
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                         
                         {/* Versión desktop */}
@@ -421,77 +436,92 @@ export default function Contactos({
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {contactosData.map((contacto) => (
-                                        <tr key={contacto.id} className="hover:bg-gray-50">
-                                            <td className="px-4 py-3">
-                                                <div>
-                                                    <p className="font-medium text-gray-900">
-                                                        {contacto.lead?.nombre_completo || 'Sin nombre'}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">
-                                                        {contacto.lead?.email || 'Sin email'} • {contacto.lead?.telefono || 'Sin teléfono'}
-                                                    </p>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {contacto.empresa ? (
+                                    {contactosData.map((contacto) => {
+                                        const presupuestoData = presupuestosPorLead[contacto.lead_id];
+                                        const comentarioData = comentariosPorLead[contacto.lead_id];
+                                        
+                                        return (
+                                            <tr key={contacto.id} className="hover:bg-gray-50">
+                                                <td className="px-4 py-3">
                                                     <div>
                                                         <p className="font-medium text-gray-900">
-                                                            {contacto.empresa.nombre_fantasia || 'Sin nombre'}
+                                                            {contacto.lead?.nombre_completo || 'Sin nombre'}
                                                         </p>
                                                         <p className="text-xs text-gray-500">
-                                                            {contacto.empresa.razon_social || 'Sin razón social'}
+                                                            {contacto.lead?.email || 'Sin email'} • {contacto.lead?.telefono || 'Sin teléfono'}
                                                         </p>
                                                     </div>
-                                                ) : (
-                                                    <span className="text-sm text-gray-400">Sin empresa</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-500">
-                                                {getLocalidadDisplay(contacto)}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                    contacto.es_contacto_principal 
-                                                        ? 'bg-purple-100 text-purple-800' 
-                                                        : 'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                    {contacto.es_contacto_principal ? 'Principal' : 'Secundario'}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-700 text-center">
-                                                {contarPresupuestosDeLead(contacto.lead_id)}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-700 text-center">
-                                                {contarComentariosDeLead(contacto.lead_id)}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-700 text-center">
-                                                {contarContratosDeLead(contacto.lead_id)}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-500">
-                                                {formatDate(contacto.created)}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center space-x-3">
-                                                    <button
-                                                        onClick={() => router.get(`/comercial/leads/${contacto.lead_id}`)}
-                                                        className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm px-2 py-1 hover:bg-blue-50 rounded transition-colors"
-                                                    >
-                                                        <Eye className="h-4 w-4 mr-1" />
-                                                        Detalles
-                                                    </button>
-                                                    
-                                                    <button
-                                                        onClick={() => handleOpenComentario(contacto)}
-                                                        className="inline-flex items-center text-green-600 hover:text-green-800 text-sm px-2 py-1 hover:bg-green-50 rounded transition-colors"
-                                                    >
-                                                        <MessageSquare className="h-4 w-4 mr-1" />
-                                                        Seguimiento
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {contacto.empresa ? (
+                                                        <div>
+                                                            <p className="font-medium text-gray-900">
+                                                                {contacto.empresa.nombre_fantasia || 'Sin nombre'}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500">
+                                                                {contacto.empresa.razon_social || 'Sin razón social'}
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-sm text-gray-400">Sin empresa</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-500">
+                                                    {getLocalidadDisplay(contacto)}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                        contacto.es_contacto_principal 
+                                                            ? 'bg-purple-100 text-purple-800' 
+                                                            : 'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                        {contacto.es_contacto_principal ? 'Principal' : 'Secundario'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                                                    {contarPresupuestosDeLead(contacto.lead_id)}
+                                                    {presupuestoData?.ultimo_formateado && (
+                                                        <div className="text-xs text-gray-400">
+                                                            {presupuestoData.ultimo_formateado}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                                                    {contarComentariosDeLead(contacto.lead_id)}
+                                                    {comentarioData?.ultimo_formateado && (
+                                                        <div className="text-xs text-gray-400">
+                                                            {comentarioData.ultimo_formateado}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                                                    {contarContratosDeLead(contacto.lead_id)}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-500">
+                                                    {formatDate(contacto.created)}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center space-x-3">
+                                                        <button
+                                                            onClick={() => router.get(`/comercial/leads/${contacto.lead_id}`)}
+                                                            className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm px-2 py-1 hover:bg-blue-50 rounded transition-colors"
+                                                        >
+                                                            <Eye className="h-4 w-4 mr-1" />
+                                                            Detalles
+                                                        </button>
+                                                        
+                                                        <button
+                                                            onClick={() => handleOpenComentario(contacto)}
+                                                            className="inline-flex items-center text-green-600 hover:text-green-800 text-sm px-2 py-1 hover:bg-green-50 rounded transition-colors"
+                                                        >
+                                                            <MessageSquare className="h-4 w-4 mr-1" />
+                                                            Seguimiento
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

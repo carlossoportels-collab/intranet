@@ -5,19 +5,22 @@ import { Eye, Edit, MessageSquare, FileText, Clock, User } from 'lucide-react';
 import React from 'react';
 
 import { BadgeEstado, BadgeOrigen } from '@/components/ui';
-import { Lead, Origen, EstadoLead } from '@/types/leads';
+import BadgeConFecha from '@/components/ui/BadgeConFecha';
+
+import { Lead, Origen, EstadoLead, ConteoConFecha  } from '@/types/leads';
 
 interface LeadTableRowProps {
   lead: Lead;
   origenes: Origen[];
   estadosLead: EstadoLead[];
-  comentariosCount: number;
-  presupuestosCount: number;
+  comentariosCount: ConteoConFecha; // ✅ Actualizado
+  presupuestosCount: ConteoConFecha; // ✅ Actualizado
   usuario: any;
   onNuevoComentario: (lead: Lead) => void;
   onVerNota: (lead: Lead) => void;
   onTiemposEstados: (lead: Lead) => void;
-  mostrarColumnaComercial?: boolean; // ← Nueva prop
+  mostrarColumnaComercial?: boolean;
+  onViewDetail: (lead: Lead) => void; // ✅ NUEVA PROP
 }
 
 const LeadTableRow: React.FC<LeadTableRowProps> = ({
@@ -30,7 +33,8 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
   onNuevoComentario,
   onVerNota,
   onTiemposEstados,
-  mostrarColumnaComercial = false // ← Por defecto false
+  mostrarColumnaComercial = false,
+  onViewDetail // ✅ NUEVA PROP
 }) => {
   const origen = origenes.find(o => o.id === lead.origen_id!);
   const estado = estadosLead.find(e => e.id === lead.estado_lead_id);
@@ -46,6 +50,11 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
     } catch {
       return 'Fecha inválida';
     }
+  };
+  
+  const handleViewDetail = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onViewDetail(lead);
   };
   
   return (
@@ -76,15 +85,33 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
         {estado && <BadgeEstado estado={estado} />}
       </td>
       
-      {/* PRESUPUESTOS - Solo número */}
-      <td className="px-4 py-3 text-sm text-gray-700 text-center">
-        {presupuestosCount}
-      </td>
-      
-      {/* COMENTARIOS - Solo número */}
-      <td className="px-4 py-3 text-sm text-gray-700 text-center">
-        {comentariosCount}
-      </td>
+{/* PRESUPUESTOS */}
+<td className="px-4 py-3 text-center">
+  {presupuestosCount && presupuestosCount.total > 0 ? (
+    <BadgeConFecha
+      type="presupuestos"
+      count={presupuestosCount.total}
+      lastDate={presupuestosCount.ultimo}
+      lastDateFormatted={presupuestosCount.ultimo_formateado}  // ✅ Usar fecha formateada
+    />
+  ) : (
+    <span className="text-xs text-gray-400">-</span>
+  )}
+</td>
+
+{/* COMENTARIOS */}
+<td className="px-4 py-3 text-center">
+  {comentariosCount && comentariosCount.total > 0 ? (
+    <BadgeConFecha
+      type="comentarios"
+      count={comentariosCount.total}
+      lastDate={comentariosCount.ultimo}
+      lastDateFormatted={comentariosCount.ultimo_formateado}  // ✅ Usar fecha formateada
+    />
+  ) : (
+    <span className="text-xs text-gray-400">-</span>
+  )}
+</td>
       
       {/* COMERCIAL - Solo visible para admins/supervisores */}
       {mostrarColumnaComercial && (
@@ -104,14 +131,15 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
       {/* Acciones */}
       <td className="px-4 py-3">
         <div className="flex items-center space-x-2">
-          <Link 
-            href={`/comercial/leads/${lead.id}`}
+          {/* ✅ CAMBIADO: usar onViewDetail en lugar de Link directo */}
+          <button 
+            onClick={handleViewDetail}
             className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm px-2 py-1 hover:bg-blue-50 rounded transition-colors"
             title="Ver detalles"
           >
             <Eye className="h-4 w-4 mr-1" />
             Detalles
-          </Link>
+          </button>
           
           <button 
             type="button"

@@ -247,6 +247,8 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::get('/desde-empresa/{empresaId}', [ContratoController::class, 'createFromEmpresa'])->name('desde-empresa')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
             Route::post('/desde-empresa', [ContratoController::class, 'storeFromEmpresa'])->name('store-from-empresa')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
             Route::post('/guardar-cotizacion', [ContratoController::class, 'guardarCotizacion'])->name('guardar-cotizacion');
+            Route::get('/{id}/edit', [ContratoController::class, 'edit'])->name('edit')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
+            Route::put('/{id}', [ContratoController::class, 'update'])->name('update')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
         });
         
         // ===== CUENTAS =====

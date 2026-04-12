@@ -142,75 +142,171 @@ class LeadFilterService
         return $mapeados;
     }
         
-    public function getConteoComentarios(array $leadIds): array
-    {
-        if (empty($leadIds)) {
-            return [];
-        }
+// app/Services/Lead/LeadFilterService.php
 
-        // Comentarios actuales (tabla comentarios)
-        $comentariosActuales = DB::table('comentarios')
-            ->select('lead_id', DB::raw('COUNT(*) as total'))
-            ->whereIn('lead_id', $leadIds)
-            ->whereNull('deleted_at')
-            ->groupBy('lead_id')
-            ->pluck('total', 'lead_id')
-            ->toArray();
-
-        // Comentarios legacy (tabla comentarios_legacy)
-        $comentariosLegacy = DB::table('comentarios_legacy')
-            ->select('lead_id', DB::raw('COUNT(*) as total'))
-            ->whereIn('lead_id', $leadIds)
-            ->groupBy('lead_id')
-            ->pluck('total', 'lead_id')
-            ->toArray();
-
-        // Combinar resultados
-        $resultado = [];
-        foreach ($leadIds as $leadId) {
-            $total = ($comentariosActuales[$leadId] ?? 0) + ($comentariosLegacy[$leadId] ?? 0);
-            if ($total > 0) {
-                $resultado[$leadId] = $total;
-            }
-        }
-
-        return $resultado;
-    }
-
-    public function getConteoPresupuestos(array $leadIds): array
-    {
-        if (empty($leadIds)) {
-            return [];
+/**
+ * Formatear fecha para mostrar (hoy, ayer, hace X días, etc.)
+ */
+private function formatDateForDisplay($date): ?string
+{
+    if (!$date) return null;
+    
+    try {
+        $fecha = new \DateTime($date);
+        $hoy = new \DateTime();
+        $ayer = (new \DateTime())->modify('-1 day');
+        
+        // Resetear horas para comparar solo fechas
+        $fechaSinHora = $fecha->setTime(0, 0, 0);
+        $hoySinHora = $hoy->setTime(0, 0, 0);
+        $ayerSinHora = $ayer->setTime(0, 0, 0);
+        
+        if ($fechaSinHora == $hoySinHora) {
+            return 'hoy';
         }
         
-        // Presupuestos actuales (tabla presupuestos)
-        $presupuestosActuales = DB::table('presupuestos')
-            ->select('lead_id', DB::raw('COUNT(*) as total'))
-            ->whereIn('lead_id', $leadIds)
-            ->whereNull('deleted_at')
-            ->groupBy('lead_id')
-            ->pluck('total', 'lead_id')
-            ->toArray();
-
-        // Presupuestos legacy (tabla presupuestos_legacy)
-        $presupuestosLegacy = DB::table('presupuestos_legacy')
-            ->select('lead_id', DB::raw('COUNT(*) as total'))
-            ->whereIn('lead_id', $leadIds)
-            ->groupBy('lead_id')
-            ->pluck('total', 'lead_id')
-            ->toArray();
-
-        // Combinar resultados
-        $resultado = [];
-        foreach ($leadIds as $leadId) {
-            $total = ($presupuestosActuales[$leadId] ?? 0) + ($presupuestosLegacy[$leadId] ?? 0);
-            if ($total > 0) {
-                $resultado[$leadId] = $total;
-            }
+        if ($fechaSinHora == $ayerSinHora) {
+            return 'ayer';
         }
-
-        return $resultado;
+        
+        $diff = $fecha->diff($hoy);
+        $dias = $diff->days;
+        
+        if ($dias < 7) {
+            return "hace {$dias} días";
+        }
+        
+        if ($dias < 30) {
+            $semanas = floor($dias / 7);
+            return "hace {$semanas} sem";
+        }
+        
+        if ($dias < 365) {
+            return $fecha->format('d/m');
+        }
+        
+        return $fecha->format('d/m/y');
+        
+    } catch (\Exception $e) {
+        return null;
     }
+}
+
+public function getConteoComentarios(array $leadIds): array
+{
+    if (empty($leadIds)) {
+        return [];
+    }
+
+    // Comentarios actuales con fecha del último
+    $comentariosActuales = DB::table('comentarios')
+        ->select('lead_id', DB::raw('COUNT(*) as total'), DB::raw('MAX(created) as ultimo'))
+        ->whereIn('lead_id', $leadIds)
+        ->whereNull('deleted_at')
+        ->groupBy('lead_id')
+        ->get()
+        ->keyBy('lead_id')
+        ->toArray();
+
+    // Comentarios legacy con fecha del último
+    $comentariosLegacy = DB::table('comentarios_legacy')
+        ->select('lead_id', DB::raw('COUNT(*) as total'), DB::raw('MAX(created) as ultimo'))
+        ->whereIn('lead_id', $leadIds)
+        ->groupBy('lead_id')
+        ->get()
+        ->keyBy('lead_id')
+        ->toArray();
+
+    // Combinar resultados
+    $resultado = [];
+    foreach ($leadIds as $leadId) {
+        $total = ($comentariosActuales[$leadId]->total ?? 0) + ($comentariosLegacy[$leadId]->total ?? 0);
+        if ($total > 0) {
+            // Obtener la fecha más reciente entre ambos
+            $fechaActual = $comentariosActuales[$leadId]->ultimo ?? null;
+            $fechaLegacy = $comentariosLegacy[$leadId]->ultimo ?? null;
+            $ultimo = null;
+            $ultimoFormateado = null;
+            
+            if ($fechaActual && $fechaLegacy) {
+                $ultimo = $fechaActual > $fechaLegacy ? $fechaActual : $fechaLegacy;
+            } elseif ($fechaActual) {
+                $ultimo = $fechaActual;
+            } elseif ($fechaLegacy) {
+                $ultimo = $fechaLegacy;
+            }
+            
+            // ✅ Formatear la fecha para mostrar
+            $ultimoFormateado = $this->formatDateForDisplay($ultimo);
+            
+            $resultado[$leadId] = [
+                'total' => $total,
+                'ultimo' => $ultimo,
+                'ultimo_formateado' => $ultimoFormateado,  // ✅ Agregar campo formateado
+            ];
+        }
+    }
+
+    return $resultado;
+}
+
+public function getConteoPresupuestos(array $leadIds): array
+{
+    if (empty($leadIds)) {
+        return [];
+    }
+    
+    // Presupuestos actuales con fecha del último
+    $presupuestosActuales = DB::table('presupuestos')
+        ->select('lead_id', DB::raw('COUNT(*) as total'), DB::raw('MAX(created) as ultimo'))
+        ->whereIn('lead_id', $leadIds)
+        ->whereNull('deleted_at')
+        ->groupBy('lead_id')
+        ->get()
+        ->keyBy('lead_id')
+        ->toArray();
+
+    // Presupuestos legacy con fecha del último
+    $presupuestosLegacy = DB::table('presupuestos_legacy')
+        ->select('lead_id', DB::raw('COUNT(*) as total'), DB::raw('MAX(created_at) as ultimo'))
+        ->whereIn('lead_id', $leadIds)
+        ->groupBy('lead_id')
+        ->get()
+        ->keyBy('lead_id')
+        ->toArray();
+
+    // Combinar resultados
+    $resultado = [];
+    foreach ($leadIds as $leadId) {
+        $total = ($presupuestosActuales[$leadId]->total ?? 0) + ($presupuestosLegacy[$leadId]->total ?? 0);
+        if ($total > 0) {
+            // Obtener la fecha más reciente entre ambos
+            $fechaActual = $presupuestosActuales[$leadId]->ultimo ?? null;
+            $fechaLegacy = $presupuestosLegacy[$leadId]->ultimo ?? null;
+            $ultimo = null;
+            $ultimoFormateado = null;
+            
+            if ($fechaActual && $fechaLegacy) {
+                $ultimo = $fechaActual > $fechaLegacy ? $fechaActual : $fechaLegacy;
+            } elseif ($fechaActual) {
+                $ultimo = $fechaActual;
+            } elseif ($fechaLegacy) {
+                $ultimo = $fechaLegacy;
+            }
+            
+            // ✅ Formatear la fecha para mostrar
+            $ultimoFormateado = $this->formatDateForDisplay($ultimo);
+            
+            $resultado[$leadId] = [
+                'total' => $total,
+                'ultimo' => $ultimo,
+                'ultimo_formateado' => $ultimoFormateado,  // ✅ Agregar campo formateado
+            ];
+        }
+    }
+
+    return $resultado;
+}
 
     public function getDatosFiltros($usuario = null): array
     {
