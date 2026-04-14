@@ -1,6 +1,6 @@
 // resources/js/components/contratos/sections/MetodoPagoSection.tsx
 import { CreditCard, Landmark, XCircle, AlertCircle, CheckCircle } from 'lucide-react';
-import React from 'react';
+import React, { memo } from 'react';
 
 interface Props {
     metodoPago: 'cbu' | 'tarjeta' | null;
@@ -44,7 +44,7 @@ const INITIAL_TARJETA = {
     tipo_tarjeta: 'debito'
 };
 
-export default function MetodoPagoSection({
+const MetodoPagoSection = memo(function MetodoPagoSection({
     metodoPago,
     setMetodoPago,
     datosCbu,
@@ -53,7 +53,7 @@ export default function MetodoPagoSection({
     setDatosTarjeta,
 }: Props) {
     
-    const handleMetodoClick = (metodo: 'cbu' | 'tarjeta') => {
+    const handleMetodoClick = React.useCallback((metodo: 'cbu' | 'tarjeta') => {
         if (metodoPago === metodo) {
             setMetodoPago(null);
             setDatosCbu(INITIAL_CBU);
@@ -66,12 +66,35 @@ export default function MetodoPagoSection({
                 setDatosCbu(INITIAL_CBU);
             }
         }
-    };
+    }, [metodoPago, setMetodoPago, setDatosCbu, setDatosTarjeta]);
 
-    // Validar que el CBU tenga exactamente 22 dígitos
-    const cbuEsValido = datosCbu.cbu.length === 22;
-    const cbuSoloNumeros = datosCbu.cbu.replace(/\D/g, '');
-    const cbuValido = cbuSoloNumeros.length === 22;
+    const handleCancelarCbu = React.useCallback(() => {
+        setMetodoPago(null);
+        setDatosCbu(INITIAL_CBU);
+    }, [setMetodoPago, setDatosCbu]);
+
+    const handleCancelarTarjeta = React.useCallback(() => {
+        setMetodoPago(null);
+        setDatosTarjeta(INITIAL_TARJETA);
+    }, [setMetodoPago, setDatosTarjeta]);
+
+    // Handlers específicos para CBU
+    const handleCbuChange = React.useCallback((field: string, value: any) => {
+        setDatosCbu((prev: any) => ({ ...prev, [field]: value }));
+    }, [setDatosCbu]);
+
+    // Handlers específicos para Tarjeta
+    const handleTarjetaChange = React.useCallback((field: string, value: any) => {
+        setDatosTarjeta((prev: any) => ({ ...prev, [field]: value }));
+    }, [setDatosTarjeta]);
+
+    // Validar CBU
+    const cbuValido = React.useMemo(() => {
+        const soloNumeros = datosCbu.cbu.replace(/\D/g, '');
+        return soloNumeros.length === 22;
+    }, [datosCbu.cbu]);
+
+    const cbuLength = React.useMemo(() => datosCbu.cbu.length, [datosCbu.cbu]);
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -137,15 +160,12 @@ export default function MetodoPagoSection({
 
                 {/* Formulario CBU */}
                 {metodoPago === 'cbu' && (
-                    <div className="space-y-3 border-t pt-4 animate-fadeIn">
+                    <div className="space-y-3 border-t pt-4">
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-medium">Datos de la cuenta</h4>
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setMetodoPago(null);
-                                    setDatosCbu(INITIAL_CBU);
-                                }}
+                                onClick={handleCancelarCbu}
                                 className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"
                             >
                                 <XCircle className="h-3 w-3" />
@@ -161,11 +181,11 @@ export default function MetodoPagoSection({
                                 <input
                                     type="text"
                                     value={datosCbu.nombre_banco}
-                                    onChange={(e) => setDatosCbu({...datosCbu, nombre_banco: e.target.value})}
+                                    onChange={(e) => handleCbuChange('nombre_banco', e.target.value)}
                                     maxLength={100}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
-                                    placeholder="Ej: Banco Galicia, Banco Frances, etc."
-                                    required
+                                    placeholder="Ej: Banco Galicia"
+                                    autoComplete="off"
                                 />
                             </div>
                             
@@ -179,26 +199,25 @@ export default function MetodoPagoSection({
                                     onChange={(e) => {
                                         const value = e.target.value.replace(/\D/g, '');
                                         if (value.length <= 22) {
-                                            setDatosCbu({...datosCbu, cbu: value});
+                                            handleCbuChange('cbu', value);
                                         }
                                     }}
                                     maxLength={22}
                                     className={`w-full px-2 py-1.5 text-sm border rounded focus:ring-1 focus:ring-green-500 focus:border-green-500 ${
-                                        datosCbu.cbu.length > 0 && datosCbu.cbu.length !== 22 && datosCbu.cbu.length < 22
+                                        cbuLength > 0 && cbuLength !== 22 && cbuLength < 22
                                             ? 'border-yellow-500 bg-yellow-50'
                                             : 'border-gray-300'
                                     }`}
                                     placeholder="00000000000000000000"
-                                    required
+                                    autoComplete="off"
                                 />
-                                {/* 🔥 Validación CBU */}
-                                {datosCbu.cbu.length > 0 && datosCbu.cbu.length !== 22 && (
+                                {cbuLength > 0 && cbuLength !== 22 && (
                                     <div className="flex items-center gap-1 mt-1 text-xs text-yellow-600">
                                         <AlertCircle className="h-3 w-3" />
-                                        <span>El CBU debe tener exactamente 22 dígitos. Actualmente tiene {datosCbu.cbu.length} dígito(s).</span>
+                                        <span>El CBU debe tener 22 dígitos. Actualmente tiene {cbuLength}.</span>
                                     </div>
                                 )}
-                                {datosCbu.cbu.length === 22 && (
+                                {cbuValido && (
                                     <div className="flex items-center gap-1 mt-1 text-xs text-green-600">
                                         <CheckCircle className="h-3 w-3" />
                                         <span>CBU válido</span>
@@ -207,16 +226,15 @@ export default function MetodoPagoSection({
                             </div>
                             
                             <div className="col-span-2">
-                                <label className="block text-xs text-gray-600 mb-1">
-                                    Alias
-                                </label>
+                                <label className="block text-xs text-gray-600 mb-1">Alias</label>
                                 <input
                                     type="text"
                                     value={datosCbu.alias_cbu}
-                                    onChange={(e) => setDatosCbu({...datosCbu, alias_cbu: e.target.value})}
+                                    onChange={(e) => handleCbuChange('alias_cbu', e.target.value)}
                                     maxLength={50}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="ALIAS.CBU.BANCO"
+                                    autoComplete="off"
                                 />
                             </div>
                             
@@ -227,11 +245,11 @@ export default function MetodoPagoSection({
                                 <input
                                     type="text"
                                     value={datosCbu.titular_cuenta}
-                                    onChange={(e) => setDatosCbu({...datosCbu, titular_cuenta: e.target.value})}
+                                    onChange={(e) => handleCbuChange('titular_cuenta', e.target.value)}
                                     maxLength={200}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="Nombre completo del titular"
-                                    required
+                                    autoComplete="off"
                                 />
                             </div>
                             
@@ -241,41 +259,25 @@ export default function MetodoPagoSection({
                                 </label>
                                 <select
                                     value={datosCbu.tipo_cuenta}
-                                    onChange={(e) => setDatosCbu({...datosCbu, tipo_cuenta: e.target.value})}
+                                    onChange={(e) => handleCbuChange('tipo_cuenta', e.target.value)}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
-                                    required
                                 >
                                     <option value="caja_ahorro">Caja de ahorro</option>
                                     <option value="cuenta_corriente">Cuenta corriente</option>
                                 </select>
                             </div>
                         </div>
-                        
-                        {/* Mensaje de resumen de validación */}
-                        {datosCbu.cbu.length > 0 && datosCbu.cbu.length !== 22 && (
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-2">
-                                <div className="flex items-center gap-2 text-yellow-700">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <p className="text-xs">
-                                        <strong>CBU incompleto:</strong> Debe ingresar los 22 dígitos completos del CBU.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 )}
 
                 {/* Formulario Tarjeta */}
                 {metodoPago === 'tarjeta' && (
-                    <div className="space-y-3 border-t pt-4 animate-fadeIn">
+                    <div className="space-y-3 border-t pt-4">
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-medium">Datos de la tarjeta</h4>
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setMetodoPago(null);
-                                    setDatosTarjeta(INITIAL_TARJETA);
-                                }}
+                                onClick={handleCancelarTarjeta}
                                 className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"
                             >
                                 <XCircle className="h-3 w-3" />
@@ -291,11 +293,11 @@ export default function MetodoPagoSection({
                                 <input
                                     type="text"
                                     value={datosTarjeta.tarjeta_banco}
-                                    onChange={(e) => setDatosTarjeta({...datosTarjeta, tarjeta_banco: e.target.value})}
+                                    onChange={(e) => handleTarjetaChange('tarjeta_banco', e.target.value)}
                                     maxLength={100}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
-                                    placeholder="Ej: Banco Galicia, Banco Santander, etc."
-                                    required
+                                    placeholder="Ej: Banco Galicia"
+                                    autoComplete="off"
                                 />
                             </div>
                             
@@ -310,13 +312,13 @@ export default function MetodoPagoSection({
                                         const value = e.target.value.replace(/[^0-9]/g, '');
                                         const formateado = value.replace(/(\d{4})(?=\d)/g, '$1 ');
                                         if (value.length <= 16) {
-                                            setDatosTarjeta({...datosTarjeta, tarjeta_numero: formateado});
+                                            handleTarjetaChange('tarjeta_numero', formateado);
                                         }
                                     }}
                                     maxLength={19}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="**** **** **** 1234"
-                                    required
+                                    autoComplete="off"
                                 />
                             </div>
                             
@@ -326,9 +328,8 @@ export default function MetodoPagoSection({
                                 </label>
                                 <select
                                     value={datosTarjeta.tarjeta_emisor}
-                                    onChange={(e) => setDatosTarjeta({...datosTarjeta, tarjeta_emisor: e.target.value})}
+                                    onChange={(e) => handleTarjetaChange('tarjeta_emisor', e.target.value)}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
-                                    required
                                 >
                                     <option value="">Seleccionar</option>
                                     <option value="Visa">Visa</option>
@@ -345,9 +346,8 @@ export default function MetodoPagoSection({
                                 </label>
                                 <select
                                     value={datosTarjeta.tipo_tarjeta}
-                                    onChange={(e) => setDatosTarjeta({...datosTarjeta, tipo_tarjeta: e.target.value})}
+                                    onChange={(e) => handleTarjetaChange('tipo_tarjeta', e.target.value)}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
-                                    required
                                 >
                                     <option value="debito">Débito</option>
                                     <option value="credito">Crédito</option>
@@ -367,13 +367,13 @@ export default function MetodoPagoSection({
                                             if (value.length > 2) {
                                                 value = value.substring(0, 2) + '/' + value.substring(2, 4);
                                             }
-                                            setDatosTarjeta({...datosTarjeta, tarjeta_expiracion: value});
+                                            handleTarjetaChange('tarjeta_expiracion', value);
                                         }
                                     }}
                                     maxLength={5}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="MM/AA"
-                                    required
+                                    autoComplete="off"
                                 />
                             </div>
                             
@@ -382,18 +382,18 @@ export default function MetodoPagoSection({
                                     CVV <span className="text-red-500">*</span>
                                 </label>
                                 <input
-                                    type="password"
+                                    type="text"
                                     value={datosTarjeta.tarjeta_codigo}
                                     onChange={(e) => {
                                         const value = e.target.value.replace(/\D/g, '');
                                         if (value.length <= 4) {
-                                            setDatosTarjeta({...datosTarjeta, tarjeta_codigo: value});
+                                            handleTarjetaChange('tarjeta_codigo', value);
                                         }
                                     }}
                                     maxLength={4}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="***"
-                                    required
+                                    autoComplete="off"
                                 />
                             </div>
                             
@@ -404,11 +404,11 @@ export default function MetodoPagoSection({
                                 <input
                                     type="text"
                                     value={datosTarjeta.titular_tarjeta}
-                                    onChange={(e) => setDatosTarjeta({...datosTarjeta, titular_tarjeta: e.target.value})}
+                                    onChange={(e) => handleTarjetaChange('titular_tarjeta', e.target.value)}
                                     maxLength={200}
                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
                                     placeholder="Nombre como figura en la tarjeta"
-                                    required
+                                    autoComplete="off"
                                 />
                             </div>
                         </div>
@@ -421,4 +421,6 @@ export default function MetodoPagoSection({
             </div>
         </div>
     );
-}
+});
+
+export default MetodoPagoSection;

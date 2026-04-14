@@ -1373,14 +1373,26 @@ public function guardarCotizacion(Request $request)
 public function edit($id)
 {
     $contrato = Contrato::with([
-        'lead', 
-        'lead.empresaContacto',
-        'lead.empresaContacto.tipoResponsabilidad',
-        'lead.empresaContacto.tipoDocumento',
-        'lead.empresaContacto.nacionalidad',
-        'empresa',
-        'empresa.responsables',
-        'empresa.responsables.tipoResponsabilidad',
+        'lead' => function($query) {
+            $query->with(['localidad.provincia', 'rubro', 'origen']);
+        },
+        'lead.empresaContacto' => function($query) {
+            $query->with(['tipoResponsabilidad', 'tipoDocumento', 'nacionalidad']);
+        },
+        'empresa' => function($query) {
+            $query->with([
+                'localidadFiscal.provincia', 
+                'rubro', 
+                'categoriaFiscal' => function($q) {
+                    $q->select('id', 'nombre', 'codigo');
+                }, 
+                'plataforma',
+                'responsables' => function($q) {  // ← IMPORTANTE: Cargar responsables activos
+                    $q->where('es_activo', true)
+                      ->with('tipoResponsabilidad');
+                }
+            ]);
+        },
         'vehiculos', 
         'debitoCbu', 
         'debitoTarjeta',
@@ -1391,14 +1403,24 @@ public function edit($id)
     // Verificar permisos
     $this->authorizePermiso(config('permisos.GESTIONAR_CONTRATOS'));
     
-    // CORREGIDO: Usar 'es_activo' en todas las consultas
+    // Obtener listas para selects
     $tiposResponsabilidad = TipoResponsabilidad::where('es_activo', 1)->get();
-    $tiposDocumento = TipoDocumento::where('es_activo', 1)->get();  // ← 'es_activo'
+    $tiposDocumento = TipoDocumento::where('es_activo', 1)->get();
     $nacionalidades = Nacionalidad::all();
-    $categoriasFiscales = CategoriaFiscal::where('es_activo', 1)->get();  // ← 'es_activo'
-    $plataformas = Plataforma::where('es_activo', 1)->get();  // ← 'es_activo'
-    $rubros = Rubro::where('activo', 1)->get();  // Rubro usa 'activo'
-    $provincias = Provincia::where('activo', 1)->orderBy('nombre')->get();  // Provincia usa 'activo'
+    
+    // 🔥 CORREGIDO: usar el scope activo
+    $categoriasFiscales = CategoriaFiscal::activo()->get(['id', 'nombre', 'codigo']);
+    
+    $plataformas = Plataforma::where('es_activo', 1)->get();
+    $rubros = Rubro::where('activo', 1)->get();
+    $provincias = Provincia::where('activo', 1)->orderBy('nombre')->get();
+    $localidades = \App\Models\Localidad::where('activo', 1)
+        ->orderBy('nombre')
+        ->get(['id', 'nombre', 'provincia_id']);
+    $origenes = \App\Models\OrigenContacto::where('activo', 1)
+        ->orderBy('nombre')
+        ->get(['id', 'nombre']);
+
     
     return Inertia::render('Comercial/Contratos/Edit', [
         'contrato' => $contrato,
@@ -1409,6 +1431,329 @@ public function edit($id)
         'plataformas' => $plataformas,
         'rubros' => $rubros,
         'provincias' => $provincias,
+        'localidades' => $localidades,
+        'origenes' => $origenes,
     ]);
+}
+/**
+ * Update contrato
+ */
+public function update(Request $request, $id)
+{
+    $this->authorizePermiso(config('permisos.GESTIONAR_CONTRATOS'));
+    
+    try {
+        DB::beginTransaction();
+        
+        $contrato = Contrato::findOrFail($id);
+        
+        // 1. Actualizar vehículos
+        if ($request->has('vehiculos')) {
+            // Eliminar vehículos existentes
+            ContratoVehiculo::where('contrato_id', $contrato->id)->delete();
+            
+            // Insertar nuevos vehículos
+            foreach ($request->vehiculos as $index => $vehiculo) {
+                if (!empty($vehiculo['patente'])) {
+                    ContratoVehiculo::create([
+                        'contrato_id' => $contrato->id,
+                        'patente' => $vehiculo['patente'],
+                        'marca' => $vehiculo['marca'] ?? null,
+                        'modelo' => $vehiculo['modelo'] ?? null,
+                        'anio' => $vehiculo['anio'] ?? null,
+                        'color' => $vehiculo['color'] ?? null,
+                        'identificador' => $vehiculo['identificador'] ?? null,
+                        'tipo' => $vehiculo['tipo'] ?? null,
+                        'orden' => $index + 1,
+                        'created' => now(),
+                    ]);
+                }
+            }
+        }
+        
+        // 2. Actualizar método de pago - ELIMINAR EL ANTERIOR
+        if ($request->metodo_pago === 'cbu') {
+            // Eliminar tarjeta si existe (cambio de tarjeta a cbu)
+            DebitoTarjeta::where('contrato_id', $contrato->id)->delete();
+            
+            // Actualizar o crear CBU
+            DebitoCbu::updateOrCreate(
+                ['contrato_id' => $contrato->id],
+                [
+                    'nombre_banco' => $request->datos_cbu['nombre_banco'] ?? '',
+                    'cbu' => $request->datos_cbu['cbu'] ?? '',
+                    'alias_cbu' => $request->datos_cbu['alias_cbu'] ?? null,
+                    'titular_cuenta' => $request->datos_cbu['titular_cuenta'] ?? '',
+                    'tipo_cuenta' => $request->datos_cbu['tipo_cuenta'] ?? 'caja_ahorro',
+                    'modified_by' => auth()->id(),
+                    'modified' => now(),
+                ]
+            );
+        } elseif ($request->metodo_pago === 'tarjeta') {
+            // Eliminar CBU si existe (cambio de cbu a tarjeta)
+            DebitoCbu::where('contrato_id', $contrato->id)->delete();
+            
+            // Actualizar o crear Tarjeta
+            DebitoTarjeta::updateOrCreate(
+                ['contrato_id' => $contrato->id],
+                [
+                    'tarjeta_emisor' => $request->datos_tarjeta['tarjeta_emisor'] ?? '',
+                    'tarjeta_expiracion' => $request->datos_tarjeta['tarjeta_expiracion'] ?? '',
+                    'tarjeta_numero' => $request->datos_tarjeta['tarjeta_numero'] ?? '',
+                    'tarjeta_codigo' => $request->datos_tarjeta['tarjeta_codigo'] ?? null,
+                    'tarjeta_banco' => $request->datos_tarjeta['tarjeta_banco'] ?? '',
+                    'titular_tarjeta' => $request->datos_tarjeta['titular_tarjeta'] ?? '',
+                    'tipo_tarjeta' => $request->datos_tarjeta['tipo_tarjeta'] ?? 'debito',
+                    'modified_by' => auth()->id(),
+                    'modified' => now(),
+                ]
+            );
+        } else {
+            // No hay método de pago seleccionado, eliminar ambos
+            DebitoCbu::where('contrato_id', $contrato->id)->delete();
+            DebitoTarjeta::where('contrato_id', $contrato->id)->delete();
+        }
+        
+        // 3. Actualizar datos del lead (cliente)
+        if ($request->has('lead_data') && $request->lead_data && $contrato->lead_id) {
+            $lead = \App\Models\Lead::find($contrato->lead_id);
+            if ($lead) {
+                $lead->update([
+                    'nombre_completo' => $request->lead_data['nombre_completo'] ?? $lead->nombre_completo,
+                    'email' => $request->lead_data['email'] ?? $lead->email,
+                    'telefono' => $request->lead_data['telefono'] ?? $lead->telefono,
+                    'rubro_id' => $request->lead_data['rubro_id'] ?? $lead->rubro_id,
+                    'origen_id' => $request->lead_data['origen_id'] ?? $lead->origen_id,
+                ]);
+                
+                // Actualizar localidad si se seleccionó
+                if (!empty($request->lead_data['localidad_id'])) {
+                    $lead->localidad_id = $request->lead_data['localidad_id'];
+                    $lead->save();
+                }
+            }
+        }
+        
+        // 4. Actualizar datos del contacto
+        if ($request->has('contacto_data') && $request->contacto_data) {
+            $contactoId = $request->contacto_data['id'] ?? null;
+            if ($contactoId) {
+                $contacto = \App\Models\EmpresaContacto::find($contactoId);
+                if ($contacto) {
+                    $contacto->update([
+                        'tipo_responsabilidad_id' => $request->contacto_data['tipo_responsabilidad_id'] ?? $contacto->tipo_responsabilidad_id,
+                        'tipo_documento_id' => $request->contacto_data['tipo_documento_id'] ?? $contacto->tipo_documento_id,
+                        'nro_documento' => $request->contacto_data['nro_documento'] ?? $contacto->nro_documento,
+                        'nacionalidad_id' => $request->contacto_data['nacionalidad_id'] ?? $contacto->nacionalidad_id,
+                        'fecha_nacimiento' => $request->contacto_data['fecha_nacimiento'] ?? $contacto->fecha_nacimiento,
+                        'direccion_personal' => $request->contacto_data['direccion_personal'] ?? $contacto->direccion_personal,
+                        'codigo_postal_personal' => $request->contacto_data['codigo_postal_personal'] ?? $contacto->codigo_postal_personal,
+                    ]);
+                }
+            }
+        }
+        
+        // 5. Actualizar datos de la empresa
+        if ($request->has('empresa_data') && $request->empresa_data && $contrato->empresa_id) {
+            $empresa = \App\Models\Empresa::find($contrato->empresa_id);
+            if ($empresa) {
+                $empresa->update([
+                    'nombre_fantasia' => $request->empresa_data['nombre_fantasia'] ?? $empresa->nombre_fantasia,
+                    'razon_social' => $request->empresa_data['razon_social'] ?? $empresa->razon_social,
+                    'cuit' => $request->empresa_data['cuit'] ?? $empresa->cuit,
+                    'direccion_fiscal' => $request->empresa_data['direccion_fiscal'] ?? $empresa->direccion_fiscal,
+                    'telefono_fiscal' => $request->empresa_data['telefono_fiscal'] ?? $empresa->telefono_fiscal,
+                    'email_fiscal' => $request->empresa_data['email_fiscal'] ?? $empresa->email_fiscal,
+                    'rubro_id' => $request->empresa_data['rubro_id'] ?? $empresa->rubro_id,
+                    'cat_fiscal_id' => $request->empresa_data['categoria_fiscal_id'] ?? $empresa->cat_fiscal_id,
+                    'plataforma_id' => $request->empresa_data['plataforma_id'] ?? $empresa->plataforma_id,
+                    'nombre_flota' => $request->empresa_data['nombre_flota'] ?? $empresa->nombre_flota,
+                ]);
+                
+                // Actualizar localidad fiscal
+                if (!empty($request->empresa_data['localidad_fiscal_id'])) {
+                    $empresa->localidad_fiscal_id = $request->empresa_data['localidad_fiscal_id'];
+                    $empresa->save();
+                }
+            }
+        }
+        
+        // 6. Actualizar datos denormalizados del contrato
+        $contrato->update([
+            'cliente_nombre_completo' => $request->lead_data['nombre_completo'] ?? $contrato->cliente_nombre_completo,
+            'cliente_email' => $request->lead_data['email'] ?? $contrato->cliente_email,
+            'cliente_telefono' => $request->lead_data['telefono'] ?? $contrato->cliente_telefono,
+            'cliente_localidad' => $request->lead_data['localidad_nombre'] ?? $contrato->cliente_localidad,
+            'cliente_provincia' => $request->lead_data['provincia_nombre'] ?? $contrato->cliente_provincia,
+            'cliente_rubro' => $request->lead_data['rubro_nombre'] ?? $contrato->cliente_rubro,
+            'cliente_origen' => $request->lead_data['origen_nombre'] ?? $contrato->cliente_origen,
+            'empresa_nombre_fantasia' => $request->empresa_data['nombre_fantasia'] ?? $contrato->empresa_nombre_fantasia,
+            'empresa_razon_social' => $request->empresa_data['razon_social'] ?? $contrato->empresa_razon_social,
+            'empresa_cuit' => $request->empresa_data['cuit'] ?? $contrato->empresa_cuit,
+            'empresa_domicilio_fiscal' => $request->empresa_data['direccion_fiscal'] ?? $contrato->empresa_domicilio_fiscal,
+            'empresa_localidad_fiscal' => $request->empresa_data['localidad_fiscal_nombre'] ?? $contrato->empresa_localidad_fiscal,
+            'empresa_provincia_fiscal' => $request->empresa_data['provincia_fiscal_nombre'] ?? $contrato->empresa_provincia_fiscal,
+            'empresa_telefono_fiscal' => $request->empresa_data['telefono_fiscal'] ?? $contrato->empresa_telefono_fiscal,
+            'empresa_email_fiscal' => $request->empresa_data['email_fiscal'] ?? $contrato->empresa_email_fiscal,
+            'empresa_actividad' => $request->empresa_data['rubro_nombre'] ?? $contrato->empresa_actividad,
+            'empresa_situacion_afip' => $request->empresa_data['categoria_fiscal_nombre'] ?? $contrato->empresa_situacion_afip,
+            'empresa_plataforma' => $request->empresa_data['plataforma_nombre'] ?? $contrato->empresa_plataforma,
+            'empresa_nombre_flota' => $request->empresa_data['nombre_flota'] ?? $contrato->empresa_nombre_flota,
+            'modified' => now(),
+        ]);
+        
+ // 7. Actualizar responsables adicionales
+if ($request->has('responsables')) {
+    Log::info('=== PROCESANDO RESPONSABLES ===');
+    Log::info('Responsables recibidos:', $request->responsables);
+    
+    $idsToKeep = [];
+    
+    foreach ($request->responsables as $responsableData) {
+        // 🔥 VERIFICAR SI ESTÁ MARCADO PARA ELIMINAR
+        $estaEliminado = isset($responsableData['deleted']) && $responsableData['deleted'] === true;
+        
+        // Si está eliminado, lo saltamos (no se agrega a $idsToKeep)
+        if ($estaEliminado) {
+            Log::info('Responsable marcado para eliminar, se ignorará:', $responsableData);
+            continue;
+        }
+        
+        // Verificar si es un ID temporal (del frontend) o un ID real
+        $esIdTemporal = isset($responsableData['id']) && $responsableData['id'] > 1000000000;
+        
+        // Si tiene ID real Y no está marcado para eliminar
+        if (isset($responsableData['id']) && !$esIdTemporal) {
+            Log::info('Actualizando responsable existente ID: ' . $responsableData['id']);
+            $responsable = EmpresaResponsable::find($responsableData['id']);
+            if ($responsable) {
+                $responsable->update([
+                    'tipo_responsabilidad_id' => $responsableData['tipo_responsabilidad_id'],
+                    'nombre_completo' => $responsableData['nombre_completo'],
+                    'telefono' => $responsableData['telefono'] ?? null,
+                    'email' => $responsableData['email'] ?? null,
+                    'modified_by' => auth()->id(),
+                    'modified' => now(),
+                ]);
+                $idsToKeep[] = $responsable->id;
+            }
+        } 
+        // Si es nuevo (tiene is_new true O es ID temporal O no tiene ID)
+        elseif (isset($responsableData['is_new']) && $responsableData['is_new'] === true || $esIdTemporal || !isset($responsableData['id'])) {
+            Log::info('Creando nuevo responsable:', $responsableData);
+            
+            // Verificar que no exista ya un responsable activo del mismo tipo
+            $existeActivo = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
+                ->where('tipo_responsabilidad_id', $responsableData['tipo_responsabilidad_id'])
+                ->where('es_activo', true)
+                ->exists();
+            
+            if (!$existeActivo) {
+                $nuevo = EmpresaResponsable::create([
+                    'empresa_id' => $contrato->empresa_id,
+                    'tipo_responsabilidad_id' => $responsableData['tipo_responsabilidad_id'],
+                    'nombre_completo' => $responsableData['nombre_completo'],
+                    'telefono' => $responsableData['telefono'] ?? null,
+                    'email' => $responsableData['email'] ?? null,
+                    'es_activo' => true,
+                    'created_by' => auth()->id(),
+                    'created' => now(),
+                ]);
+                $idsToKeep[] = $nuevo->id;
+                Log::info('Responsable creado ID: ' . $nuevo->id);
+            } else {
+                Log::info('Ya existe un responsable activo de este tipo, no se crea duplicado');
+            }
+        }
+    }
+    
+    // 🔥 CORREGIDO: Eliminar responsables que NO están en la lista de ids a mantener
+    // YA NO excluimos tipos 3,4,5 porque pueden ser responsables adicionales que queremos eliminar
+    // Solo excluimos si el responsable es el contacto principal (eso se maneja aparte)
+    $eliminados = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
+        ->where('es_activo', true)
+        ->whereNotIn('id', $idsToKeep)
+        ->update([
+            'es_activo' => false,
+            'deleted_by' => auth()->id(),
+            'deleted_at' => now(),
+        ]);
+    
+    Log::info('Responsables eliminados (marcados como inactivos): ' . $eliminados);
+}
+
+// 🔥 8. ACTUALIZAR CAMPOS DENORMALIZADOS DEL CONTRATO CON LOS RESPONSABLES
+$responsableFlota = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
+    ->where('es_activo', true)
+    ->whereIn('tipo_responsabilidad_id', [3, 5])
+    ->first();
+
+$responsablePagos = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
+    ->where('es_activo', true)
+    ->whereIn('tipo_responsabilidad_id', [4, 5])
+    ->first();
+
+// También verificar el contacto principal si tiene responsabilidades
+$contactoPrincipal = null;
+if ($contrato->lead_id) {
+    $lead = \App\Models\Lead::find($contrato->lead_id);
+    if ($lead) {
+        $contactoPrincipal = EmpresaContacto::where('lead_id', $lead->id)
+            ->where('es_contacto_principal', true)
+            ->first();
+    }
+}
+
+// Determinar valores finales para flota
+if ($contactoPrincipal && $contactoPrincipal->tipo_responsabilidad_id == 5) {
+    // Contacto principal es responsable de flota y pagos
+    $contrato->responsable_flota_nombre = $contactoPrincipal->nombre_completo;
+    $contrato->responsable_flota_telefono = $contactoPrincipal->telefono;
+    $contrato->responsable_flota_email = $contactoPrincipal->email;
+    $contrato->responsable_pagos_nombre = $contactoPrincipal->nombre_completo;
+    $contrato->responsable_pagos_telefono = $contactoPrincipal->telefono;
+    $contrato->responsable_pagos_email = $contactoPrincipal->email;
+} elseif ($contactoPrincipal && $contactoPrincipal->tipo_responsabilidad_id == 3) {
+    // Contacto principal solo responsable de flota
+    $contrato->responsable_flota_nombre = $contactoPrincipal->nombre_completo;
+    $contrato->responsable_flota_telefono = $contactoPrincipal->telefono;
+    $contrato->responsable_flota_email = $contactoPrincipal->email;
+} elseif ($contactoPrincipal && $contactoPrincipal->tipo_responsabilidad_id == 4) {
+    // Contacto principal solo responsable de pagos
+    $contrato->responsable_pagos_nombre = $contactoPrincipal->nombre_completo;
+    $contrato->responsable_pagos_telefono = $contactoPrincipal->telefono;
+    $contrato->responsable_pagos_email = $contactoPrincipal->email;
+}
+
+// Si el contacto principal no tiene esas responsabilidades, usar los responsables de la empresa
+if (!$contrato->responsable_flota_nombre && $responsableFlota) {
+    $contrato->responsable_flota_nombre = $responsableFlota->nombre_completo;
+    $contrato->responsable_flota_telefono = $responsableFlota->telefono;
+    $contrato->responsable_flota_email = $responsableFlota->email;
+}
+
+if (!$contrato->responsable_pagos_nombre && $responsablePagos) {
+    $contrato->responsable_pagos_nombre = $responsablePagos->nombre_completo;
+    $contrato->responsable_pagos_telefono = $responsablePagos->telefono;
+    $contrato->responsable_pagos_email = $responsablePagos->email;
+}
+
+// Guardar los cambios en el contrato
+$contrato->save();
+
+        
+        DB::commit();
+        
+        // 🔥 IMPORTANTE: Devolver una respuesta Inertia, NO json
+        return redirect()->back()->with('success', 'Contrato actualizado exitosamente');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error al actualizar contrato: ' . $e->getMessage());
+        Log::error('Trace: ' . $e->getTraceAsString());
+        
+        // 🔥 Devolver error como respuesta Inertia
+        return redirect()->back()->with('error', 'Error al actualizar contrato: ' . $e->getMessage());
+    }
 }
 }

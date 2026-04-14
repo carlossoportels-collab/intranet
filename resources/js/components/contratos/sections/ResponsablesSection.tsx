@@ -1,9 +1,6 @@
 // resources/js/components/contratos/sections/ResponsablesSection.tsx
-import { router } from '@inertiajs/react';
-import { Plus, Trash2, User, AlertCircle, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, User, ChevronDown, ChevronUp } from 'lucide-react';
 import React, { useState } from 'react';
-
-import { useToast } from '@/contexts/ToastContext';
 
 interface Props {
     responsables: any[];
@@ -24,12 +21,10 @@ export default function ResponsablesSection({
     const [showForm, setShowForm] = useState(false);
     const [nuevoResponsable, setNuevoResponsable] = useState({
         tipo_responsabilidad_id: '',
-        nombre_completo: '',  
+        nombre_completo: '',
         telefono: '',
         email: ''
     });
-    const [guardando, setGuardando] = useState(false);
-    const toast = useToast();
 
     // Filtrar solo responsables activos
     const responsablesActivos = responsables.filter(r => r.es_activo !== false);
@@ -104,73 +99,46 @@ export default function ResponsablesSection({
         }
     };
 
-    const guardarResponsable = () => {
+    // 🔥 Guardar responsable en el estado LOCAL, no en el backend
+    const agregarResponsableLocal = () => {
         if (!nuevoResponsable.tipo_responsabilidad_id) {
-            toast.error('Debe seleccionar un tipo de responsable');
-            return;
+            return; // Toast manejado por el padre si es necesario
         }
         if (!nuevoResponsable.nombre_completo) {
-            toast.error('Nombre completo es requerido');
             return;
         }
 
-        setGuardando(true);
+        const nuevoId = Date.now(); // ID temporal para el estado local
         
-        router.post('/comercial/empresa/responsables', {
+        const nuevoResp = {
+            id: nuevoId,
             empresa_id: empresaId,
-            tipo_responsabilidad_id: nuevoResponsable.tipo_responsabilidad_id,
+            tipo_responsabilidad_id: parseInt(nuevoResponsable.tipo_responsabilidad_id),
+            tipo_responsabilidad: tiposResponsabilidad.find(t => t.id === parseInt(nuevoResponsable.tipo_responsabilidad_id)),
             nombre_completo: nuevoResponsable.nombre_completo,
             telefono: nuevoResponsable.telefono || null,
-            email: nuevoResponsable.email || null
-        }, {
-            preserveScroll: true,
-            onSuccess: (page: any) => {
-                const message = page.props.flash?.success;
-                if (message) toast.success(message);
-                
-                router.reload({
-                    only: ['responsables'],
-                    onSuccess: (reloadedPage: any) => {
-                        if (reloadedPage.props.responsables) {
-                            setResponsables(reloadedPage.props.responsables);
-                        }
-                        setNuevoResponsable({
-                            tipo_responsabilidad_id: '',
-                            nombre_completo: '',
-                            telefono: '',
-                            email: ''
-                        });
-                        setShowForm(false);
-                        setGuardando(false);
-                    }
-                });
-            },
-            onError: (errors) => {
-                console.error('Error:', errors);
-                const errorMsg = Object.values(errors)[0] || 'Error al guardar el responsable';
-                toast.error(errorMsg as string);
-                setGuardando(false);
-            }
+            email: nuevoResponsable.email || null,
+            es_activo: true,
+            is_new: true // Marcar como nuevo para saber que hay que guardarlo
+        };
+
+        setResponsables([...responsables, nuevoResp]);
+        
+        // Resetear formulario
+        setNuevoResponsable({
+            tipo_responsabilidad_id: '',
+            nombre_completo: '',
+            telefono: '',
+            email: ''
         });
+        setShowForm(false);
     };
 
-    const eliminarResponsable = (id: number) => {
-        router.delete(`/comercial/empresa/responsables/${id}`, {
-            preserveScroll: true,
-            onSuccess: (page: any) => {
-                const message = page.props.flash?.success;
-                if (message) toast.success(message);
-                
-                setResponsables(responsables.map(r => 
-                    r.id === id ? { ...r, es_activo: false } : r
-                ));
-            },
-            onError: (errors) => {
-                console.error('Error:', errors);
-                const errorMsg = Object.values(errors)[0] || 'Error al eliminar el responsable';
-                toast.error(errorMsg as string);
-            }
-        });
+    // 🔥 Eliminar responsable del estado LOCAL
+    const eliminarResponsableLocal = (id: number) => {
+        setResponsables(responsables.map(r => 
+            r.id === id ? { ...r, es_activo: false, deleted: true } : r
+        ));
     };
 
     const cancelar = () => {
@@ -189,6 +157,7 @@ export default function ResponsablesSection({
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <button
+                type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="w-full px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors"
             >
@@ -219,6 +188,7 @@ export default function ResponsablesSection({
                         <p className="text-xs text-gray-500">{getMensajeInformativo()}</p>
                         {!showForm && puedeAgregar && (
                             <button
+                                type="button"
                                 onClick={() => setShowForm(true)}
                                 className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
                             >
@@ -239,7 +209,7 @@ export default function ResponsablesSection({
                                     <select
                                         value={nuevoResponsable.tipo_responsabilidad_id}
                                         onChange={(e) => handleInputChange('tipo_responsabilidad_id', e.target.value)}
-                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                     >
                                         <option value="">Seleccionar</option>
                                         {opcionesDisponibles.map(tipo => (
@@ -258,9 +228,8 @@ export default function ResponsablesSection({
                                         value={nuevoResponsable.nombre_completo}
                                         onChange={(e) => handleInputChange('nombre_completo', e.target.value)}
                                         maxLength={200}
-                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                         placeholder="Nombre y apellido"
-                                        required
                                     />
                                 </div>
 
@@ -273,7 +242,7 @@ export default function ResponsablesSection({
                                         value={nuevoResponsable.telefono}
                                         onChange={(e) => handleInputChange('telefono', e.target.value)}
                                         maxLength={20}
-                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                         placeholder="Ej: 1144170730"
                                     />
                                 </div>
@@ -286,24 +255,25 @@ export default function ResponsablesSection({
                                         value={nuevoResponsable.email}
                                         onChange={(e) => handleInputChange('email', e.target.value)}
                                         maxLength={150}
-                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                         placeholder="ejemplo@correo.com"
                                     />
                                 </div>
                             </div>
                             <div className="flex justify-end gap-2 mt-4">
                                 <button
+                                    type="button"
                                     onClick={cancelar}
-                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                                 >
                                     Cancelar
                                 </button>
                                 <button
-                                    onClick={guardarResponsable}
-                                    disabled={guardando}
-                                    className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                                    type="button"
+                                    onClick={agregarResponsableLocal}
+                                    className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
                                 >
-                                    {guardando ? 'Guardando...' : 'Guardar'}
+                                    Agregar
                                 </button>
                             </div>
                         </div>
@@ -323,8 +293,9 @@ export default function ResponsablesSection({
                                             <p className="text-xs text-gray-500">{resp.tipo_responsabilidad?.nombre}</p>
                                         </div>
                                         <button
-                                            onClick={() => eliminarResponsable(resp.id)}
-                                            className="text-red-600 hover:text-red-700"
+                                            type="button"
+                                            onClick={() => eliminarResponsableLocal(resp.id)}
+                                            className="text-red-600 hover:text-red-700 transition-colors"
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </button>
@@ -350,6 +321,13 @@ export default function ResponsablesSection({
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                    
+                    {/* Indicador de que hay cambios pendientes */}
+                    {responsables.some(r => r.is_new || r.deleted) && (
+                        <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded border border-yellow-200">
+                            ⚠️ Hay cambios pendientes. Guarde el contrato para aplicar los cambios.
                         </div>
                     )}
                 </div>

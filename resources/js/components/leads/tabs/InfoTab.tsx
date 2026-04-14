@@ -36,6 +36,34 @@ const InfoTab: React.FC<InfoTabProps> = ({ lead }) => {
     }
   };
 
+  // Formatear número de teléfono para WhatsApp
+  const formatWhatsAppUrl = (telefono: string): string => {
+    // Eliminar todos los caracteres no numéricos
+    let numeroLimpio = telefono.replace(/\D/g, '');
+    
+    // Si el número tiene 10 dígitos y comienza con 11, agregar código de país 54
+    if (numeroLimpio.length === 10 && numeroLimpio.startsWith('11')) {
+      numeroLimpio = '549' + numeroLimpio;
+    }
+    // Si el número tiene 10 dígitos y no comienza con 11, asumir que es de otra provincia
+    else if (numeroLimpio.length === 10) {
+      numeroLimpio = '549' + numeroLimpio;
+    }
+    // Si el número tiene 8 dígitos (sin código de área), agregar 54911
+    else if (numeroLimpio.length === 8) {
+      numeroLimpio = '54911' + numeroLimpio;
+    }
+    
+    return `https://wa.me/${numeroLimpio}`;
+  };
+
+  // Abrir WhatsApp
+  const openWhatsApp = (telefono: string) => {
+    if (!telefono) return;
+    const url = formatWhatsAppUrl(telefono);
+    window.open(url, '_blank');
+  };
+
   // Obtener nombre de la provincia desde el objeto Provincia
   const getProvinciaNombre = (): string | null => {
     if (!lead.localidad?.provincia) return null;
@@ -59,7 +87,7 @@ const InfoTab: React.FC<InfoTabProps> = ({ lead }) => {
   const getUbicacionTexto = (): string | null => {
     if (!lead.localidad) return null;
     
-    let texto = lead.localidad.nombre; // ← Cambiado de 'localidad' a 'nombre'
+    let texto = lead.localidad.nombre;
     const provinciaNombre = getProvinciaNombre();
     if (provinciaNombre) {
       texto += `, ${provinciaNombre}`;
@@ -94,9 +122,31 @@ const InfoTab: React.FC<InfoTabProps> = ({ lead }) => {
             
             {lead.telefono && (
               <InfoRow icon={<Phone className="h-5 w-5 text-gray-400" />}>
-                <a href={`tel:${lead.telefono}`} className="text-sm text-blue-600 hover:text-blue-800">
-                  {lead.telefono}
-                </a>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <a href={`tel:${lead.telefono}`} className="text-sm text-blue-600 hover:text-blue-800">
+                    {lead.telefono}
+                  </a>
+                  <button
+                    onClick={() => openWhatsApp(lead.telefono!)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+                    title="Enviar mensaje por WhatsApp"
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      width="12" 
+                      height="12" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                    </svg>
+                    WhatsApp
+                  </button>
+                </div>
                 <p className="text-xs text-gray-500">Teléfono</p>
               </InfoRow>
             )}
