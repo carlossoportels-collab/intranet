@@ -123,7 +123,6 @@ Route::get('/lead/{lead}/info', [LeadContactController::class, 'previewInfo'])
 Route::get('/lead/{lead}/contactar', [LeadContactController::class, 'contactarLead'])
     ->name('lead.contactar');
 
-    
 // ============================================
 // RUTAS TEMPORALES (PDFs)
 // ============================================
@@ -150,8 +149,18 @@ Route::prefix('temp')->name('temp.')->group(function () {
     })->name('presupuesto');
     
     Route::get('/contrato/{id}', function ($id) {
-        $path = storage_path("app/temp/contrato-{$id}-*.pdf");
+        // Normalizar ID a 8 dígitos con ceros a la izquierda
+        $idNormalizado = str_pad($id, 8, '0', STR_PAD_LEFT);
+        
+        // Buscar con ID normalizado (8 dígitos)
+        $path = storage_path("app/temp/contrato-{$idNormalizado}-*.pdf");
         $archivos = glob($path);
+        
+        // Si no encuentra, buscar con ID original (por si acaso)
+        if (empty($archivos)) {
+            $path = storage_path("app/temp/contrato-{$id}-*.pdf");
+            $archivos = glob($path);
+        }
         
         if (empty($archivos)) {
             abort(404, 'Archivo no encontrado');

@@ -1,6 +1,6 @@
 // resources/js/Pages/Comercial/Presupuestos/Index.tsx
 import { Link, router } from '@inertiajs/react';
-import { Gift, Eye, Edit, FileText, ChevronDown, ChevronUp, Filter, Calendar, Truck, DollarSign } from 'lucide-react';
+import { Gift, Eye, Edit, FileText, ChevronDown, ChevronUp, Filter, Calendar, Truck, DollarSign, User } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { PresupuestoFilterBar } from '@/components/presupuestos/PresupuestoFilterBar';
@@ -182,6 +182,13 @@ export default function PresupuestosIndex({
 
     const handleVerPDF = (presupuestoId: number) => {
         window.open(`/comercial/presupuestos/${presupuestoId}/pdf`, '_blank');
+    };
+
+    // ✅ Nueva función para navegar al lead
+    const handleVerLead = (leadId?: number) => {
+        if (leadId) {
+            router.visit(`/comercial/leads/${leadId}`);
+        }
     };
 
     const toggleMobileCard = (id: number) => {
@@ -385,6 +392,16 @@ export default function PresupuestosIndex({
                                                     >
                                                         <FileText className="h-4 w-4" />
                                                     </button>
+                                                                                                        {/* ✅ Nuevo botón para ver lead */}
+                                                    {presupuesto.lead && (
+                                                        <button
+                                                            onClick={() => handleVerLead(presupuesto.lead?.id)}
+                                                            className="text-purple-600 hover:text-purple-900 p-1 rounded hover:bg-purple-50 transition-colors"
+                                                            title="Ver lead asociado"
+                                                        >
+                                                            <User className="h-4 w-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -473,7 +490,18 @@ export default function PresupuestosIndex({
                                             </div>
 
                                             {/* Acciones móvil */}
-                                            <div className="grid grid-cols-3 gap-2">
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {/* ✅ Nuevo botón para ver lead en mobile */}
+                                                {presupuesto.lead && (
+                                                    <button
+                                                        onClick={() => handleVerLead(presupuesto.lead?.id)}
+                                                        className="px-3 py-2 bg-purple-50 text-purple-700 text-sm rounded-lg hover:bg-purple-100 transition-colors flex items-center justify-center gap-1"
+                                                        title="Ver lead"
+                                                    >
+                                                        <User className="h-4 w-4" />
+                                                        Lead
+                                                    </button>
+                                                )}
                                                 <Link
                                                     href={`/comercial/presupuestos/${presupuesto.id}`}
                                                     className="px-3 py-2 bg-indigo-50 text-indigo-700 text-sm rounded-lg hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1"
