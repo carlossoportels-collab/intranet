@@ -26,7 +26,7 @@ let toastId = 0;
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
-    const timeoutsRef = useRef<{ [key: number]: NodeJS.Timeout }>({});
+    const timeoutsRef = useRef<{ [key: number]: ReturnType<typeof setTimeout>  }>({});
 
     const removeToast = useCallback((id: number) => {
         setToasts(prev => prev.filter(toast => toast.id !== id));

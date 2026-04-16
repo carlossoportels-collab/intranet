@@ -284,12 +284,11 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::post('/cambio-titularidad', [CambioTitularidadController::class, 'store'])->name('cambio-titularidad.store');
             Route::post('/transferencias/ejecutar', [TransferenciasController::class, 'ejecutarTransferencia'])->name('transferencias.ejecutar');
         });
-        
+
         // ===== LEADS =====
         Route::get('/leads', [LeadController::class, 'index'])->name('leads.index')->middleware('permiso:' . config('permisos.VER_PROSPECTOS'));
         Route::post('/leads', [LeadController::class, 'store'])->name('leads.store')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS'));
-        
-        
+
         Route::prefix('leads/{lead}')->name('leads.')->group(function () {
             Route::get('/', [LeadController::class, 'show'])->name('show')->middleware('permiso:' . config('permisos.VER_PROSPECTOS'));
             Route::put('/', [ProspectosController::class, 'update'])->name('update')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS'));
@@ -298,6 +297,7 @@ Route::prefix('temp')->name('temp.')->group(function () {
             Route::get('/comentarios-modal-data', [ProspectosController::class, 'comentariosModalData'])->name('comentarios-modal-data');
             Route::get('/datos-alta', [LeadDataController::class, 'getDatosAlta'])->name('datos-alta');
             Route::get('/verificar-datos-contrato', [LeadController::class, 'verificarDatosContrato'])->name('verificar-datos-contrato');
+            Route::post('/upgrade', [LeadController::class, 'upgradeToClient'])->name('upgrade')->middleware('permiso:' . config('permisos.GESTIONAR_LEADS'));
         });
         
         // ===== LEADS PERDIDOS =====

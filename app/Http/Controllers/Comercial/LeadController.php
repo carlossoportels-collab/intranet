@@ -18,6 +18,7 @@ use App\Models\EstadoLead;
 use App\Traits\Authorizable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -373,6 +374,234 @@ public function verificarDatosContrato($id)
         return response()->json([
             'error' => 'Error al verificar datos: ' . $e->getMessage()
         ], 500);
+    }
+}
+
+/**
+ * Convertir un lead en cliente (upgrade)
+ */
+public function upgradeToClient($id)
+{
+    try {
+        $lead = Lead::findOrFail($id);
+        
+        // Verificar que el lead tenga prefijo_id = 7
+        if ($lead->prefijo_id != 7) {
+            return redirect()->back()->withErrors(['error' => 'Este lead no es elegible para upgrade']);
+        }
+
+        // Verificar que no sea ya cliente
+        if ($lead->es_cliente) {
+            return redirect()->back()->withErrors(['error' => 'Este lead ya es cliente']);
+        }
+        
+        DB::beginTransaction();
+        
+        try {
+            // Obtener el estado anterior
+            $estadoAnterior = EstadoLead::find($lead->estado_lead_id);
+            
+            // Obtener el estado de cliente (ID 7)
+            $estadoCliente = EstadoLead::find(7);
+            if (!$estadoCliente) {
+                throw new \Exception('Estado de cliente no encontrado (ID: 7)');
+            }
+            
+            // Guardar datos para auditoría
+            $leadId = $lead->id;
+            $usuarioId = auth()->id();
+            $nombreLead = $lead->nombre_completo;
+            
+            // Eliminar notificaciones pendientes
+            $notificacionesEliminadas = $this->eliminarNotificacionesLead($leadId, $usuarioId);
+            
+            // Actualizar el lead
+            $lead->es_cliente = 1;
+            $lead->estado_lead_id = 7;
+            $lead->modified_by = $usuarioId;
+            $lead->modified = now();
+            $lead->save();
+            
+            // Registrar en auditoría
+            DB::table('auditoria_log')->insert([
+                'tabla_afectada' => 'leads',
+                'registro_id' => $leadId,
+                'accion' => 'update',
+                'usuario_id' => $usuarioId,
+                'valores_anteriores' => json_encode([
+                    'es_cliente' => 0,
+                    'estado_lead_id' => $lead->getOriginal('estado_lead_id'),
+                ]),
+                'valores_nuevos' => json_encode([
+                    'es_cliente' => 1,
+                    'estado_lead_id' => 7,
+                    'notificaciones_eliminadas' => $notificacionesEliminadas,
+                ]),
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'created' => now(),
+            ]);
+            
+            DB::commit();
+            
+            // 🔥 Redirigir de vuelta con mensaje de éxito (para Inertia)
+            return redirect()->back()->with('success', "{$nombreLead} ha sido convertido a cliente exitosamente");
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+        
+    } catch (\Exception $e) {
+        Log::error('Error en upgradeToClient:', [
+            'lead_id' => $id,
+            'error' => $e->getMessage()
+        ]);
+        
+        return redirect()->back()->withErrors(['error' => 'Error al convertir el lead: ' . $e->getMessage()]);
+    }
+}
+
+/**
+ * Eliminar todas las notificaciones pendientes asociadas a un lead
+ */
+private function eliminarNotificacionesLead(int $leadId, int $usuarioId): array
+{
+    $tiposEliminados = [];
+    
+    try {
+        // 1. Eliminar notificaciones de tipo 'lead_sin_contactar'
+        $leadSinContactar = DB::table('notificaciones')
+            ->where('entidad_id', $leadId)
+            ->where('entidad_tipo', 'lead')
+            ->where('tipo', 'lead_sin_contactar')
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => now(),
+                'deleted_by' => $usuarioId
+            ]);
+        
+        if ($leadSinContactar > 0) {
+            $tiposEliminados['lead_sin_contactar'] = $leadSinContactar;
+        }
+        
+        // 2. Eliminar notificaciones de tipo 'lead_vencido'
+        $leadVencido = DB::table('notificaciones')
+            ->where('entidad_id', $leadId)
+            ->where('entidad_tipo', 'lead')
+            ->where('tipo', 'lead_vencido')
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => now(),
+                'deleted_by' => $usuarioId
+            ]);
+        
+        if ($leadVencido > 0) {
+            $tiposEliminados['lead_vencido'] = $leadVencido;
+        }
+        
+        // 3. Eliminar notificaciones de tipo 'lead_posible_recontacto'
+        $posibleRecontacto = DB::table('notificaciones')
+            ->where('entidad_id', $leadId)
+            ->where('entidad_tipo', 'lead')
+            ->where('tipo', 'lead_posible_recontacto')
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => now(),
+                'deleted_by' => $usuarioId
+            ]);
+        
+        if ($posibleRecontacto > 0) {
+            $tiposEliminados['lead_posible_recontacto'] = $posibleRecontacto;
+        }
+        
+        // 4. Eliminar notificaciones de tipo 'asignacion_lead'
+        $asignacion = DB::table('notificaciones')
+            ->where('entidad_id', $leadId)
+            ->where('entidad_tipo', 'lead')
+            ->where('tipo', 'asignacion_lead')
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => now(),
+                'deleted_by' => $usuarioId
+            ]);
+        
+        if ($asignacion > 0) {
+            $tiposEliminados['asignacion_lead'] = $asignacion;
+        }
+        
+        // 5. Eliminar notificaciones de tipo 'comentario_recordatorio' (buscar por comentarios del lead)
+        $comentariosIds = DB::table('comentarios')
+            ->where('lead_id', $leadId)
+            ->whereNull('deleted_at')
+            ->pluck('id')
+            ->toArray();
+        
+        $recordatoriosComentarios = 0;
+        if (!empty($comentariosIds)) {
+            $recordatoriosComentarios = DB::table('notificaciones')
+                ->where('tipo', 'comentario_recordatorio')
+                ->where('entidad_tipo', 'comentario')
+                ->whereIn('entidad_id', $comentariosIds)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => now(),
+                    'deleted_by' => $usuarioId
+                ]);
+            
+            if ($recordatoriosComentarios > 0) {
+                $tiposEliminados['comentario_recordatorio'] = $recordatoriosComentarios;
+            }
+        }
+        
+        // 6. Eliminar notificaciones de tipo 'recontacto_recordatorio' (buscar por seguimientos_perdida)
+        $seguimientosIds = DB::table('seguimientos_perdida')
+            ->where('lead_id', $leadId)
+            ->whereNull('deleted_at')
+            ->pluck('id')
+            ->toArray();
+        
+        $recontactoRecordatorio = 0;
+        if (!empty($seguimientosIds)) {
+            $recontactoRecordatorio = DB::table('notificaciones')
+                ->where('tipo', 'recontacto_recordatorio')
+                ->where('entidad_tipo', 'seguimiento_perdida')
+                ->whereIn('entidad_id', $seguimientosIds)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => now(),
+                    'deleted_by' => $usuarioId
+                ]);
+            
+            if ($recontactoRecordatorio > 0) {
+                $tiposEliminados['recontacto_recordatorio'] = $recontactoRecordatorio;
+            }
+        }
+        
+        $total = array_sum($tiposEliminados);
+        
+        Log::info('Notificaciones eliminadas por upgrade a cliente', [
+            'lead_id' => $leadId,
+            'total' => $total,
+            'detalles' => $tiposEliminados
+        ]);
+        
+        return [
+            'total' => $total,
+            'detalles' => $tiposEliminados
+        ];
+        
+    } catch (\Exception $e) {
+        Log::error('Error eliminando notificaciones del lead:', [
+            'lead_id' => $leadId,
+            'error' => $e->getMessage()
+        ]);
+        
+        return [
+            'total' => 0,
+            'detalles' => [],
+            'error' => $e->getMessage()
+        ];
     }
 }
 }

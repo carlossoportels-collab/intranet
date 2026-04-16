@@ -196,12 +196,7 @@ public function recordatoriosNoLeidos()
         ->where('leida', false)
         ->whereNull('deleted_at');
 }
-/**
- * Accessor para obtener el nombre del comercial asignado
- */
-/**
- * Accessor para obtener el nombre del comercial asignado
- */
+
 /**
  * Accessor para obtener el nombre del comercial asignado
  */

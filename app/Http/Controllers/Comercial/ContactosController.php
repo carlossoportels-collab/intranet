@@ -9,6 +9,7 @@ use App\Traits\Authorizable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\EmpresaContacto;
+use App\Models\Lead;
 use Illuminate\Support\Facades\DB;
 
 class ContactosController extends Controller
@@ -25,12 +26,13 @@ class ContactosController extends Controller
 
     public function index(Request $request)
     {
-       
         $this->authorizePermiso(config('permisos.VER_CONTACTOS'));
         
         $usuario = auth()->user();
         
-        // Base query para contactos (empresa_contactos con lead asociado)
+        // ==========================================
+        // 1. QUERY PARA CONTACTOS EXISTENTES (empresa_contactos)
+        // ==========================================
         $contactosQuery = EmpresaContacto::with([
             'lead', 
             'lead.localidad.provincia',
@@ -38,14 +40,14 @@ class ContactosController extends Controller
         ])->where('es_activo', 1)
         ->whereNull('deleted_at');
         
-        // 🔥 FILTRO DE LOCALIDAD - DEBE IR ANTES DE PAGINAR
-        if ($request->has('localidad_nombre') && $request->localidad_nombre) {
+        // Filtrar contactos existentes por localidad
+        if ($request->filled('localidad_nombre')) {
             $contactosQuery->whereHas('lead.localidad', function ($query) use ($request) {
                 $query->where('nombre', 'like', '%' . $request->localidad_nombre . '%');
             });
         }
         
-        // Para contactos, filtramos a través de las empresas
+        // Filtrar contactos existentes por permisos
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
@@ -66,8 +68,8 @@ class ContactosController extends Controller
             }
         }
         
-        // Aplicar búsqueda por nombre/email/empresa
-        if ($request->has('search') && $request->search) {
+        // Búsqueda por nombre/email/empresa para contactos existentes
+        if ($request->filled('search')) {
             $search = $request->search;
             $contactosQuery->where(function ($query) use ($search) {
                 $query->whereHas('lead', function ($q) use ($search) {
@@ -81,78 +83,118 @@ class ContactosController extends Controller
             });
         }
         
-        // Ordenar y paginar (AHORA SÍ, después de todos los filtros)
-        $contactos = $contactosQuery->orderBy('created', 'desc')
-            ->paginate(15)
-            ->withQueryString();
+        // ==========================================
+        // 2. QUERY PARA LEADS UPGRADEADOS (prefijo_id = 7 Y es_cliente = 1)
+        // ==========================================
+        $leadsUpgradeQuery = Lead::with([
+            'localidad.provincia'
+        ])
+        ->where('prefijo_id', 7)
+        ->where('es_cliente', 1)
+        ->where('es_activo', 1)
+        ->whereNull('deleted_at')
+        ->whereDoesntHave('empresaContacto');
         
-        // Contar contactos principales (con los mismos filtros)
-        $contactosPrincipalesQuery = EmpresaContacto::query()
-            ->where('es_activo', 1)
-            ->where('es_contacto_principal', 1)
-            ->whereNull('deleted_at');
-        
-        // Aplicar filtro de localidad también al conteo de principales
-        if ($request->has('localidad_nombre') && $request->localidad_nombre) {
-            $contactosPrincipalesQuery->whereHas('lead.localidad', function ($query) use ($request) {
+        // Filtrar leads upgrade por localidad
+        if ($request->filled('localidad_nombre')) {
+            $leadsUpgradeQuery->whereHas('localidad', function ($query) use ($request) {
                 $query->where('nombre', 'like', '%' . $request->localidad_nombre . '%');
             });
         }
         
-        // Aplicar los mismos filtros de permisos a principales
+        // Filtrar leads upgrade por permisos
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
-                $empresasIds = DB::table('empresas')
-                    ->whereIn('prefijo_id', $prefijosUsuario)
-                    ->whereNull('deleted_at')
-                    ->pluck('id')
-                    ->toArray();
-                
-                if (!empty($empresasIds)) {
-                    $contactosPrincipalesQuery->whereIn('empresa_id', $empresasIds);
-                } else {
-                    $contactosPrincipalesQuery->whereRaw('1 = 0');
+                if (!in_array(7, $prefijosUsuario)) {
+                    $leadsUpgradeQuery->whereRaw('1 = 0');
                 }
             } else {
-                $contactosPrincipalesQuery->whereRaw('1 = 0');
+                $leadsUpgradeQuery->whereRaw('1 = 0');
             }
         }
         
-        // Aplicar búsqueda también a principales
-        if ($request->has('search') && $request->search) {
+        // Búsqueda para leads upgrade
+        if ($request->filled('search')) {
             $search = $request->search;
-            $contactosPrincipalesQuery->where(function ($query) use ($search) {
-                $query->whereHas('lead', function ($q) use ($search) {
-                    $q->where('nombre_completo', 'like', "%{$search}%")
+            $leadsUpgradeQuery->where(function ($query) use ($search) {
+                $query->where('nombre_completo', 'like', "%{$search}%")
                       ->orWhere('email', 'like', "%{$search}%")
                       ->orWhere('telefono', 'like', "%{$search}%");
-                })->orWhereHas('empresa', function ($q) use ($search) {
-                    $q->where('nombre_fantasia', 'like', "%{$search}%")
-                      ->orWhere('razon_social', 'like', "%{$search}%");
-                });
             });
         }
         
-        $contactosPrincipales = $contactosPrincipalesQuery->count();
+        // ==========================================
+        // 3. OBTENER Y COMBINAR RESULTADOS
+        // ==========================================
+        $contactosCollection = $contactosQuery->orderBy('created', 'desc')->get();
+        $leadsUpgradeCollection = $leadsUpgradeQuery->orderBy('created', 'desc')->get();
         
-        // Obtener los prefijos asignados al usuario para mostrar en la vista
-        $prefijosAsignados = [];
-        $cantidadPrefijos = 0;
-        if (!$usuario->ve_todas_cuentas) {
-            $prefijosAsignados = $this->getPrefijosPermitidos();
-            $cantidadPrefijos = count($prefijosAsignados);
-        }
+        // Transformar leads upgrade a formato compatible con contactos
+        $leadsUpgradeTransformados = $leadsUpgradeCollection->map(function($lead) {
+            return (object) [
+                'id' => -$lead->id,
+                'empresa_id' => null,
+                'lead_id' => $lead->id,
+                'es_contacto_principal' => true,
+                'es_activo' => true,
+                'created' => $lead->created,
+                'modified' => $lead->modified,
+                'deleted_at' => null,
+                'lead' => $lead,
+                'empresa' => null,
+                'es_upgrade' => true,
+            ];
+        });
         
-        // Obtener IDs de leads de los contactos para los conteos
-        $leadIds = $contactos->pluck('lead_id')->filter()->values()->toArray();
+        // Combinar ambas colecciones
+        $todosLosContactos = $contactosCollection->concat($leadsUpgradeTransformados);
         
-        // Usar el LeadFilterService para obtener los conteos
-        $comentariosPorLead = $this->filterService->getConteoComentarios($leadIds);
-        $presupuestosPorLead = $this->filterService->getConteoPresupuestos($leadIds);
-        $contratosPorLead = $this->getConteoContratos($leadIds);
-
+        // Ordenar por fecha de creación
+        $todosLosContactos = $todosLosContactos->sortByDesc(function($item) {
+            return $item->created;
+        })->values();
+        
+        // ==========================================
+        // 4. PAGINACIÓN MANUAL
+        // ==========================================
+        $perPage = 15;
+        $currentPage = $request->get('page', 1);
+        $offset = ($currentPage - 1) * $perPage;
+        
+        $paginatedItems = $todosLosContactos->slice($offset, $perPage)->values();
+        
+        $paginatedResult = new \Illuminate\Pagination\LengthAwarePaginator(
+            $paginatedItems,
+            $todosLosContactos->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+        
+        // ==========================================
+        // 5. ESTADÍSTICAS
+        // ==========================================
+        $contactosPrincipalesQuery = clone $contactosQuery;
+        $contactosPrincipales = $contactosPrincipalesQuery->where('es_contacto_principal', 1)->count();
+        $leadsUpgradePrincipales = $leadsUpgradeCollection->count();
+        $totalPrincipales = $contactosPrincipales + $leadsUpgradePrincipales;
+        
+        // ==========================================
+        // 6. OBTENER CONTADORES
+        // ==========================================
+        $leadIdsContactos = $contactosCollection->pluck('lead_id')->filter()->values()->toArray();
+        $leadIdsUpgrade = $leadsUpgradeCollection->pluck('id')->filter()->values()->toArray();
+        $todosLeadIds = array_merge($leadIdsContactos, $leadIdsUpgrade);
+        
+        $comentariosPorLead = $this->filterService->getConteoComentarios($todosLeadIds);
+        $presupuestosPorLead = $this->filterService->getConteoPresupuestos($todosLeadIds);
+        $contratosPorLead = $this->getConteoContratos($todosLeadIds);
+        
+        // ==========================================
+        // 7. DATOS PARA FILTROS
+        // ==========================================
         $localidades = \App\Models\Localidad::with('provincia')
             ->where('activo', 1)
             ->orderBy('nombre')
@@ -165,14 +207,21 @@ class ContactosController extends Controller
                     'nombre_completo' => $localidad->nombre_completo,
                 ];
             });
-    
+        
+        $prefijosAsignados = [];
+        $cantidadPrefijos = 0;
+        if (!$usuario->ve_todas_cuentas) {
+            $prefijosAsignados = $this->getPrefijosPermitidos();
+            $cantidadPrefijos = count($prefijosAsignados);
+        }
+        
         return Inertia::render('Comercial/Contactos', [
-            'contactos' => $contactos,
+            'contactos' => $paginatedResult,
             'estadisticas' => [
-                'total' => $contactos->total(),
-                'principales' => $contactosPrincipales,
+                'total' => $todosLosContactos->count(),
+                'principales' => $totalPrincipales,
             ],
-            'filters' => $request->only(['search', 'localidad_nombre']), // ← Cambiado de localidad_id a localidad_nombre
+            'filters' => $request->only(['search', 'localidad_nombre']),
             'usuario' => [
                 've_todas_cuentas' => (bool) $usuario->ve_todas_cuentas,
                 'rol_id' => $usuario->rol_id,
@@ -189,6 +238,7 @@ class ContactosController extends Controller
             'localidades' => $localidades,
         ]);
     }
+    
     /**
      * Mostrar un contacto específico
      */
@@ -196,18 +246,53 @@ class ContactosController extends Controller
     {
         $usuario = auth()->user();
         
-        $contacto = EmpresaContacto::with(['lead', 'empresa', 'empresa.comercial.personal'])
+        // Verificar si es un lead upgrade (ID negativo)
+        if ($id < 0) {
+            $leadId = abs($id);
+            $lead = Lead::with(['localidad.provincia'])
+                ->where('id', $leadId)
+                ->where('prefijo_id', 7)
+                ->where('es_cliente', 1)
+                ->where('es_activo', 1)
+                ->whereNull('deleted_at')
+                ->firstOrFail();
+            
+            if (!$usuario->ve_todas_cuentas) {
+                $prefijosUsuario = $this->getPrefijosPermitidos();
+                if (!in_array(7, $prefijosUsuario)) {
+                    abort(403, 'No tiene permisos para ver este contacto.');
+                }
+            }
+            
+            return Inertia::render('Comercial/ContactoShow', [
+                'contacto' => (object) [
+                    'id' => -$lead->id,
+                    'empresa_id' => null,
+                    'lead_id' => $lead->id,
+                    'es_contacto_principal' => true,
+                    'es_activo' => true,
+                    'created' => $lead->created,
+                    'lead' => $lead,
+                    'empresa' => null,
+                    'es_upgrade' => true,
+                ],
+                'usuario' => [
+                    've_todas_cuentas' => (bool) $usuario->ve_todas_cuentas,
+                ],
+            ]);
+        }
+        
+        // Contacto normal
+        $contacto = EmpresaContacto::with(['lead', 'lead.localidad.provincia', 'empresa', 'empresa.comercial.personal'])
             ->where('id', $id)
             ->where('es_activo', 1)
             ->whereNull('deleted_at')
             ->firstOrFail();
         
-       
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
             if (!empty($prefijosUsuario)) {
-                // Verificar si la empresa del contacto tiene un prefijo permitido
                 $empresaPrefijo = DB::table('empresas')
                     ->where('id', $contacto->empresa_id)
                     ->whereNull('deleted_at')
@@ -234,18 +319,15 @@ class ContactosController extends Controller
      */
     public function create()
     {
-        
         $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
         
         $usuario = auth()->user();
         
-        // Obtener empresas disponibles según permisos
         $empresasQuery = DB::table('empresas')
             ->select('id', 'razon_social', 'nombre_fantasia', 'prefijo_id')
             ->whereNull('deleted_at')
             ->orderBy('nombre_fantasia');
         
-        // Filtrar empresas por permisos
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
@@ -271,10 +353,8 @@ class ContactosController extends Controller
      */
     public function store(Request $request)
     {
-        
         $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
         
-        // Validar los datos del formulario
         $validated = $request->validate([
             'empresa_id' => 'required|exists:empresas,id',
             'lead_id' => 'required|exists:leads,id',
@@ -283,7 +363,6 @@ class ContactosController extends Controller
             'departamento' => 'nullable|string|max:100',
         ]);
         
-        // Verificar permisos para crear contacto en esta empresa
         $usuario = auth()->user();
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
@@ -306,7 +385,6 @@ class ContactosController extends Controller
             }
         }
         
-        // Crear el contacto
         $contacto = EmpresaContacto::create([
             'empresa_id' => $validated['empresa_id'],
             'lead_id' => $validated['lead_id'],
@@ -337,7 +415,6 @@ class ContactosController extends Controller
             ->whereNull('deleted_at')
             ->firstOrFail();
         
-        // Verificar permisos para editar este contacto
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
@@ -355,13 +432,11 @@ class ContactosController extends Controller
             }
         }
         
-        // Obtener empresas disponibles según permisos
         $empresasQuery = DB::table('empresas')
             ->select('id', 'razon_social', 'nombre_fantasia', 'prefijo_id')
             ->whereNull('deleted_at')
             ->orderBy('nombre_fantasia');
         
-        // Filtrar empresas por permisos
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
@@ -388,7 +463,6 @@ class ContactosController extends Controller
      */
     public function update(Request $request, $id)
     {
-       
         $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
         
         $contacto = EmpresaContacto::where('id', $id)
@@ -396,7 +470,6 @@ class ContactosController extends Controller
             ->whereNull('deleted_at')
             ->firstOrFail();
         
-        // Verificar permisos para actualizar este contacto
         $usuario = auth()->user();
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
@@ -419,7 +492,6 @@ class ContactosController extends Controller
             }
         }
         
-        // Validar los datos del formulario
         $validated = $request->validate([
             'empresa_id' => 'required|exists:empresas,id',
             'es_contacto_principal' => 'boolean',
@@ -427,7 +499,6 @@ class ContactosController extends Controller
             'departamento' => 'nullable|string|max:100',
         ]);
         
-        // Verificar permisos para la nueva empresa si cambió
         if ($contacto->empresa_id != $validated['empresa_id'] && !$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
             
@@ -445,7 +516,6 @@ class ContactosController extends Controller
             }
         }
         
-        // Actualizar el contacto
         $contacto->update([
             'empresa_id' => $validated['empresa_id'],
             'es_contacto_principal' => $validated['es_contacto_principal'] ?? false,
@@ -464,7 +534,6 @@ class ContactosController extends Controller
      */
     public function destroy($id)
     {
-       
         $this->authorizePermiso(config('permisos.GESTIONAR_CONTACTOS'));
         
         $contacto = EmpresaContacto::where('id', $id)
@@ -472,7 +541,6 @@ class ContactosController extends Controller
             ->whereNull('deleted_at')
             ->firstOrFail();
         
-        // Verificar permisos para eliminar este contacto
         $usuario = auth()->user();
         if (!$usuario->ve_todas_cuentas) {
             $prefijosUsuario = $this->getPrefijosPermitidos();
@@ -491,7 +559,6 @@ class ContactosController extends Controller
             }
         }
         
-        // Soft delete del contacto
         $contacto->update([
             'deleted_at' => now(),
             'deleted_by' => $usuario->id,
@@ -510,7 +577,6 @@ class ContactosController extends Controller
             return [];
         }
 
-        // Contratos nuevos
         $contratosNuevos = DB::table('contratos')
             ->select('lead_id', DB::raw('COUNT(*) as total'))
             ->whereIn('lead_id', $leadIds)
@@ -520,7 +586,6 @@ class ContactosController extends Controller
             ->pluck('total', 'lead_id')
             ->toArray();
 
-        // Contratos legacy
         $contratosLegacy = DB::table('contratos_legacy')
             ->select('lead_id', DB::raw('COUNT(*) as total'))
             ->whereIn('lead_id', $leadIds)
@@ -528,7 +593,6 @@ class ContactosController extends Controller
             ->pluck('total', 'lead_id')
             ->toArray();
 
-        // Combinar
         $resultado = [];
         foreach ($leadIds as $leadId) {
             $total = ($contratosNuevos[$leadId] ?? 0) + ($contratosLegacy[$leadId] ?? 0);

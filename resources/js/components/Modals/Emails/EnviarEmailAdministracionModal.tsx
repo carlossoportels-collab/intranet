@@ -1,7 +1,7 @@
 // resources/js/components/Modals/Emails/EnviarEmailAdministracionModal.tsx
 
 import { router } from '@inertiajs/react';
-import { X, Send, Mail, Building2, FileText, Files, Upload, Trash2, Eye, Paperclip } from 'lucide-react';
+import { X, Send, Mail, Building2, FileText, Files, Upload, Trash2, Eye, Paperclip, AlertCircle } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 
 import { useToast } from '@/contexts/ToastContext';
@@ -59,6 +59,73 @@ export default function EnviarEmailAdministracionModal({
 
     // Obtener tipo de operación
     const tipoOperacion = contrato?.tipo_operacion;
+
+    // ==========================================
+    // FUNCIONES PARA VERIFICAR ACCESORIOS Y SERVICIOS
+    // ==========================================
+    
+    // Verificar si existe el accesorio TASA007
+    const tieneTasa007 = () => {
+        if (!contrato?.presupuesto?.agregados) return false;
+        return contrato.presupuesto.agregados.some((item: any) => {
+            const codigo = item.producto_codigo || item.productoServicio?.codigopro;
+            return codigo === 'TASA007';
+        });
+    };
+
+    // Verificar si existe el servicio ADIC022
+    const tieneAdic022 = () => {
+        if (!contrato?.presupuesto?.agregados) return false;
+        return contrato.presupuesto.agregados.some((item: any) => {
+            const codigo = item.producto_codigo || item.productoServicio?.codigopro;
+            return codigo === 'ADIC022';
+        });
+    };
+
+    // Verificar si existe alguno de los servicios ADIC (recupero vehicular)
+    const tieneAdicRecuperoVehicular = () => {
+        if (!contrato?.presupuesto?.agregados) return false;
+        const codigosRecupero = ['ADIC010', 'ADIC014', 'ADIC015', 'ADIC016', 'ADIC017', 'ADIC018'];
+        return contrato.presupuesto.agregados.some((item: any) => {
+            const codigo = item.producto_codigo || item.productoServicio?.codigopro;
+            return codigosRecupero.includes(codigo);
+        });
+    };
+
+    // Determinar qué leyenda mostrar
+    const getLeyendaAddenda = () => {
+        const tieneTasa = tieneTasa007();
+        const tieneAdic22 = tieneAdic022();
+        const tieneRecupero = tieneAdicRecuperoVehicular();
+
+        // Caso 1: TASA007 presente y NO hay servicios de recupero NI ADIC022
+        if (tieneTasa && !tieneRecupero && !tieneAdic22) {
+            return {
+                texto: "Recordá adjuntar la Addenda de corte por autogestión",
+                tipo: "warning"
+            };
+        }
+
+        // Caso 2: ADIC022 presente
+        if (tieneAdic22) {
+            return {
+                texto: "Recordá adjuntar la Addenda de respuesta operativa",
+                tipo: "info"
+            };
+        }
+
+        // Caso 3: Cualquier servicio de recupero vehicular presente
+        if (tieneRecupero) {
+            return {
+                texto: "Recordá adjuntar la Addenda de recupero vehicular",
+                tipo: "warning"
+            };
+        }
+
+        return null;
+    };
+
+    const leyenda = getLeyendaAddenda();
 
     //  DESTINATARIOS: SOLO GFAURE Y PAGOMEZ
     const getDestinatarios = () => {
@@ -588,6 +655,22 @@ export default function EnviarEmailAdministracionModal({
                                     />
                                 </div>
 
+                                {/* LEYENDA DINÁMICA - Aquí se muestra según los accesorios/servicios */}
+                                {leyenda && (
+                                    <div className={`flex items-start gap-2 p-3 rounded-lg border ${
+                                        leyenda.tipo === 'warning' 
+                                            ? 'bg-yellow-50 border-yellow-200 text-yellow-800' 
+                                            : 'bg-blue-50 border-blue-200 text-blue-800'
+                                    }`}>
+                                        <AlertCircle className={`h-4 w-4 flex-shrink-0 mt-0.5 ${
+                                            leyenda.tipo === 'warning' ? 'text-yellow-600' : 'text-blue-600'
+                                        }`} />
+                                        <span className="text-xs sm:text-sm font-medium">
+                                            {leyenda.texto}
+                                        </span>
+                                    </div>
+                                )}
+
                                 {documentosAdjuntos.length > 0 && (
                                     <div className="bg-white p-3 rounded-xl border border-purple-200">
                                         <p className="text-xs sm:text-sm font-medium text-purple-800 mb-2">
@@ -760,6 +843,36 @@ export default function EnviarEmailAdministracionModal({
                 companiaId={companiaId}
                 selectedFiles={documentosAdjuntos}
             />
+
+            {/* Modal de vista previa (opcional - puedes implementarlo si quieres) */}
+            {showVistaPrevia && (
+                <div className="fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-900">Vista previa del mensaje</h3>
+                            <button
+                                onClick={() => setShowVistaPrevia(false)}
+                                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4">
+                            <pre className="whitespace-pre-wrap font-mono text-sm bg-gray-50 p-4 rounded-lg">
+                                {formData.body}
+                            </pre>
+                        </div>
+                        <div className="flex justify-end p-4 border-t border-gray-200">
+                            <button
+                                onClick={() => setShowVistaPrevia(false)}
+                                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

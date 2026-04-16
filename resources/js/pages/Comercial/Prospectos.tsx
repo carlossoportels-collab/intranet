@@ -1,7 +1,7 @@
 // resources/js/Pages/Comercial/Prospectos.tsx
 import { Head, Link, router } from '@inertiajs/react'; 
 import React, { useState, useCallback } from 'react';
-import { Eye, MessageSquare, FileText, User } from 'lucide-react';
+import { Eye, MessageSquare, FileText, User, Star } from 'lucide-react';
 
 import { FilterBar, ActiveFilters } from '@/components/filters';
 import { LeadCardMobile, LeadTableRow, PipelineStatistics } from '@/components/leads';
@@ -9,7 +9,9 @@ import TiemposEstados from '@/components/leads/TiemposEstados';
 import NuevoComentarioModal from '@/components/Modals/NuevoComentarioModal';
 import VerNotaModal from '@/components/Modals/VerNotaModal';
 import { Pagination, EmptyState } from '@/components/ui';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useProspectosFilters } from '@/hooks/useProspectosFilters';
+import { useToast } from '@/contexts/ToastContext'; // 🔥 Usar ToastContext
 import AppLayout from '@/layouts/app-layout';
 import {
   Lead,
@@ -124,6 +126,14 @@ export default function Prospectos({
   });
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   
+  // Estados para el diálogo de upgrade
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [leadToUpgrade, setLeadToUpgrade] = useState<Lead | null>(null);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  
+  // 🔥 Usar ToastContext
+  const toast = useToast();
+  
   const handleOpenModal = useCallback((modal: keyof typeof showModals, lead: Lead) => {
     setSelectedLead(lead);
     setShowModals(prev => ({ ...prev, [modal]: true }));
@@ -177,7 +187,6 @@ export default function Prospectos({
     }
   };
 
-  // Función para obtener el estilo del badge de estado usando el color de la base de datos
   const getEstadoBadgeStyle = (colorHex?: string) => {
     if (colorHex) {
       const hex = colorHex.startsWith('#') ? colorHex : `#${colorHex}`;
@@ -193,6 +202,37 @@ export default function Prospectos({
       border: '1px solid #e5e7eb'
     };
   };
+
+  const openUpgradeDialog = useCallback((lead: Lead) => {
+    setLeadToUpgrade(lead);
+    setShowUpgradeDialog(true);
+  }, []);
+
+  // 🔥 Función handleUpgrade usando router.post y toast del contexto
+  const handleUpgrade = useCallback(() => {
+    if (!leadToUpgrade) return;
+    
+    setIsUpgrading(true);
+    
+    router.post(`/comercial/leads/${leadToUpgrade.id}/upgrade`, {}, {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.success(`${leadToUpgrade.nombre_completo} ha sido convertido a cliente exitosamente`);
+        setTimeout(() => {
+          router.reload({ only: ['leads', 'comentariosPorLead', 'presupuestosPorLead'] });
+        }, 500);
+      },
+      onError: (errors) => {
+        console.error('Error en upgrade:', errors);
+        toast.error(errors.error || 'Error al convertir el lead');
+      },
+      onFinish: () => {
+        setIsUpgrading(false);
+        setShowUpgradeDialog(false);
+        setLeadToUpgrade(null);
+      }
+    });
+  }, [leadToUpgrade, toast]);
   
   return (
     <AppLayout title="Prospectos">
@@ -227,7 +267,6 @@ export default function Prospectos({
           </div>
         </div>
         
-        {/* Pipeline Statistics */}
         <div className="p-4 md:p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Pipeline de Prospectos
@@ -238,7 +277,6 @@ export default function Prospectos({
           />
         </div>
         
-        {/* Filtros */}
         <div className="p-4 md:p-6 border-b border-gray-200">
           <FilterBar 
             showMobileFilters={showMobileFilters}
@@ -264,7 +302,6 @@ export default function Prospectos({
           />
         </div>
         
-        {/* Active Filters */}
         {hasActiveFilters && (
           <div className="px-4 md:px-6 py-3 border-b border-gray-200 bg-gray-50">
             <ActiveFilters 
@@ -278,7 +315,6 @@ export default function Prospectos({
           </div>
         )}
         
-        {/* Lista de Leads */}
         <div className="p-4 md:p-6">
           {leadsData.length === 0 ? (
             <EmptyState 
@@ -315,14 +351,12 @@ export default function Prospectos({
                             </span>
                           </div>
                           
-                          {/* Localidad */}
                           <div className="mt-2 text-xs text-gray-500">
                             📍 {lead.localidad?.nombre 
                               ? `${lead.localidad.nombre}${lead.localidad.provincia?.nombre ? `, ${lead.localidad.provincia.nombre}` : ''}`
                               : 'Sin localidad'}
                           </div>
                           
-                          {/* Comercial */}
                           {!usuarioEsComercial && lead.asignado_nombre && (
                             <div className="mt-2 p-2 bg-gray-50 rounded">
                               <p className="text-xs font-medium text-gray-700">Comercial:</p>
@@ -330,7 +364,6 @@ export default function Prospectos({
                             </div>
                           )}
                           
-                          {/* Badges de presupuestos y comentarios */}
                           <div className="flex flex-wrap items-center gap-3 mt-3">
                             {contarPresupuestosDeLead(lead.id) > 0 && (
                               <div className="flex items-center gap-1 text-xs text-blue-600">
@@ -375,6 +408,15 @@ export default function Prospectos({
                               <MessageSquare className="h-4 w-4 mr-1" />
                               Seguimiento
                             </button>
+                            {lead.prefijo_id === 7 && !lead.es_cliente && (
+                              <button
+                                onClick={() => openUpgradeDialog(lead)}
+                                className="inline-flex items-center text-purple-600 hover:text-purple-800 text-sm px-2 py-1 hover:bg-purple-50 rounded transition-colors"
+                              >
+                                <Star className="h-4 w-4 mr-1" />
+                                Convertir
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -453,7 +495,6 @@ export default function Prospectos({
                             </span>
                           </td>
                           
-                          {/* PRESUPUESTOS */}
                           <td className="px-4 py-3 text-sm text-gray-700 text-center">
                             {contarPresupuestosDeLead(lead.id)}
                             {presupuestoData?.ultimo_formateado && (
@@ -463,7 +504,6 @@ export default function Prospectos({
                             )}
                           </td>
                           
-                          {/* COMENTARIOS */}
                           <td className="px-4 py-3 text-sm text-gray-700 text-center">
                             {contarComentariosDeLead(lead.id)}
                             {comentarioData?.ultimo_formateado && (
@@ -473,7 +513,6 @@ export default function Prospectos({
                             )}
                           </td>
                           
-                          {/* COMERCIAL */}
                           {!usuarioEsComercial && (
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1">
@@ -483,12 +522,10 @@ export default function Prospectos({
                             </td>
                           )}
                           
-                          {/* Registro */}
                           <td className="px-4 py-3 text-sm text-gray-500">
                             {formatDate(lead.created)}
                           </td>
                           
-                          {/* Acciones */}
                           <td className="px-4 py-3">
                             <div className="flex items-center space-x-2">
                               <button 
@@ -506,6 +543,15 @@ export default function Prospectos({
                                 <MessageSquare className="h-4 w-4 mr-1" />
                                 Comentario
                               </button>
+                              {lead.prefijo_id === 7 && !lead.es_cliente && (
+                                <button 
+                                  onClick={() => openUpgradeDialog(lead)}
+                                  className="inline-flex items-center text-purple-600 hover:text-purple-800 text-sm px-2 py-1 hover:bg-purple-50 rounded transition-colors"
+                                >
+                                  <Star className="h-4 w-4 mr-1" />
+                                  Convertir
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -515,7 +561,6 @@ export default function Prospectos({
                 </table>
               </div>
               
-              {/* Paginación */}
               <div className="mt-6">
                 <Pagination
                   currentPage={current_page}
@@ -531,7 +576,22 @@ export default function Prospectos({
         </div>
       </div>
 
-      {/* Modales */}
+      <ConfirmDialog
+        isOpen={showUpgradeDialog}
+        onClose={() => {
+          if (!isUpgrading) {
+            setShowUpgradeDialog(false);
+            setLeadToUpgrade(null);
+          }
+        }}
+        onConfirm={handleUpgrade}
+        title="Convertir a Cliente"
+        message={`¿Está seguro que desea convertir a "${leadToUpgrade?.nombre_completo}" en cliente? Esta acción cambiará el estado del lead y lo marcará como cliente.`}
+        confirmText={isUpgrading ? "Procesando..." : "Sí, convertir"}
+        cancelText="Cancelar"
+        type="warning"
+      />
+
       <NuevoComentarioModal
         isOpen={showModals.nuevoComentario}
         onClose={handleCloseModals}

@@ -13,7 +13,7 @@ interface ToastConfig {
 export const useToast = () => {
     const [toast, setToast] = useState<ToastConfig & { id: number } | null>(null);
     const toastIdRef = useRef(0);
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout>  | null>(null);
 
     const showToast = useCallback((config: ToastConfig) => {
         if (timeoutRef.current) {
