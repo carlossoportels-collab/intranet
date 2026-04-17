@@ -59,6 +59,9 @@ class ContratoDataService
         // Hidratar productos
         $this->hidratarProductos($contrato);
         
+        // Agregar datos económicos
+        $this->enriquecerConDatosEconomicos($contrato);
+        
         return ['contrato' => $contrato];
     }
 
@@ -150,5 +153,146 @@ class ContratoDataService
             $contrato->presupuesto->abono_codigo = $contrato->presupuesto->abono->codigopro ?? 'ABONO';
             $contrato->presupuesto->abono_nombre = $contrato->presupuesto->abono->nombre ?? 'Abono mensual';
         }
+    }
+
+    /**
+     * Enriquecer contrato con datos económicos del presupuesto
+     */
+    private function enriquecerConDatosEconomicos(Contrato $contrato): void
+    {
+        $presupuesto = $contrato->presupuesto;
+        
+        if (!$presupuesto) {
+            $this->setDefaultValues($contrato);
+            return;
+        }
+
+        // Cantidad de vehículos
+        $cantidadVehiculos = $presupuesto->cantidad_vehiculos ?? 1;
+        
+        // ========== TASA (Instalación) - Usar subtotal del presupuesto directamente ==========
+        $contrato->tasa = $presupuesto->tasa;
+        $contrato->valor_tasa = $presupuesto->valor_tasa ?? 0;
+        $contrato->tasa_bonificacion = $presupuesto->tasa_bonificacion ?? 0;
+        // Usar subtotal_tasa que ya tiene el descuento aplicado por el servicio
+        $contrato->subtotal_tasa = $presupuesto->subtotal_tasa ?? ($contrato->valor_tasa * $cantidadVehiculos);
+        
+        // ========== ABONO - Usar subtotal del presupuesto directamente ==========
+        $contrato->abono = $presupuesto->abono;
+        $contrato->valor_abono = $presupuesto->valor_abono ?? 0;
+        $contrato->abono_bonificacion = $presupuesto->abono_bonificacion ?? 0;
+        // Usar subtotal_abono que ya tiene el descuento aplicado por el servicio
+        $contrato->subtotal_abono = $presupuesto->subtotal_abono ?? ($contrato->valor_abono * $cantidadVehiculos);
+        
+        // ========== ACCESORIOS Y SERVICIOS ==========
+        $accesorios = [];
+        $servicios = [];
+        $totalAccesorios = 0;
+        $totalServicios = 0;
+        
+        if ($presupuesto->agregados && $presupuesto->agregados->count() > 0) {
+            foreach ($presupuesto->agregados as $agregado) {
+                $tipo = $agregado->tipo_nombre ?? $agregado->productoServicio?->tipo?->nombre_tipo_abono ?? 'Otros';
+                $cantidad = $agregado->cantidad ?? 1;
+                $valorUnitario = $agregado->valor ?? 0;
+                // Subtotal base (sin descuento) = valor unitario * cantidad
+                $subtotalBase = $valorUnitario * $cantidad;
+                $bonificacion = $agregado->bonificacion ?? 0;
+                // Usar el subtotal que ya tiene el descuento aplicado
+                $subtotal = $agregado->subtotal ?? $subtotalBase;
+                
+                $itemData = [
+                    'id' => $agregado->id,
+                    'prd_servicio_id' => $agregado->prd_servicio_id,
+                    'cantidad' => $cantidad,
+                    'valor' => $valorUnitario,
+                    'bonificacion' => $bonificacion,
+                    'subtotal' => $subtotal,
+                    'subtotal_base' => $subtotalBase,
+                    'producto_servicio' => $agregado->productoServicio,
+                    'producto_codigo' => $agregado->producto_codigo ?? 'XXXX',
+                    'producto_nombre' => $agregado->producto_nombre ?? 'Sin nombre',
+                    'tipo_nombre' => $tipo
+                ];
+                
+                // Clasificar por tipo
+                if (strtolower($tipo) === 'accesorio' || strpos(strtolower($tipo), 'accesorio') !== false) {
+                    $accesorios[] = $itemData;
+                    $totalAccesorios += $subtotal;
+                } else {
+                    $servicios[] = $itemData;
+                    $totalServicios += $subtotal;
+                }
+            }
+        }
+        
+        $contrato->accesorios = $accesorios;
+        $contrato->servicios = $servicios;
+        $contrato->total_accesorios = $totalAccesorios;
+        $contrato->total_servicios = $totalServicios;
+        
+        // ========== TOTALES ==========
+        // Inversión inicial = Subtotal Tasa + Total Accesorios
+        $contrato->total_inversion_inicial = ($contrato->subtotal_tasa ?? 0) + $totalAccesorios;
+        
+        // Costo mensual = Subtotal Abono + Total Servicios
+        $contrato->total_mensual = ($contrato->subtotal_abono ?? 0) + $totalServicios;
+        
+        // ========== PROMOCIÓN ==========
+        $contrato->promocion_id = $presupuesto->promocion_id;
+        $contrato->promocion = $presupuesto->promocion;
+        
+        // Obtener IDs de productos con promoción (bonificación > 0)
+        $productosConPromocion = [];
+        if ($presupuesto->agregados) {
+            foreach ($presupuesto->agregados as $agregado) {
+                if (($agregado->bonificacion ?? 0) > 0 && $agregado->prd_servicio_id) {
+                    $productosConPromocion[] = $agregado->prd_servicio_id;
+                }
+            }
+        }
+        if (($presupuesto->tasa_bonificacion ?? 0) > 0 && $presupuesto->tasa?->id) {
+            $productosConPromocion[] = $presupuesto->tasa->id;
+        }
+        if (($presupuesto->abono_bonificacion ?? 0) > 0 && $presupuesto->abono?->id) {
+            $productosConPromocion[] = $presupuesto->abono->id;
+        }
+        
+        $contrato->productos_con_promocion = array_unique($productosConPromocion);
+        
+        Log::info('Datos económicos del contrato', [
+            'contrato_id' => $contrato->id,
+            'cantidad_vehiculos' => $cantidadVehiculos,
+            'subtotal_tasa' => $contrato->subtotal_tasa,
+            'subtotal_abono' => $contrato->subtotal_abono,
+            'total_inversion_inicial' => $contrato->total_inversion_inicial,
+            'total_mensual' => $contrato->total_mensual,
+            'total_accesorios' => $totalAccesorios,
+            'total_servicios' => $totalServicios
+        ]);
+    }
+
+    /**
+     * Establecer valores por defecto cuando no hay presupuesto
+     */
+    private function setDefaultValues(Contrato $contrato): void
+    {
+        $contrato->tasa = null;
+        $contrato->abono = null;
+        $contrato->accesorios = [];
+        $contrato->servicios = [];
+        $contrato->valor_tasa = 0;
+        $contrato->tasa_bonificacion = 0;
+        $contrato->subtotal_tasa = 0;
+        $contrato->valor_abono = 0;
+        $contrato->abono_bonificacion = 0;
+        $contrato->subtotal_abono = 0;
+        $contrato->total_accesorios = 0;
+        $contrato->total_servicios = 0;
+        $contrato->total_inversion_inicial = 0;
+        $contrato->total_mensual = 0;
+        $contrato->promocion_id = null;
+        $contrato->promocion = null;
+        $contrato->productos_con_promocion = [];
     }
 }

@@ -1,7 +1,7 @@
 // resources/js/Pages/Comercial/Contratos/Show.tsx
 
 import { Head, router } from '@inertiajs/react';
-import { ArrowLeft, FileText, Calendar, User, Building, Edit, Truck, CreditCard, Download, ChevronDown, ChevronUp, Mail, Send, Building2 } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, User, Building, Edit, Truck, CreditCard, Download, ChevronDown, ChevronUp, Mail, Send, Building2, Package, Wrench, Gift } from 'lucide-react';
 import React, { useState } from 'react';
 import EnviarContratoEmailModal from '@/components/Modals/Emails/EnviarContratoEmailModal';
 import EnviarEmailAdministracionModal from '@/components/Modals/Emails/EnviarEmailAdministracionModal';
@@ -12,7 +12,7 @@ import { InfoRow } from '@/components/ui/InfoRow';
 import { SensitiveData } from '@/components/ui/SensitiveData';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate } from '@/utils/formatters';
+import { formatDate, formatMoney, toNumber } from '@/utils/formatters';
 import { useToast } from '@/contexts/ToastContext';
 
 interface Props {
@@ -35,6 +35,18 @@ export default function ContratoShow({ contrato }: Props) {
         responsables: false,
         vehiculos: false
     });
+
+    // Funciones auxiliares para formateo
+    const formatMoneyLocal = (value: any): string => {
+        const num = toNumber(value);
+        return '$ ' + num.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    };
+
+    const formatPorcentaje = (value: any): string => {
+        const num = toNumber(value);
+        if (num === 0) return '';
+        return Math.round(num).toString() + '%';
+    };
 
     const getEstadoColor = (estadoId?: number) => {
         switch(estadoId) {
@@ -105,9 +117,11 @@ export default function ContratoShow({ contrato }: Props) {
             });
         }
     };
+    
     const handleEdit = () => {
-            router.visit(`/comercial/contratos/${contrato.id}/edit`);
-        };
+        router.visit(`/comercial/contratos/${contrato.id}/edit`);
+    };
+    
     const toggleMobileSection = (section: string) => {
         setShowMobileDetails(prev => ({
             ...prev,
@@ -115,25 +129,34 @@ export default function ContratoShow({ contrato }: Props) {
         }));
     };
 
-const getTipoOperacionBadge = () => {
-    const tipo = contrato?.tipo_operacion;
+    const getTipoOperacionBadge = () => {
+        const tipo = contrato?.tipo_operacion;
+        
+        switch(tipo) {
+            case 'venta_cliente':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
+            case 'alta_nueva':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
+            case 'cambio_titularidad':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
+            case 'cambio_razon_social':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
+            case 'cambio_smartsat':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">Cambio SmartSat</span>;
+            default:
+                return null;
+        }
+    };
+
+    // Determinar si hay promoción
+    const tienePromocion = !!contrato.promocion_id;
     
-    switch(tipo) {
-        case 'venta_cliente':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
-        case 'alta_nueva':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
-        case 'cambio_titularidad':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
-        case 'cambio_razon_social':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
-        // Nuevo Badge SmartSat
-        case 'cambio_smartsat':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">Cambio SmartSat</span>;
-        default:
-            return null;
-    }
-};
+    // Verificar si un producto tiene promoción
+    const tienePromocionProducto = (productoId: number) => {
+        if (!tienePromocion) return false;
+        return contrato.productos_con_promocion?.includes(productoId) || false;
+    };
+    const cantidadVehiculos = contrato.presupuesto_cantidad_vehiculos || 1;
 
     return (
         <AppLayout title={`Contrato #${contrato.numero_contrato}`}>
@@ -172,12 +195,12 @@ const getTipoOperacionBadge = () => {
                     
                     <div className="flex flex-col sm:flex-row gap-2">
                         <button
-                                onClick={handleEdit}
-                                className="px-3 sm:px-4 py-2 bg-yellow-600 text-white text-sm sm:text-base rounded-md hover:bg-yellow-700 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Edit className="h-4 w-4" />
-                                <span className="sm:inline">Editar</span>
-                            </button>
+                            onClick={handleEdit}
+                            className="px-3 sm:px-4 py-2 bg-yellow-600 text-white text-sm sm:text-base rounded-md hover:bg-yellow-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Edit className="h-4 w-4" />
+                            <span className="sm:inline">Editar</span>
+                        </button>
                         <button
                             onClick={handleVerPDF}
                             className="px-3 sm:px-4 py-2 bg-blue-600 text-white text-sm sm:text-base rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
@@ -314,6 +337,7 @@ const getTipoOperacionBadge = () => {
                         </div>
                     </>
                 )}
+                
                 {/* Información General - Mobile */}
                 <div className="block lg:hidden mb-4">
                     <DataCard title="Información del Contrato" icon={<FileText className="h-5 w-5" />}>
@@ -325,7 +349,6 @@ const getTipoOperacionBadge = () => {
                         </div>
                     </DataCard>
                 </div>
-
 
                 {/* Información General - Desktop */}
                 <div className="hidden lg:grid lg:grid-cols-3 gap-6 mb-6">
@@ -359,7 +382,6 @@ const getTipoOperacionBadge = () => {
 
                 {/* Cliente y Empresa - Mobile Accordion */}
                 <div className="lg:hidden space-y-4 mb-4">
-                    {/* Cliente Mobile */}
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
                         <button
                             onClick={() => toggleMobileSection('cliente')}
@@ -385,7 +407,6 @@ const getTipoOperacionBadge = () => {
                         )}
                     </div>
 
-                    {/* Empresa Mobile */}
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
                         <button
                             onClick={() => toggleMobileSection('empresa')}
@@ -412,19 +433,265 @@ const getTipoOperacionBadge = () => {
                     </div>
                 </div>
 
-                {/* Totales - Responsive */}
-                <DataCard title="Resumen Económico" className="mb-4 sm:mb-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-                        <div className="bg-blue-50 p-3 sm:p-4 rounded-lg border border-blue-200">
-                            <p className="text-xs sm:text-sm text-blue-600 mb-1">Inversión Inicial</p>
-                            <Amount value={contrato.presupuesto_total_inversion} className="text-base sm:text-lg lg:text-xl font-bold text-blue-700" />
+                {/* ========================================== */}
+                {/* RESUMEN ECONÓMICO CON CANTIDADES */}
+                {/* ========================================== */}
+                <DataCard title="Detalle de Inversión" className="mb-4 sm:mb-6">
+                    <div className="space-y-6">
+                        {/* Layout de dos columnas */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* INVERSIÓN INICIAL */}
+                            <div className="bg-blue-50 rounded-lg border border-blue-200 overflow-hidden h-fit">
+                                <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                                    <div className="flex items-center gap-2">
+                                        <CreditCard className="h-4 w-4 text-blue-700" />
+                                        <h3 className="font-semibold text-blue-900">Inversión Inicial (Pago Único)</h3>
+                                    </div>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    {/* TASA */}
+                                    {contrato.tasa && toNumber(contrato.subtotal_tasa) > 0 && (
+                                        <div className="border-b border-blue-200 pb-3 last:border-0">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <div className="flex items-center gap-1">
+                                                    <Wrench className="h-4 w-4 text-gray-500" />
+                                                    <span className="font-medium text-gray-700">{contrato.tasa.nombre}:</span>
+                                                </div>
+                                                <span className="text-gray-600">{formatMoneyLocal(contrato.valor_tasa)} c/u</span>
+                                            </div>
+                                            
+                                            {/* Mostrar cantidad de vehículos */}
+                                            {cantidadVehiculos > 1 && (
+                                                <div className="flex justify-between text-xs text-gray-500 pl-6 mt-1">
+                                                    <span>Cantidad: {cantidadVehiculos} vehículos</span>
+                                                    <span>{formatMoneyLocal(contrato.valor_tasa * cantidadVehiculos)}</span>
+                                                </div>
+                                            )}
+                                            
+                                            {tienePromocionProducto(contrato.tasa?.id) && toNumber(contrato.tasa_bonificacion) > 0 ? (
+                                                <div className="mt-1 pl-6">
+                                                    <div className="flex justify-between text-green-700 text-xs">
+                                                        <span>🎉 Descuento promoción: {formatPorcentaje(contrato.tasa_bonificacion)}</span>
+                                                        <span>- {formatMoneyLocal((toNumber(contrato.valor_tasa) * cantidadVehiculos) - toNumber(contrato.subtotal_tasa))}</span>
+                                                    </div>
+                                                </div>
+                                            ) : toNumber(contrato.tasa_bonificacion) > 0 ? (
+                                                <div className="mt-1 pl-6">
+                                                    <div className="flex justify-between text-green-600 text-xs">
+                                                        <span>Descuento: {formatPorcentaje(contrato.tasa_bonificacion)}</span>
+                                                        <span>- {formatMoneyLocal((toNumber(contrato.valor_tasa) * cantidadVehiculos) - toNumber(contrato.subtotal_tasa))}</span>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            
+                                            <div className="flex justify-between mt-1 pl-6 font-semibold text-blue-700">
+                                                <span>Total instalación:</span>
+                                                <span>{formatMoneyLocal(contrato.subtotal_tasa)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ACCESORIOS */}
+                                    {contrato.accesorios && contrato.accesorios.length > 0 && (
+                                        <div className="border-b border-blue-200 pb-3 last:border-0">
+                                            <div className="flex items-center gap-1 mb-2">
+                                                <Package className="h-4 w-4 text-gray-500" />
+                                                <span className="font-medium text-gray-700">Accesorios:</span>
+                                            </div>
+                                            
+                                            <div className="space-y-3 pl-6">
+                                                {contrato.accesorios.map((item: any, index: number) => {
+                                                    const cantidad = item.cantidad || 1;
+                                                    const valorUnitario = toNumber(item.valor);
+                                                    const subtotalBase = valorUnitario * cantidad;
+                                                    const enPromocion = tienePromocionProducto(item.prd_servicio_id);
+                                                    
+                                                    return (
+                                                        <div key={index} className="text-sm">
+                                                            <div className="flex justify-between text-gray-600">
+                                                                <span>• {item.producto_servicio?.nombre}</span>
+                                                                <span>{formatMoneyLocal(valorUnitario)} c/u</span>
+                                                            </div>
+                                                            
+                                                            {/* Mostrar cantidad explícitamente */}
+                                                            {cantidad > 1 && (
+                                                                <div className="flex justify-between text-xs text-gray-500 mt-0.5">
+                                                                    <span className="pl-4">Cantidad: {cantidad} unidades</span>
+                                                                    <span>{formatMoneyLocal(subtotalBase)}</span>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {enPromocion && toNumber(item.bonificacion) > 0 ? (
+                                                                <div className="flex justify-between text-green-700 text-xs mt-0.5">
+                                                                    <span>Descuento promoción: {formatPorcentaje(item.bonificacion)}</span>
+                                                                    <span>- {formatMoneyLocal(subtotalBase - toNumber(item.subtotal))}</span>
+                                                                </div>
+                                                            ) : toNumber(item.bonificacion) > 0 ? (
+                                                                <div className="flex justify-between text-green-600 text-xs mt-0.5">
+                                                                    <span>Descuento: {formatPorcentaje(item.bonificacion)}</span>
+                                                                    <span>- {formatMoneyLocal(subtotalBase - toNumber(item.subtotal))}</span>
+                                                                </div>
+                                                            ) : null}
+                                                            
+                                                            <div className="flex justify-between font-medium text-gray-800 mt-0.5">
+                                                                <span>Subtotal:</span>
+                                                                <span>{formatMoneyLocal(item.subtotal)}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            
+                                            <div className="flex justify-between mt-3 pt-2 border-t border-blue-200 font-semibold text-blue-700">
+                                                <span>TOTAL ACCESORIOS:</span>
+                                                <span>{formatMoneyLocal(contrato.total_accesorios || 0)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* TOTAL INVERSIÓN INICIAL */}
+                                    <div className="bg-blue-100 rounded-lg p-3 mt-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold text-blue-900">💰 TOTAL INVERSIÓN INICIAL:</span>
+                                            <span className="text-xl font-bold text-blue-900">{formatMoneyLocal(contrato.total_inversion_inicial)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* COSTO RECURRENTE - MENSUAL */}
+                            <div className="bg-green-50 rounded-lg border border-green-200 overflow-hidden h-fit">
+                                <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-green-700" />
+                                        <h3 className="font-semibold text-green-900">Costo Recurrente (Mensual)</h3>
+                                    </div>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    {/* ABONO */}
+                                    {contrato.abono && toNumber(contrato.subtotal_abono) > 0 && (
+                                        <div className="border-b border-green-200 pb-3 last:border-0">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <div className="flex items-center gap-1">
+                                                    <CreditCard className="h-4 w-4 text-gray-500" />
+                                                    <span className="font-medium text-gray-700">{contrato.abono.nombre}:</span>
+                                                </div>
+                                                <span className="text-gray-600">{formatMoneyLocal(contrato.valor_abono)} c/u</span>
+                                            </div>
+                                            
+                                            {/* Mostrar cantidad de vehículos */}
+                                            {cantidadVehiculos > 1 && (
+                                                <div className="flex justify-between text-xs text-gray-500 pl-6 mt-1">
+                                                    <span>Cantidad: {cantidadVehiculos} vehículos</span>
+                                                    <span>{formatMoneyLocal(contrato.valor_abono * cantidadVehiculos)}</span>
+                                                </div>
+                                            )}
+                                            
+                                            {tienePromocionProducto(contrato.abono?.id) && toNumber(contrato.abono_bonificacion) > 0 ? (
+                                                <div className="mt-1 pl-6">
+                                                    <div className="flex justify-between text-green-700 text-xs">
+                                                        <span>🎉 Descuento promoción: {formatPorcentaje(contrato.abono_bonificacion)}</span>
+                                                        <span>- {formatMoneyLocal((toNumber(contrato.valor_abono) * cantidadVehiculos) - toNumber(contrato.subtotal_abono))}</span>
+                                                    </div>
+                                                </div>
+                                            ) : toNumber(contrato.abono_bonificacion) > 0 ? (
+                                                <div className="mt-1 pl-6">
+                                                    <div className="flex justify-between text-green-600 text-xs">
+                                                        <span>Descuento: {formatPorcentaje(contrato.abono_bonificacion)}</span>
+                                                        <span>- {formatMoneyLocal((toNumber(contrato.valor_abono) * cantidadVehiculos) - toNumber(contrato.subtotal_abono))}</span>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            
+                                            <div className="flex justify-between mt-1 pl-6 font-semibold text-green-700">
+                                                <span>Total abono:</span>
+                                                <span>{formatMoneyLocal(contrato.subtotal_abono)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* SERVICIOS */}
+                                    {contrato.servicios && contrato.servicios.length > 0 && (
+                                        <div className="border-b border-green-200 pb-3 last:border-0">
+                                            <div className="flex items-center gap-1 mb-2">
+                                                <Package className="h-4 w-4 text-gray-500" />
+                                                <span className="font-medium text-gray-700">Servicios:</span>
+                                            </div>
+                                            
+                                            <div className="space-y-3 pl-6">
+                                                {contrato.servicios.map((item: any, index: number) => {
+                                                    const cantidad = item.cantidad || 1;
+                                                    const valorUnitario = toNumber(item.valor);
+                                                    const subtotalBase = valorUnitario * cantidad;
+                                                    const enPromocion = tienePromocionProducto(item.prd_servicio_id);
+                                                    
+                                                    return (
+                                                        <div key={index} className="text-sm">
+                                                            <div className="flex justify-between text-gray-600">
+                                                                <span>• {item.producto_servicio?.nombre}</span>
+                                                                <span>{formatMoneyLocal(valorUnitario)} c/u</span>
+                                                            </div>
+                                                            
+                                                            {/* Mostrar cantidad explícitamente */}
+                                                            {cantidad > 1 && (
+                                                                <div className="flex justify-between text-xs text-gray-500 mt-0.5">
+                                                                    <span className="pl-4">Cantidad: {cantidad} unidades</span>
+                                                                    <span>{formatMoneyLocal(subtotalBase)}</span>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {enPromocion && toNumber(item.bonificacion) > 0 ? (
+                                                                <div className="flex justify-between text-green-700 text-xs mt-0.5">
+                                                                    <span>Descuento promoción: {formatPorcentaje(item.bonificacion)}</span>
+                                                                    <span>- {formatMoneyLocal(subtotalBase - toNumber(item.subtotal))}</span>
+                                                                </div>
+                                                            ) : toNumber(item.bonificacion) > 0 ? (
+                                                                <div className="flex justify-between text-green-600 text-xs mt-0.5">
+                                                                    <span>Descuento: {formatPorcentaje(item.bonificacion)}</span>
+                                                                    <span>- {formatMoneyLocal(subtotalBase - toNumber(item.subtotal))}</span>
+                                                                </div>
+                                                            ) : null}
+                                                            
+                                                            <div className="flex justify-between font-medium text-gray-800 mt-0.5">
+                                                                <span>Subtotal:</span>
+                                                                <span>{formatMoneyLocal(item.subtotal)}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            
+                                            <div className="flex justify-between mt-3 pt-2 border-t border-green-200 font-semibold text-green-700">
+                                                <span>TOTAL SERVICIOS:</span>
+                                                <span>{formatMoneyLocal(contrato.total_servicios || 0)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* TOTAL COSTO MENSUAL */}
+                                    <div className="bg-green-100 rounded-lg p-3 mt-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold text-green-900">📅 TOTAL COSTO MENSUAL:</span>
+                                            <span className="text-xl font-bold text-green-900">{formatMoneyLocal(contrato.total_mensual)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="bg-green-50 p-3 sm:p-4 rounded-lg border border-green-200">
-                            <p className="text-xs sm:text-sm text-green-600 mb-1">Costo Mensual</p>
-                            <Amount value={contrato.presupuesto_total_mensual} className="text-base sm:text-lg lg:text-xl font-bold text-green-700" />
-                        </div>
+                        
+                        {/* PROMOCIÓN DESTACADA */}
+                        {tienePromocion && (
+                            <div className="bg-purple-50 rounded-lg border border-purple-200 p-3">
+                                <div className="flex items-center gap-2 text-purple-800">
+                                    <Gift className="h-4 w-4" />
+                                    <span className="font-medium">Promoción aplicada:</span>
+                                    <span>{contrato.promocion?.nombre}</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </DataCard>
+
 
                 {/* Responsables - Mobile Accordion */}
                 {(contrato.responsable_flota_nombre || contrato.responsable_pagos_nombre) && (
@@ -572,86 +839,85 @@ const getTipoOperacionBadge = () => {
                     </DataCard>
                 )}
 
-{/* Vehículos - Mobile Accordion */}
-{contrato.vehiculos?.length > 0 && (
-    <div className="lg:hidden mb-4">
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <button
-                onClick={() => toggleMobileSection('vehiculos')}
-                className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between text-left"
-            >
-                <div className="flex items-center gap-2">
-                    <Truck className="h-5 w-5 text-gray-600" />
-                    <span className="font-medium text-gray-900">Vehículos ({contrato.vehiculos.length})</span>
-                </div>
-                {showMobileDetails.vehiculos ? (
-                    <ChevronUp className="h-5 w-5 text-gray-500" />
-                ) : (
-                    <ChevronDown className="h-5 w-5 text-gray-500" />
-                )}
-            </button>
-            {showMobileDetails.vehiculos && (
-                <div className="p-4 bg-white space-y-4">
-                    {contrato.vehiculos.map((vehiculo: any) => (
-                        <div key={vehiculo.id} className="border border-gray-200 rounded-lg p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Truck className="h-4 w-4 text-gray-500" />
-                                <span className="font-medium text-gray-900">{vehiculo.patente}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                {/* Tipo */}
-                                <div>
-                                    <p className="text-xs text-gray-500">Tipo</p>
-                                    <p className="text-gray-900">
-                                        {vehiculo.tipo ? (
-                                            vehiculo.tipo === 'auto' ? '🚗 Auto' :
-                                            vehiculo.tipo === 'camioneta' ? '🚙 Camioneta' :
-                                            vehiculo.tipo === 'camion' ? '🚛 Camión' :
-                                            vehiculo.tipo === 'moto' ? '🏍️ Moto' :
-                                            vehiculo.tipo === 'utilitario' ? '🚐 Utilitario' :
-                                            vehiculo.tipo === 'minibus' ? '🚌 Minibus' :
-                                            vehiculo.tipo === 'colectivo' ? '🚌 Colectivo' :
-                                            vehiculo.tipo === 'maquinaria' ? '🏗️ Maquinaria' :
-                                            vehiculo.tipo === 'motoniveladora' ? '🚜 Motoniveladora' :
-                                            vehiculo.tipo === 'retroexcavadora' ? '🚜 Retroexcavadora' :
-                                            vehiculo.tipo === 'grua' ? '🏗️ Grúa' :
-                                            vehiculo.tipo === 'barco' ? '⛵ Barco' :
-                                            vehiculo.tipo === 'remolque' ? '🔗 Remolque' :
-                                            vehiculo.tipo === 'trailer' ? '🚛 Trailer' :
-                                            '📦 Otro'
-                                        ) : '-'}
-                                    </p>
+                {/* Vehículos - Mobile Accordion */}
+                {contrato.vehiculos?.length > 0 && (
+                    <div className="lg:hidden mb-4">
+                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                            <button
+                                onClick={() => toggleMobileSection('vehiculos')}
+                                className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between text-left"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Truck className="h-5 w-5 text-gray-600" />
+                                    <span className="font-medium text-gray-900">Vehículos ({contrato.vehiculos.length})</span>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-gray-500">Marca</p>
-                                    <p className="text-gray-900">{vehiculo.marca || '-'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500">Modelo</p>
-                                    <p className="text-gray-900">{vehiculo.modelo || '-'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500">Año</p>
-                                    <p className="text-gray-900">{vehiculo.anio || '-'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500">Color</p>
-                                    <p className="text-gray-900">{vehiculo.color || '-'}</p>
-                                </div>
-                                {vehiculo.identificador && (
-                                    <div className="col-span-2">
-                                        <p className="text-xs text-gray-500">Identificador</p>
-                                        <p className="text-gray-900">{vehiculo.identificador}</p>
-                                    </div>
+                                {showMobileDetails.vehiculos ? (
+                                    <ChevronUp className="h-5 w-5 text-gray-500" />
+                                ) : (
+                                    <ChevronDown className="h-5 w-5 text-gray-500" />
                                 )}
-                            </div>
+                            </button>
+                            {showMobileDetails.vehiculos && (
+                                <div className="p-4 bg-white space-y-4">
+                                    {contrato.vehiculos.map((vehiculo: any) => (
+                                        <div key={vehiculo.id} className="border border-gray-200 rounded-lg p-3">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Truck className="h-4 w-4 text-gray-500" />
+                                                <span className="font-medium text-gray-900">{vehiculo.patente}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                                <div>
+                                                    <p className="text-xs text-gray-500">Tipo</p>
+                                                    <p className="text-gray-900">
+                                                        {vehiculo.tipo ? (
+                                                            vehiculo.tipo === 'auto' ? '🚗 Auto' :
+                                                            vehiculo.tipo === 'camioneta' ? '🚙 Camioneta' :
+                                                            vehiculo.tipo === 'camion' ? '🚛 Camión' :
+                                                            vehiculo.tipo === 'moto' ? '🏍️ Moto' :
+                                                            vehiculo.tipo === 'utilitario' ? '🚐 Utilitario' :
+                                                            vehiculo.tipo === 'minibus' ? '🚌 Minibus' :
+                                                            vehiculo.tipo === 'colectivo' ? '🚌 Colectivo' :
+                                                            vehiculo.tipo === 'maquinaria' ? '🏗️ Maquinaria' :
+                                                            vehiculo.tipo === 'motoniveladora' ? '🚜 Motoniveladora' :
+                                                            vehiculo.tipo === 'retroexcavadora' ? '🚜 Retroexcavadora' :
+                                                            vehiculo.tipo === 'grua' ? '🏗️ Grúa' :
+                                                            vehiculo.tipo === 'barco' ? '⛵ Barco' :
+                                                            vehiculo.tipo === 'remolque' ? '🔗 Remolque' :
+                                                            vehiculo.tipo === 'trailer' ? '🚛 Trailer' :
+                                                            '📦 Otro'
+                                                        ) : '-'}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-500">Marca</p>
+                                                    <p className="text-gray-900">{vehiculo.marca || '-'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-500">Modelo</p>
+                                                    <p className="text-gray-900">{vehiculo.modelo || '-'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-500">Año</p>
+                                                    <p className="text-gray-900">{vehiculo.anio || '-'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-500">Color</p>
+                                                    <p className="text-gray-900">{vehiculo.color || '-'}</p>
+                                                </div>
+                                                {vehiculo.identificador && (
+                                                    <div className="col-span-2">
+                                                        <p className="text-xs text-gray-500">Identificador</p>
+                                                        <p className="text-gray-900">{vehiculo.identificador}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    </div>
-)}
+                    </div>
+                )}
 
                 {/* Vehículos - Desktop */}
                 {contrato.vehiculos?.length > 0 && (
@@ -708,7 +974,8 @@ const getTipoOperacionBadge = () => {
                     </DataCard>
                 )}
             </div>
-               {pdfUrl && (
+
+            {pdfUrl && (
                 <EnviarContratoEmailModal
                     isOpen={showEmailModal}
                     onClose={() => {
@@ -717,8 +984,8 @@ const getTipoOperacionBadge = () => {
                     }}
                     contrato={contrato}
                     comercialNombre={contrato.vendedor_nombre || ''}
-                    comercialEmail={contrato.vendedor_email || ''}  // ← Usar vendedor_email
-                    comercialTelefono={contrato.vendedor_telefono || ''}  // ← Usar vendedor_telefono
+                    comercialEmail={contrato.vendedor_email || ''}
+                    comercialTelefono={contrato.vendedor_telefono || ''}
                     companiaId={contrato.compania_id || 1}
                     companiaNombre={contrato.compania_nombre || 'LOCALSAT'}
                     plataforma={contrato.empresa_plataforma || 'ALPHA'}
@@ -726,25 +993,25 @@ const getTipoOperacionBadge = () => {
                     leadEsCliente={contrato.lead_es_cliente}
                 />
             )}
-                 {/* Modal para administración (nuevo) */}
-                {pdfUrl && (
-                    <EnviarEmailAdministracionModal
-                        isOpen={showEmailAdminModal}
-                        onClose={() => {
-                            setShowEmailAdminModal(false);
-                            setPdfUrl(null);
-                        }}
-                        contrato={contrato}
-                        comercialNombre={contrato.vendedor_nombre || ''}
-                        comercialEmail={contrato.vendedor_email || ''}
-                        comercialTelefono={contrato.vendedor_telefono || ''}
-                        companiaId={contrato.compania_id || 1}
-                        companiaNombre={contrato.compania_nombre || 'LOCALSAT'}
-                        plataforma={contrato.empresa_plataforma || 'ALPHA'}
-                        pdfUrl={pdfUrl}
-                        leadEsCliente={contrato.lead_es_cliente}
-                    />
-                )}
+            
+            {pdfUrl && (
+                <EnviarEmailAdministracionModal
+                    isOpen={showEmailAdminModal}
+                    onClose={() => {
+                        setShowEmailAdminModal(false);
+                        setPdfUrl(null);
+                    }}
+                    contrato={contrato}
+                    comercialNombre={contrato.vendedor_nombre || ''}
+                    comercialEmail={contrato.vendedor_email || ''}
+                    comercialTelefono={contrato.vendedor_telefono || ''}
+                    companiaId={contrato.compania_id || 1}
+                    companiaNombre={contrato.compania_nombre || 'LOCALSAT'}
+                    plataforma={contrato.empresa_plataforma || 'ALPHA'}
+                    pdfUrl={pdfUrl}
+                    leadEsCliente={contrato.lead_es_cliente}
+                />
+            )}
         </AppLayout>
     );
 }
