@@ -436,28 +436,33 @@ export const usePresupuestoEditForm = ({
         toast.success(`Promoción "${promocion.nombre}" aplicada`);
     }, [promociones, updateField, cargarProductosPromocion, toast, setState, presupuesto, accesoriosAgregados, serviciosAgregados]);
 
+    /**
+     * VALIDACIÓN DEL FORMULARIO - ACTUALIZADA
+     * Permite presupuestos con solo tasa, solo abono, solo productos, o combinaciones
+     */
     const validateForm = useCallback((): boolean => {
-        if (!state.prefijoId) {
+        // Validar comercial
+        if (!state.prefijoId || state.prefijoId === 0) {
             toast.error('Debe seleccionar un comercial');
             return false;
         }
-        if (!state.tasaId) {
-            toast.error('Debe seleccionar una tasa de instalación');
-            return false;
-        }
-        if (!state.tasaMetodoPagoId) {
+        
+        // 🔥 VALIDACIONES ELIMINADAS - Ya no es obligatorio tener Tasa ni Abono
+        // Ahora se puede editar presupuesto solo con accesorios o servicios
+        
+        // Validar método de pago de la tasa (solo si tiene tasa)
+        if (state.tasaId && state.tasaId !== 0 && (!state.tasaMetodoPagoId || state.tasaMetodoPagoId === 0)) {
             toast.error('Debe seleccionar un método de pago para la tasa');
             return false;
         }
-        if (!state.abonoId) {
-            toast.error('Debe seleccionar un abono mensual');
-            return false;
-        }
-        if (!state.abonoMetodoPagoId) {
+        
+        // Validar método de pago del abono (solo si tiene abono)
+        if (state.abonoId && state.abonoId !== 0 && (!state.abonoMetodoPagoId || state.abonoMetodoPagoId === 0)) {
             toast.error('Debe seleccionar un método de pago para el abono');
             return false;
         }
         
+        // Validar cantidad mínima para promoción
         if (state.promocionId && state.cantidadVehiculos < cantidadMinimaPromo) {
             toast.error(`Esta promoción requiere un mínimo de ${cantidadMinimaPromo} vehículos`);
             return false;
@@ -466,6 +471,9 @@ export const usePresupuestoEditForm = ({
         return true;
     }, [state, toast, cantidadMinimaPromo]);
 
+    /**
+     * SUBMIT DEL FORMULARIO - ACTUALIZADO
+     */
     const handleSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         
@@ -480,14 +488,14 @@ export const usePresupuestoEditForm = ({
             promocion_id: state.promocionId,
             cantidad_vehiculos: state.cantidadVehiculos,
             validez: state.diasValidez,
-            tasa_id: state.tasaId,
-            valor_tasa: valores.valorTasa,
-            tasa_bonificacion: state.tasaBonificacion,
-            tasa_metodo_pago_id: state.tasaMetodoPagoId,
-            abono_id: state.abonoId,
-            valor_abono: valores.valorAbono,
-            abono_bonificacion: state.abonoBonificacion,
-            abono_metodo_pago_id: state.abonoMetodoPagoId,
+            tasa_id: state.tasaId && state.tasaId !== 0 ? state.tasaId : null,
+            valor_tasa: state.tasaId && state.tasaId !== 0 ? valores.valorTasa : 0,
+            tasa_bonificacion: state.tasaId && state.tasaId !== 0 ? state.tasaBonificacion : 0,
+            tasa_metodo_pago_id: state.tasaId && state.tasaId !== 0 ? state.tasaMetodoPagoId : null,
+            abono_id: state.abonoId && state.abonoId !== 0 ? state.abonoId : null,
+            valor_abono: state.abonoId && state.abonoId !== 0 ? valores.valorAbono : 0,
+            abono_bonificacion: state.abonoId && state.abonoId !== 0 ? state.abonoBonificacion : 0,
+            abono_metodo_pago_id: state.abonoId && state.abonoId !== 0 ? state.abonoMetodoPagoId : null,
             agregados: [
                 ...state.accesoriosAgregados.map(a => ({
                     prd_servicio_id: a.prd_servicio_id,

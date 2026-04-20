@@ -33,20 +33,34 @@ class PresupuestoEnviado extends Mailable
         
         $mail = $this->from($fromEmail, $fromName)
                     ->subject($this->data['subject'])
-                    ->view('emails.presupuesto')
+                    ->view('emails.presupuesto')  // Usamos la misma vista para ambos
                     ->with([
                         'body' => $this->data['body'],
                         'compania' => $this->compania,
                         'data' => $this->data
                     ]);
 
+        // Adjuntar PDF principal
         if ($this->pdfPath && file_exists($this->pdfPath)) {
             $mail->attach($this->pdfPath, [
                 'as' => $this->data['filename'] ?? 'presupuesto.pdf',
                 'mime' => 'application/pdf',
             ]);
         }
+        
+        // Adjuntar documentos adicionales
+        if (!empty($this->data['attachments'])) {
+            foreach ($this->data['attachments'] as $attachment) {
+                if (file_exists($attachment['path'])) {
+                    $mail->attach($attachment['path'], [
+                        'as' => $attachment['name'],
+                        'mime' => $attachment['mime'] ?? 'application/octet-stream',
+                    ]);
+                }
+            }
+        }
 
+        // Añadir CC y BCC
         if (!empty($this->data['cc'])) {
             $mail->cc($this->data['cc']);
         }

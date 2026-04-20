@@ -37,145 +37,145 @@ class PresupuestosController extends Controller
         $this->initializeAuthorization(); //INICIALIZAR
     }
 
-public function index(Request $request)
-{
-    //VERIFICAR PERMISO
-    $this->authorizePermiso(config('permisos.VER_PRESUPUESTOS'));
-    
-    $usuario = auth()->user();
-    
-    $query = Presupuesto::with(['lead', 'prefijo', 'estado', 'promocion']);
-    
-    if ($request->filled('estado_id')) {
-        $query->where('estado_id', $request->estado_id);
-    }
-    
-    if ($request->filled('prefijo_id')) {
-        $query->where('prefijo_id', $request->prefijo_id);
-    }
-    
-    if ($request->filled('promocion_id')) {
-        if ($request->promocion_id === '0' || $request->promocion_id === 'sin_promocion') {
-            $query->where(function($q) {
-                $q->whereNull('promocion_id')
-                ->orWhere('promocion_id', 0);
-            });
-        } else {
-            $query->where('promocion_id', $request->promocion_id);
+    public function index(Request $request)
+    {
+        //VERIFICAR PERMISO
+        $this->authorizePermiso(config('permisos.VER_PRESUPUESTOS'));
+        
+        $usuario = auth()->user();
+        
+        $query = Presupuesto::with(['lead', 'prefijo', 'estado', 'promocion']);
+        
+        if ($request->filled('estado_id')) {
+            $query->where('estado_id', $request->estado_id);
         }
-    }
-    
-    if ($request->filled('fecha_inicio')) {
-        $query->whereDate('created', '>=', $request->fecha_inicio);
-    }
-    
-    if ($request->filled('fecha_fin')) {
-        $query->whereDate('created', '<=', $request->fecha_fin);
-    }
-    
-    //APLICAR FILTRO DE PREFIJOS usando el trait
-    $this->applyPrefijoFilter($query, $usuario);
-    
-    $presupuestos = $query->orderBy('created', 'desc')->paginate(5);
-
-    $presupuestos->through(function ($presupuesto) {
-        $presupuesto->referencia = sprintf('LS-%s-%s', date('Y', strtotime($presupuesto->created)), $presupuesto->id);
-        $presupuesto->total_presupuesto = (float) $presupuesto->total_presupuesto; 
-        return $presupuesto;
-    });
-
-    //ESTADÍSTICAS con filtro de prefijos
-    $estadisticasQuery = Presupuesto::query();
-    $this->applyPrefijoFilter($estadisticasQuery, $usuario);
-    
-    $estadisticas = [
-        'total' => (clone $estadisticasQuery)->count(),
-        'activos' => (clone $estadisticasQuery)->where('estado_id', 1)->count(),
-        'vencidos' => (clone $estadisticasQuery)->where('estado_id', 2)->count(),
-        'aprobados' => (clone $estadisticasQuery)->where('estado_id', 3)->count(),
-        'rechazados' => (clone $estadisticasQuery)->where('estado_id', 4)->count(),
-    ];
-
-    //OBTENER PREFIJOS PERMITIDOS usando el trait
-    $prefijosPermitidos = $this->getPrefijosPermitidos();
-    
-    // 🔥 Obtener prefijo del usuario si es comercial (con valor por defecto null)
-    $prefijoUsuario = null;
-    if ($usuario->rol_id == 5) {
-        $comercial = \App\Models\Comercial::with('personal')
-            ->where('personal_id', $usuario->personal_id)
-            ->where('activo', 1)
-            ->first();
-            
-        if ($comercial) {
-            $prefijo = \App\Models\Prefijo::find($comercial->prefijo_id);
-            if ($prefijo) {
-                $nombreComercial = null;
-                if ($comercial->personal) {
-                    $nombreComercial = trim($comercial->personal->nombre . ' ' . $comercial->personal->apellido);
-                }
-                
-                $prefijoUsuario = [
-                    'id' => (string) $prefijo->id,
-                    'codigo' => $prefijo->codigo,
-                    'descripcion' => $prefijo->descripcion,
-                    'comercial_nombre' => $nombreComercial,
-                    'display_text' => "[{$prefijo->codigo}] " . ($nombreComercial ?? $prefijo->descripcion)
-                ];
+        
+        if ($request->filled('prefijo_id')) {
+            $query->where('prefijo_id', $request->prefijo_id);
+        }
+        
+        if ($request->filled('promocion_id')) {
+            if ($request->promocion_id === '0' || $request->promocion_id === 'sin_promocion') {
+                $query->where(function($q) {
+                    $q->whereNull('promocion_id')
+                    ->orWhere('promocion_id', 0);
+                });
+            } else {
+                $query->where('promocion_id', $request->promocion_id);
             }
         }
-    }
-    
-    // 🔥 Obtener todos los prefijos para el filtro (solo para usuarios NO comerciales)
-    $prefijosFiltro = [];
-    if ($usuario->rol_id != 5) {
-        $prefijosFiltro = \App\Models\Prefijo::where('activo', 1)
-            ->get()
-            ->map(function($prefijo) {
-                // Buscar el comercial asociado a este prefijo
-                $comercial = \App\Models\Comercial::with('personal')
-                    ->where('prefijo_id', $prefijo->id)
-                    ->where('activo', 1)
-                    ->first();
+        
+        if ($request->filled('fecha_inicio')) {
+            $query->whereDate('created', '>=', $request->fecha_inicio);
+        }
+        
+        if ($request->filled('fecha_fin')) {
+            $query->whereDate('created', '<=', $request->fecha_fin);
+        }
+        
+        //APLICAR FILTRO DE PREFIJOS usando el trait
+        $this->applyPrefijoFilter($query, $usuario);
+        
+        $presupuestos = $query->orderBy('created', 'desc')->paginate(5);
+
+        $presupuestos->through(function ($presupuesto) {
+            $presupuesto->referencia = sprintf('LS-%s-%s', date('Y', strtotime($presupuesto->created)), $presupuesto->id);
+            $presupuesto->total_presupuesto = (float) $presupuesto->total_presupuesto; 
+            return $presupuesto;
+        });
+
+        //ESTADÍSTICAS con filtro de prefijos
+        $estadisticasQuery = Presupuesto::query();
+        $this->applyPrefijoFilter($estadisticasQuery, $usuario);
+        
+        $estadisticas = [
+            'total' => (clone $estadisticasQuery)->count(),
+            'activos' => (clone $estadisticasQuery)->where('estado_id', 1)->count(),
+            'vencidos' => (clone $estadisticasQuery)->where('estado_id', 2)->count(),
+            'aprobados' => (clone $estadisticasQuery)->where('estado_id', 3)->count(),
+            'rechazados' => (clone $estadisticasQuery)->where('estado_id', 4)->count(),
+        ];
+
+        //OBTENER PREFIJOS PERMITIDOS usando el trait
+        $prefijosPermitidos = $this->getPrefijosPermitidos();
+        
+        // 🔥 Obtener prefijo del usuario si es comercial (con valor por defecto null)
+        $prefijoUsuario = null;
+        if ($usuario->rol_id == 5) {
+            $comercial = \App\Models\Comercial::with('personal')
+                ->where('personal_id', $usuario->personal_id)
+                ->where('activo', 1)
+                ->first();
                 
-                $nombreComercial = null;
-                if ($comercial && $comercial->personal) {
-                    $nombreComercial = trim($comercial->personal->nombre . ' ' . $comercial->personal->apellido);
+            if ($comercial) {
+                $prefijo = \App\Models\Prefijo::find($comercial->prefijo_id);
+                if ($prefijo) {
+                    $nombreComercial = null;
+                    if ($comercial->personal) {
+                        $nombreComercial = trim($comercial->personal->nombre . ' ' . $comercial->personal->apellido);
+                    }
+                    
+                    $prefijoUsuario = [
+                        'id' => (string) $prefijo->id,
+                        'codigo' => $prefijo->codigo,
+                        'descripcion' => $prefijo->descripcion,
+                        'comercial_nombre' => $nombreComercial,
+                        'display_text' => "[{$prefijo->codigo}] " . ($nombreComercial ?? $prefijo->descripcion)
+                    ];
                 }
-                
-                return [
-                    'id' => (string) $prefijo->id,
-                    'codigo' => $prefijo->codigo,
-                    'descripcion' => $prefijo->descripcion,
-                    'comercial_nombre' => $nombreComercial,
-                    'display_text' => $nombreComercial 
-                        ? "[{$prefijo->codigo}] {$nombreComercial}"
-                        : "[{$prefijo->codigo}] {$prefijo->descripcion}"
-                ];
-            })
-            ->toArray();
+            }
+        }
+        
+        // 🔥 Obtener todos los prefijos para el filtro (solo para usuarios NO comerciales)
+        $prefijosFiltro = [];
+        if ($usuario->rol_id != 5) {
+            $prefijosFiltro = \App\Models\Prefijo::where('activo', 1)
+                ->get()
+                ->map(function($prefijo) {
+                    // Buscar el comercial asociado a este prefijo
+                    $comercial = \App\Models\Comercial::with('personal')
+                        ->where('prefijo_id', $prefijo->id)
+                        ->where('activo', 1)
+                        ->first();
+                    
+                    $nombreComercial = null;
+                    if ($comercial && $comercial->personal) {
+                        $nombreComercial = trim($comercial->personal->nombre . ' ' . $comercial->personal->apellido);
+                    }
+                    
+                    return [
+                        'id' => (string) $prefijo->id,
+                        'codigo' => $prefijo->codigo,
+                        'descripcion' => $prefijo->descripcion,
+                        'comercial_nombre' => $nombreComercial,
+                        'display_text' => $nombreComercial 
+                            ? "[{$prefijo->codigo}] {$nombreComercial}"
+                            : "[{$prefijo->codigo}] {$prefijo->descripcion}"
+                    ];
+                })
+                ->toArray();
+        }
+
+        $estados = \App\Models\EstadoEntidad::all(['id', 'nombre']);
+        $promociones = \App\Models\Promocion::where('activo', 1)->get(['id', 'nombre']);
+
+        return Inertia::render('Comercial/Presupuestos/Index', [
+            'presupuestos' => $presupuestos,
+            'estadisticas' => $estadisticas,
+            'usuario' => [
+                've_todas_cuentas' => $usuario->ve_todas_cuentas,
+                'rol_id' => $usuario->rol_id,
+                'nombre_completo' => $usuario->personal ? 
+                    $usuario->personal->nombre_completo : 
+                    $usuario->nombre_usuario,
+                'prefijos_asignados' => $usuario->ve_todas_cuentas ? null : $prefijosPermitidos
+            ],
+            'prefijosFiltro' => $prefijosFiltro,
+            'prefijoUsuario' => $prefijoUsuario,
+            'estados' => $estados,
+            'promociones' => $promociones
+        ]);
     }
-
-    $estados = \App\Models\EstadoEntidad::all(['id', 'nombre']);
-    $promociones = \App\Models\Promocion::where('activo', 1)->get(['id', 'nombre']);
-
-    return Inertia::render('Comercial/Presupuestos/Index', [
-        'presupuestos' => $presupuestos,
-        'estadisticas' => $estadisticas,
-        'usuario' => [
-            've_todas_cuentas' => $usuario->ve_todas_cuentas,
-            'rol_id' => $usuario->rol_id,
-            'nombre_completo' => $usuario->personal ? 
-                $usuario->personal->nombre_completo : 
-                $usuario->nombre_usuario,
-            'prefijos_asignados' => $usuario->ve_todas_cuentas ? null : $prefijosPermitidos
-        ],
-        'prefijosFiltro' => $prefijosFiltro,
-        'prefijoUsuario' => $prefijoUsuario,
-        'estados' => $estados,
-        'promociones' => $promociones
-    ]);
-}
 
     public function create(Request $request)
     {
@@ -281,13 +281,13 @@ public function index(Request $request)
                 'cantidad_vehiculos' => 'required|integer|min:1',
                 'validez' => 'required|integer|min:1',
                 
-                // TASA - ahora opcional
+                // TASA - opcional
                 'tasa_id' => 'nullable|exists:productos_servicios,id',
                 'valor_tasa' => 'nullable|numeric|min:0',
                 'tasa_bonificacion' => 'nullable|numeric|min:0|max:100',
                 'tasa_metodo_pago_id' => 'nullable|exists:metodos_pago,id',
                 
-                // ABONO - ahora opcional
+                // ABONO - opcional
                 'abono_id' => 'nullable|exists:productos_servicios,id',
                 'valor_abono' => 'nullable|numeric|min:0',
                 'abono_bonificacion' => 'nullable|numeric|min:0|max:100',
@@ -301,12 +301,8 @@ public function index(Request $request)
                 'agregados.*.bonificacion' => 'nullable|numeric|min:0|max:100',
             ]);
             
-            // Validación adicional: al menos debe haber tasa o abono
-            if (empty($validated['tasa_id']) && empty($validated['abono_id'])) {
-                return back()->withErrors([
-                    'error' => 'Debe seleccionar al menos una Tasa de Instalación o un Abono Mensual.'
-                ])->withInput();
-            }
+            // 🔥 VALIDACIÓN ELIMINADA - Ya no es obligatorio tener Tasa o Abono
+            // Ahora se puede crear presupuesto solo con accesorios o servicios
             
             // Si no hay tasa, establecer valores por defecto
             if (empty($validated['tasa_id'])) {
@@ -358,6 +354,7 @@ public function index(Request $request)
         // Cargar todas las relaciones necesarias
         $presupuesto->load([
             'lead', 
+            'lead.empresaContacto.empresa',
             'prefijo.comercial.personal',
             'prefijo.comercial.compania', 
             'tasa', 
@@ -490,13 +487,13 @@ public function index(Request $request)
                 'cantidad_vehiculos' => 'required|integer|min:1',
                 'validez' => 'required|integer|min:1',
                 
-                // TASA - ahora opcional
+                // TASA - opcional
                 'tasa_id' => 'nullable|exists:productos_servicios,id',
                 'valor_tasa' => 'nullable|numeric|min:0',
                 'tasa_bonificacion' => 'nullable|numeric|min:0|max:100',
                 'tasa_metodo_pago_id' => 'nullable|exists:metodos_pago,id',
                 
-                // ABONO - ahora opcional
+                // ABONO - opcional
                 'abono_id' => 'nullable|exists:productos_servicios,id',
                 'valor_abono' => 'nullable|numeric|min:0',
                 'abono_bonificacion' => 'nullable|numeric|min:0|max:100',
@@ -510,12 +507,7 @@ public function index(Request $request)
                 'agregados.*.bonificacion' => 'nullable|numeric|min:0|max:100',
             ]);
             
-            // Validación adicional: al menos debe haber tasa o abono
-            if (empty($validated['tasa_id']) && empty($validated['abono_id'])) {
-                return back()->withErrors([
-                    'error' => 'Debe seleccionar al menos una Tasa de Instalación o un Abono Mensual.'
-                ])->withInput();
-            }
+            // 🔥 VALIDACIÓN ELIMINADA - Ya no es obligatorio tener Tasa o Abono
             
             // Si no hay tasa, establecer valores por defecto
             if (empty($validated['tasa_id'])) {

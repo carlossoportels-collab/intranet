@@ -1,11 +1,12 @@
 // resources/js/components/presupuestos/PresupuestoActions.tsx
 
 import { Link, router } from '@inertiajs/react';
-import { Edit, Download, MessageCircle, Mail, Eye, Loader, Building, FileSignature, ChevronDown } from 'lucide-react';
+import { Edit, Download, MessageCircle, Mail, Eye, Loader, Building, FileSignature, ChevronDown, Building2 } from 'lucide-react';
 import React, { useState, useCallback } from 'react';
 
 import { useToast } from '@/contexts/ToastContext';
 import EnviarPresupuestoEmailModal from '@/components/Modals/Emails/EnviarPresupuestoEmailModal';
+import EnviarPresupuestoAdministracionModal from '@/components/Modals/Emails/EnviarPresupuestoAdministracionModal';
 import AltaEmpresaModal from '@/components/empresa/AltaEmpresaModal';
 import { sendWhatsApp, sendWhatsAppWithFile } from '@/utils/whatsapp.utils';
 import type { Lead, Origen, Rubro, Provincia } from '@/types/leads';
@@ -28,6 +29,7 @@ interface Props {
     origenes?: Origen[];
     rubros?: Rubro[];
     provincias?: Provincia[];
+    presupuestoCompleto?: any;
 }
 
 interface PdfData {
@@ -54,10 +56,13 @@ export const PresupuestoActions: React.FC<Props> = ({
     lead = null,
     origenes = [],
     rubros = [],
-    provincias = []
+    provincias = [],
+    presupuestoCompleto = null  // 🔥 NUEVO
 }) => {
     const [generandoPDF, setGenerandoPDF] = useState(false);
     const [showEmailModal, setShowEmailModal] = useState(false);
+    const [showEmailAdminModal, setShowEmailAdminModal] = useState(false);
+    const [showOpcionesEmail, setShowOpcionesEmail] = useState(false);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [showWhatsAppMenu, setShowWhatsAppMenu] = useState(false);
     const [showAccionesMenu, setShowAccionesMenu] = useState(false);
@@ -66,7 +71,7 @@ export const PresupuestoActions: React.FC<Props> = ({
     const [verificandoDatos, setVerificandoDatos] = useState(false);
     const [modoCompletar, setModoCompletar] = useState(false);
     const [datosExistentes, setDatosExistentes] = useState<{ empresa?: any; contacto?: any } | undefined>(undefined);
-    const [pasoInicial, setPasoInicial] = useState<number>(1); // 🔥 NUEVO: guardar el paso inicial
+    const [pasoInicial, setPasoInicial] = useState<number>(1);
     
     const toast = useToast();
 
@@ -114,50 +119,49 @@ export const PresupuestoActions: React.FC<Props> = ({
         }
     };
 
-const handleDescargarPDF = async () => {
-    setGenerandoPDF(true);
-    toast.info('Generando PDF...');
-    
-    try {
-        const response = await fetch(`/comercial/presupuestos/${presupuestoId}/pdf?download=1`, {
-            method: 'GET',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                'Accept': 'application/pdf'
+    const handleDescargarPDF = async () => {
+        setGenerandoPDF(true);
+        toast.info('Generando PDF...');
+        
+        try {
+            const response = await fetch(`/comercial/presupuestos/${presupuestoId}/pdf?download=1`, {
+                method: 'GET',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'Accept': 'application/pdf'
+                }
+            });
+            
+            if (!response.ok) throw new Error();
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `Presupuesto_${referencia}.pdf`;
+            
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
             }
-        });
-        
-        if (!response.ok) throw new Error();
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        
-        // 🔥 OBTENER EL NOMBRE DEL ARCHIVO DEL HEADER Content-Disposition
-        const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = `Presupuesto_${referencia}.pdf`;
-        
-        if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-            if (filenameMatch && filenameMatch[1]) {
-                filename = filenameMatch[1].replace(/['"]/g, '');
-            }
+            
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            toast.success('PDF descargado correctamente');
+        } catch {
+            toast.error('Error al generar el PDF');
+        } finally {
+            setGenerandoPDF(false);
         }
-        
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        
-        toast.success('PDF descargado correctamente');
-    } catch {
-        toast.error('Error al generar el PDF');
-    } finally {
-        setGenerandoPDF(false);
-    }
-};
+    };
 
     const handleVerPDF = () => {
         window.open(`/comercial/presupuestos/${presupuestoId}/pdf`, '_blank');
@@ -174,136 +178,139 @@ const handleDescargarPDF = async () => {
         }
     };
 
-const handleWhatsAppConPDF = async () => {
-    if (!telefono || !mensajeWhatsApp) return;
+    const handleWhatsAppConPDF = async () => {
+        if (!telefono || !mensajeWhatsApp) return;
 
-    setShowWhatsAppMenu(false);
-    setGenerandoPDF(true);
-    toast.info('Preparando PDF...');
-    
-    try {
-        const response = await fetch(`/comercial/presupuestos/${presupuestoId}/pdf?download=1`, {
-            method: 'GET',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                'Accept': 'application/pdf'
-            }
-        });
-        
-        if (!response.ok) throw new Error();
-        
-        const pdfBlob = await response.blob();
-        
-        // 🔥 OBTENER EL NOMBRE DEL ARCHIVO DEL HEADER
-        const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = `Presupuesto_${referencia}.pdf`;
-        
-        if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-            if (filenameMatch && filenameMatch[1]) {
-                filename = filenameMatch[1].replace(/['"]/g, '');
-            }
-        }
-        
-        const result = await sendWhatsAppWithFile(telefono, mensajeWhatsApp, pdfBlob, filename);
-        
-        if (result.success) {
-            toast.success('PDF preparado y WhatsApp abierto');
-        } else {
-            toast.error(result.error || 'Error al procesar la solicitud');
-        }
-    } catch {
-        toast.error('Error al procesar la solicitud');
-    } finally {
-        setGenerandoPDF(false);
-    }
-};
-
-    const handleOpenEmailModal = async () => {
+        setShowWhatsAppMenu(false);
         setGenerandoPDF(true);
-        toast.info('Preparando PDF para email...');
+        toast.info('Preparando PDF...');
         
         try {
-            const url = await generarPDFTemporal();
-            if (url) {
-                setPdfUrl(url);
-                setShowEmailModal(true);
+            const response = await fetch(`/comercial/presupuestos/${presupuestoId}/pdf?download=1`, {
+                method: 'GET',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'Accept': 'application/pdf'
+                }
+            });
+            
+            if (!response.ok) throw new Error();
+            
+            const pdfBlob = await response.blob();
+            
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `Presupuesto_${referencia}.pdf`;
+            
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
+            }
+            
+            const result = await sendWhatsAppWithFile(telefono, mensajeWhatsApp, pdfBlob, filename);
+            
+            if (result.success) {
+                toast.success('PDF preparado y WhatsApp abierto');
+            } else {
+                toast.error(result.error || 'Error al procesar la solicitud');
             }
         } catch {
-            toast.error('Error al preparar el PDF');
+            toast.error('Error al procesar la solicitud');
         } finally {
             setGenerandoPDF(false);
         }
     };
 
-    const verificarYabrirModal = useCallback(async () => {
-    if (!leadId) {
-        toast.error('No se pudo identificar el lead');
-        return;
-    }
+    const handleOpenEmailOptions = async () => {
+        setGenerandoPDF(true);
+        toast.info('Preparando PDF...');
+        
+        const url = await generarPDFTemporal();
+        if (url) {
+            setPdfUrl(url);
+            setShowOpcionesEmail(true);
+        }
+        setGenerandoPDF(false);
+    };
 
-    setVerificandoDatos(true);
-    
-    try {
-        const response = await fetch(`/comercial/leads/${leadId}/verificar-datos-contrato`);
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Error al verificar datos');
+    const handleSendToCliente = () => {
+        setShowOpcionesEmail(false);
+        setShowEmailModal(true);
+    };
+
+    const handleSendToAdministracion = () => {
+        setShowOpcionesEmail(false);
+        setShowEmailAdminModal(true);
+    };
+
+    const handleVerificarYabrirModal = useCallback(async () => {
+        if (!leadId) {
+            toast.error('No se pudo identificar el lead');
+            return;
         }
+
+        setVerificandoDatos(true);
         
-        // 🔥 CONSTRUIR LEAD ACTUALIZADO CON LOS DATOS DEL BACKEND
-        const leadActualizado = data.lead ? {
-            ...lead,
-            id: data.lead.id,
-            nombre_completo: data.lead.nombre_completo,
-            genero: data.lead.genero,
-            telefono: data.lead.telefono,
-            email: data.lead.email,
-            localidad_id: data.lead.localidad_id,
-            localidad: data.lead.localidad_nombre ? {
-                nombre: data.lead.localidad_nombre,
-                provincia_id: data.lead.provincia_id,
-                provincia: data.lead.provincia_nombre ? { nombre: data.lead.provincia_nombre } : null
-            } : null,
-            rubro_id: data.lead.rubro_id,
-            origen_id: data.lead.origen_id,
-            prefijo_id: data.lead.prefijo_id,
-        } : lead;
-        
-        setDatosExistentes({
-            empresa: data.empresa || undefined,
-            contacto: data.contacto || undefined
-        });
-        
-        const paso = data.pasoAMostrar || 1;
-        setPasoInicial(paso);
-        
-        const tieneAlgunDato = !!data.contacto || !!data.empresa;
-        
-        if (data.todosCompletos) {
-            toast.success('Todos los datos están completos. Generando contrato...');
-            setTimeout(() => {
-                window.location.href = `/comercial/contratos/create-from-lead/${presupuestoId}`;
-            }, 500);
-        } else {
-            setModoCompletar(tieneAlgunDato);
-            setModalAltaEmpresaOpen(true);
+        try {
+            const response = await fetch(`/comercial/leads/${leadId}/verificar-datos-contrato`);
+            const data = await response.json();
             
-            const nombresPasos = { 1: 'Datos del Lead', 2: 'Datos Personales', 3: 'Datos de Empresa' };
-            toast.info(`Complete los datos faltantes en "${nombresPasos[paso as 1 | 2 | 3]}"`);
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al verificar datos');
+            }
+            
+            const leadActualizado = data.lead ? {
+                ...lead,
+                id: data.lead.id,
+                nombre_completo: data.lead.nombre_completo,
+                genero: data.lead.genero,
+                telefono: data.lead.telefono,
+                email: data.lead.email,
+                localidad_id: data.lead.localidad_id,
+                localidad: data.lead.localidad_nombre ? {
+                    nombre: data.lead.localidad_nombre,
+                    provincia_id: data.lead.provincia_id,
+                    provincia: data.lead.provincia_nombre ? { nombre: data.lead.provincia_nombre } : null
+                } : null,
+                rubro_id: data.lead.rubro_id,
+                origen_id: data.lead.origen_id,
+                prefijo_id: data.lead.prefijo_id,
+            } : lead;
+            
+            setDatosExistentes({
+                empresa: data.empresa || undefined,
+                contacto: data.contacto || undefined
+            });
+            
+            const paso = data.pasoAMostrar || 1;
+            setPasoInicial(paso);
+            
+            const tieneAlgunDato = !!data.contacto || !!data.empresa;
+            
+            if (data.todosCompletos) {
+                toast.success('Todos los datos están completos. Generando contrato...');
+                setTimeout(() => {
+                    window.location.href = `/comercial/contratos/create-from-lead/${presupuestoId}`;
+                }, 500);
+            } else {
+                setModoCompletar(tieneAlgunDato);
+                setModalAltaEmpresaOpen(true);
+                
+                const nombresPasos = { 1: 'Datos del Lead', 2: 'Datos Personales', 3: 'Datos de Empresa' };
+                toast.info(`Complete los datos faltantes en "${nombresPasos[paso as 1 | 2 | 3]}"`);
+            }
+        } catch (error) {
+            console.error('Error verificando datos:', error);
+            toast.error('Error al verificar datos del cliente');
+        } finally {
+            setVerificandoDatos(false);
         }
-    } catch (error) {
-        console.error('Error verificando datos:', error);
-        toast.error('Error al verificar datos del cliente');
-    } finally {
-        setVerificandoDatos(false);
-    }
-}, [leadId, presupuestoId, toast, lead]);
+    }, [leadId, presupuestoId, toast, lead]);
 
     const handleAccionPrincipal = useCallback(async () => {
-        await verificarYabrirModal();
-    }, [verificarYabrirModal]);
+        await handleVerificarYabrirModal();
+    }, [handleVerificarYabrirModal]);
 
     const handleModalClose = useCallback((empresaGuardada?: boolean, irAContrato?: boolean) => {
         setModalAltaEmpresaOpen(false);
@@ -324,10 +331,39 @@ const handleWhatsAppConPDF = async () => {
         const handleClickOutside = () => {
             setShowWhatsAppMenu(false);
             setShowAccionesMenu(false);
+            setShowOpcionesEmail(false);
         };
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
+
+    // 🔥 Construir objeto presupuesto para el modal
+    const presupuestoParaModal = presupuestoCompleto || {
+        id: presupuestoId,
+        cantidad_vehiculos: 1,
+        created: new Date().toISOString(),
+        valor_tasa: 0,
+        tasa_bonificacion: 0,
+        subtotal_tasa: 0,
+        valor_abono: 0,
+        abono_bonificacion: 0,
+        subtotal_abono: 0,
+        total_presupuesto: 0,
+        agregados: [],
+        lead: lead ? {
+            ...lead,
+            telefono: telefono,
+            email: leadEmail,
+            nombre_completo: leadNombre,
+            empresa_contacto: lead?.empresaContacto,
+            empresa: lead?.empresa
+        } : {
+            id: leadId,
+            nombre_completo: leadNombre,
+            email: leadEmail,
+            telefono: telefono,
+        }
+    };
 
     return (
         <>
@@ -369,6 +405,7 @@ const handleWhatsAppConPDF = async () => {
                                 e.stopPropagation();
                                 setShowWhatsAppMenu(!showWhatsAppMenu);
                                 setShowAccionesMenu(false);
+                                setShowOpcionesEmail(false);
                             }}
                             className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm transition-colors"
                         >
@@ -409,6 +446,7 @@ const handleWhatsAppConPDF = async () => {
                             e.stopPropagation();
                             setShowAccionesMenu(!showAccionesMenu);
                             setShowWhatsAppMenu(false);
+                            setShowOpcionesEmail(false);
                         }}
                         className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm transition-colors"
                     >
@@ -418,10 +456,10 @@ const handleWhatsAppConPDF = async () => {
                     </button>
                     
                     {showAccionesMenu && (
-                        <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10 overflow-hidden">
+                        <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-10 overflow-hidden">
                             <button
-                                onClick={handleOpenEmailModal}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                onClick={handleOpenEmailOptions}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 border-b border-gray-100"
                             >
                                 <Mail className="h-4 w-4 text-blue-600" />
                                 Enviar por email
@@ -450,6 +488,67 @@ const handleWhatsAppConPDF = async () => {
                 </div>
             </div>
 
+            {/* Modal de opciones de email */}
+            {showOpcionesEmail && pdfUrl && (
+                <>
+                    <div className="fixed inset-0 bg-black/60 z-[99990]" onClick={() => setShowOpcionesEmail(false)} />
+                    <div className="fixed inset-0 flex items-center justify-center p-8 z-[99995] pointer-events-none">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto border border-gray-100">
+                            <div className="p-6 border-b border-gray-200">
+                                <h3 className="text-xl font-semibold text-gray-900">¿A quién querés enviar el email?</h3>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <button
+                                    onClick={handleSendToCliente}
+                                    className="w-full p-4 border-2 border-blue-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-blue-100 rounded-xl group-hover:bg-blue-200">
+                                            <Mail className="h-6 w-6 text-blue-600" />
+                                        </div>
+                                        <div className="text-left">
+                                            <h4 className="font-medium text-gray-900">Enviar al Cliente</h4>
+                                            <p className="text-sm text-gray-500 mt-1">
+                                                {leadEmail || 'No tiene email'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </button>
+                                
+                                <button
+                                    onClick={handleSendToAdministracion}
+                                    className="w-full p-4 border-2 border-purple-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-purple-100 rounded-xl group-hover:bg-purple-200">
+                                            <Building2 className="h-6 w-6 text-purple-600" />
+                                        </div>
+                                        <div className="text-left">
+                                            <h4 className="font-medium text-gray-900">Enviar a Administración</h4>
+                                            <p className="text-sm text-gray-500 mt-1">
+                                                gfaure@localsat.com.ar
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                Envía los detalles del presupuesto a administración
+                                            </p>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className="p-6 border-t border-gray-200 bg-gray-50">
+                                <button
+                                    onClick={() => setShowOpcionesEmail(false)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Modal de email para cliente */}
             {pdfUrl && (
                 <EnviarPresupuestoEmailModal
                     isOpen={showEmailModal}
@@ -467,6 +566,28 @@ const handleWhatsAppConPDF = async () => {
                     companiaId={companiaId}
                     companiaNombre={companiaNombre}
                     pdfUrl={pdfUrl}
+                />
+            )}
+
+            {/* Modal de email para administración - AHORA CON PRESUPUESTO COMPLETO */}
+            {pdfUrl && (
+                <EnviarPresupuestoAdministracionModal
+                    isOpen={showEmailAdminModal}
+                    onClose={() => {
+                        setShowEmailAdminModal(false);
+                        setPdfUrl(null);
+                    }}
+                    presupuesto={presupuestoCompleto }
+                    comercialNombre={comercialNombre}
+                    comercialEmail={comercialEmail}
+                    comercialTelefono={telefono}
+                    companiaId={companiaId}
+                    companiaNombre={companiaNombre}
+                    plataforma="ALPHA"
+                    pdfUrl={pdfUrl}
+                    leadNombre={leadNombre}
+                    leadEmail={leadEmail}
+                    referencia={referencia}
                 />
             )}
 

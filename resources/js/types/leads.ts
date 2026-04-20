@@ -58,7 +58,141 @@ export interface Comercial {
 export interface ConteoConFecha {
     total: number;
     ultimo: string | null;
-    ultimo_formateado: string | null;  // ✅ Agregar campo formateado
+    ultimo_formateado: string | null;
+}
+
+// 🔥 INTERFACES PARA EMPRESA Y CONTACTOS
+export interface Empresa {
+    id: number;
+    alta_emp?: string;
+    prefijo_id?: number;
+    numeroalfa?: number;
+    nombre_fantasia?: string;
+    razon_social?: string;
+    cuit?: string;
+    direccion_fiscal?: string;
+    codigo_postal_fiscal?: string;
+    localidad_fiscal_id?: number;
+    telefono_fiscal?: string;
+    email_fiscal?: string;
+    rubro_id?: number;
+    cat_fiscal_id?: number;
+    plataforma_id?: number;
+    nombre_flota?: string;
+    es_activo?: boolean;
+    created?: string;
+    created_by?: number;
+    modified?: string;
+    modified_by?: number;
+    deleted_at?: string;
+    deleted_by?: number;
+}
+
+export interface EmpresaContacto {
+    id: number;
+    empresa_id: number;
+    lead_id: number;
+    es_contacto_principal: boolean;
+    tipo_responsabilidad_id?: number;
+    tipo_documento_id?: number;
+    nro_documento?: string;
+    nacionalidad_id?: number;
+    fecha_nacimiento?: string;
+    direccion_personal?: string;
+    codigo_postal_personal?: string;
+    es_activo: boolean;
+    created?: string;
+    created_by?: number;
+    modified?: string;
+    modified_by?: number;
+    deleted_at?: string;
+    deleted_by?: number;
+    empresa?: Empresa;
+}
+
+// 🔥 INTERFACES PARA PRODUCTOS Y SERVICIOS
+export interface TipoProducto {
+    id: number;
+    nombre: string;
+    nombre_tipo_abono?: string;
+}
+
+export interface ProductoServicio {
+    id: number;
+    codigopro?: string;
+    nombre: string;
+    descripcion?: string;
+    tipo_id: number;
+    tipo?: TipoProducto;
+    valor_unitario?: number;
+    es_activo?: boolean;
+}
+
+// 🔥 INTERFACES PARA AGREGADOS DEL PRESUPUESTO
+export interface PresupuestoAgregado {
+    id: number;
+    presupuesto_id: number;
+    prd_servicio_id: number;
+    cantidad: number;
+    aplica_a_todos_vehiculos: boolean;
+    valor: number;
+    bonificacion: number;
+    subtotal: number;
+    created?: string;
+    deleted_at?: string;
+    deleted_by?: number;
+    productoServicio?: ProductoServicio;
+    producto_codigo?: string;
+    producto_nombre?: string;
+    tipo_nombre?: string;
+}
+
+// 🔥 INTERFACES PARA EL PRESUPUESTO COMPLETO
+export interface PresupuestoCompleto {
+    id: number;
+    prefijo_id: number;
+    lead_id: number;
+    promocion_id?: number;
+    cantidad_vehiculos: number;
+    validez: string;
+    tasa_id?: number;
+    valor_tasa: number;
+    tasa_bonificacion: number;
+    subtotal_tasa: number;
+    tasa_metodo_pago_id?: number;
+    abono_id?: number;
+    valor_abono: number;
+    abono_bonificacion: number;
+    subtotal_abono: number;
+    abono_metodo_pago_id?: number;
+    subtotal_productos_agregados: number;
+    total_presupuesto: number;
+    estado_id: number;
+    activo: boolean;
+    created: string;
+    created_by?: number;
+    modified?: string;
+    modified_by?: number;
+    deleted_at?: string;
+    deleted_by?: number;
+    // Relaciones
+    lead?: Lead;
+    prefijo?: PrefijoDTO;
+    tasa?: ProductoServicio;
+    abono?: ProductoServicio;
+    promocion?: any;
+    estado?: any;
+    agregados?: PresupuestoAgregado[];
+    // Campos calculados
+    referencia?: string;
+    comercial_email?: string;
+    compania_nombre?: string;
+    compania_id?: number;
+    nombre_comercial?: string;
+    tasa_codigo?: string;
+    tasa_nombre?: string;
+    abono_codigo?: string;
+    abono_nombre?: string;
 }
 
 export interface Lead {
@@ -112,6 +246,12 @@ export interface Lead {
     };
     notas?: NotaLead[]; 
     seguimientoPerdida?: SeguimientoPerdida;
+    empresa_contacto?: EmpresaContacto;
+    empresa?: Empresa;
+    empresa_razon_social?: string;
+    empresa_cuit?: string;
+    empresa_nombre_flota?: string;
+    telefono_empresa?: string;
 }
 
 export interface NotaLead {

@@ -122,6 +122,7 @@ export default function PresupuestosShow({
                             origenes={origenes}
                             rubros={rubros}
                             provincias={provincias}
+                            presupuestoCompleto={presupuesto}
                         />
                     </div>
                 </div>

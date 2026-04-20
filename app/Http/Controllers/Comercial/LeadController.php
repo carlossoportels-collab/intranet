@@ -380,6 +380,7 @@ public function verificarDatosContrato($id)
 /**
  * Convertir un lead en cliente (upgrade)
  */
+
 public function upgradeToClient($id)
 {
     try {
@@ -395,46 +396,50 @@ public function upgradeToClient($id)
             return redirect()->back()->withErrors(['error' => 'Este lead ya es cliente']);
         }
         
+        // Verificar si venía de un estado perdido (para saber si es recuperación)
+        $estadoAnterior = EstadoLead::find($lead->estado_lead_id);
+        $tiposPerdidos = ['final_negativo', 'recontacto'];
+        $idsPerdidos = [8, 13, 14, 15, 16, 17];
+        $eraPerdido = in_array($estadoAnterior?->tipo, $tiposPerdidos) || in_array($estadoAnterior?->id, $idsPerdidos);
+        
         DB::beginTransaction();
         
         try {
-            // Obtener el estado anterior
-            $estadoAnterior = EstadoLead::find($lead->estado_lead_id);
-            
-            // Obtener el estado de cliente (ID 7)
-            $estadoCliente = EstadoLead::find(7);
-            if (!$estadoCliente) {
-                throw new \Exception('Estado de cliente no encontrado (ID: 7)');
-            }
-            
-            // Guardar datos para auditoría
-            $leadId = $lead->id;
             $usuarioId = auth()->id();
             $nombreLead = $lead->nombre_completo;
             
             // Eliminar notificaciones pendientes
-            $notificacionesEliminadas = $this->eliminarNotificacionesLead($leadId, $usuarioId);
+            $notificacionesEliminadas = $this->eliminarNotificacionesLead($lead->id, $usuarioId);
             
             // Actualizar el lead
             $lead->es_cliente = 1;
             $lead->estado_lead_id = 7;
             $lead->modified_by = $usuarioId;
             $lead->modified = now();
+            
+            // 🔥 MARCAR COMO RECUPERADO (solo si venía de estado perdido)
+            if ($eraPerdido) {
+                $lead->es_recuperacion = 1;
+            }
+            
             $lead->save();
             
             // Registrar en auditoría
             DB::table('auditoria_log')->insert([
                 'tabla_afectada' => 'leads',
-                'registro_id' => $leadId,
+                'registro_id' => $lead->id,
                 'accion' => 'update',
                 'usuario_id' => $usuarioId,
                 'valores_anteriores' => json_encode([
                     'es_cliente' => 0,
                     'estado_lead_id' => $lead->getOriginal('estado_lead_id'),
+                    'es_recuperacion' => $lead->getOriginal('es_recuperacion'),
+                    'era_perdido' => $eraPerdido,
                 ]),
                 'valores_nuevos' => json_encode([
                     'es_cliente' => 1,
                     'estado_lead_id' => 7,
+                    'es_recuperacion' => $eraPerdido ? 1 : $lead->es_recuperacion,
                     'notificaciones_eliminadas' => $notificacionesEliminadas,
                 ]),
                 'ip_address' => request()->ip(),
@@ -444,8 +449,11 @@ public function upgradeToClient($id)
             
             DB::commit();
             
-            // 🔥 Redirigir de vuelta con mensaje de éxito (para Inertia)
-            return redirect()->back()->with('success', "{$nombreLead} ha sido convertido a cliente exitosamente");
+            $mensaje = $eraPerdido 
+                ? "{$nombreLead} ha sido convertido a cliente y marcado como recuperado exitosamente"
+                : "{$nombreLead} ha sido convertido a cliente exitosamente";
+            
+            return redirect()->back()->with('success', $mensaje);
             
         } catch (\Exception $e) {
             DB::rollBack();
@@ -459,6 +467,42 @@ public function upgradeToClient($id)
         ]);
         
         return redirect()->back()->withErrors(['error' => 'Error al convertir el lead: ' . $e->getMessage()]);
+    }
+}
+
+/**
+ *  NUEVO: Marcar lead como recuperado en seguimientos_perdida
+ */
+private function marcarLeadComoRecuperado(Lead $lead, int $usuarioId): void
+{
+    try {
+        $seguimiento = DB::table('seguimientos_perdida')
+            ->where('lead_id', $lead->id)
+            ->whereNull('deleted_at')
+            ->first();
+        
+        if ($seguimiento && !$seguimiento->restaurado) {
+            DB::table('seguimientos_perdida')
+                ->where('id', $seguimiento->id)
+                ->update([
+                    'restaurado' => 1,
+                    'fecha_restauracion' => now(),
+                    'restaurado_por' => $usuarioId,
+                ]);
+            
+            Log::info('Lead marcado como recuperado en upgradeToClient', [
+                'lead_id' => $lead->id,
+                'lead_nombre' => $lead->nombre_completo,
+                'estado_anterior_id' => $lead->getOriginal('estado_lead_id'),
+                'usuario_id' => $usuarioId
+            ]);
+        }
+    } catch (\Exception $e) {
+        Log::error('Error al marcar lead como recuperado en upgradeToClient', [
+            'lead_id' => $lead->id,
+            'error' => $e->getMessage()
+        ]);
+        // No lanzamos excepción para no interrumpir el upgrade
     }
 }
 

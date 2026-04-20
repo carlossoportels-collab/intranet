@@ -1,7 +1,8 @@
-import { useForm,router } from '@inertiajs/react';
+// resources/js/Components/Modals/NuevoComentarioModal.tsx
+
+import { useForm, router } from '@inertiajs/react';
 import { X, MessageSquare, Bell, Calendar, Save, XCircle, AlertCircle, Lock, FileText, CalendarDays, ThumbsDown } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-
 
 interface TipoComentario {
     id: number;
@@ -23,10 +24,10 @@ interface EstadoLead {
 interface Lead {
     id: number;
     nombre_completo: string;
-    email?: string; // Hacer opcional
-    telefono?: string; // Hacer opcional
+    email?: string;
+    telefono?: string;
     estado_lead_id?: number;
-    es_cliente?: boolean; 
+    es_cliente?: boolean;
 }
 
 interface MotivoPerdida {
@@ -68,21 +69,17 @@ export default function NuevoComentarioModal({
     };
 
     const { data, setData, post, processing, errors, reset } = useForm({
-        // Datos generales del comentario
         comentario: '',
         tipo_comentario_id: getTipoPredeterminado() as string | number,
         crea_recordatorio: true,
         dias_recordatorio: 0,
         cambiar_estado_lead: true,
-        
-        // Datos específicos para rechazo
         motivo_perdida_id: '',
         notas_adicionales: '',
         posibilidades_futuras: 'no',
         fecha_posible_recontacto: '',
     });
 
-    // Definir variables derivadas ANTES de los useEffect
     const tiposComentarioFiltrados = tiposComentario.filter(tipo => 
         tipo.es_activo && (tipo.aplica_a === 'lead' || tipo.aplica_a === 'ambos')
     );
@@ -112,7 +109,7 @@ export default function NuevoComentarioModal({
     }, [isOpen, lead, esRechazo]);
 
     const cargarMotivosPerdida = () => {
-        if (motivosPerdida.length > 0) return; // Ya cargados
+        if (motivosPerdida.length > 0) return;
         
         setLoadingMotivos(true);
         
@@ -123,11 +120,16 @@ export default function NuevoComentarioModal({
             })
             .then(data => {
                 if (Array.isArray(data)) {
-                    setMotivosPerdida(data);
+                    // 🔥 FILTRAR motivos históricos (Lead 2021, Lead 2022, etc.)
+                    const motivosFiltrados = data.filter((motivo: MotivoPerdida) => {
+                        return !motivo.nombre.match(/^Lead \d{4}$/);
+                    });
+                    setMotivosPerdida(motivosFiltrados);
                 }
             })
             .catch(error => {
                 console.error('Error cargando motivos de pérdida:', error);
+                // Motivos de ejemplo sin los históricos
                 const motivosEjemplo = [
                     { id: 1, nombre: 'Precio muy elevado', descripcion: 'El cliente consideró que el precio no se ajustaba a su presupuesto', es_activo: 1 },
                     { id: 2, nombre: 'No necesita el producto/servicio', descripcion: 'El cliente determinó que no tiene necesidad actual', es_activo: 1 },
@@ -148,7 +150,6 @@ export default function NuevoComentarioModal({
             );
             
             if (tipo) {
-                // Si es Pausa temporal, forzar recordatorio a 90 días
                 if (tipo.nombre === 'Pausa temporal') {
                     setData({
                         ...data,
@@ -156,7 +157,6 @@ export default function NuevoComentarioModal({
                         dias_recordatorio: 90
                     });
                 }
-                // Si es rechazo, desactivar recordatorio
                 else if (tipo.nombre === 'Rechazo lead') {
                     setData({
                         ...data,
@@ -164,7 +164,6 @@ export default function NuevoComentarioModal({
                         dias_recordatorio: 0
                     });
                 }
-                // Para otros tipos, usar configuración por defecto
                 else {
                     let nuevosDias = 7;
                     if (comentariosExistentes === 0 && tipo.nombre === 'Contacto inicial') {
@@ -231,19 +230,16 @@ export default function NuevoComentarioModal({
         
         const esRechazo = tipoSeleccionado.nombre === 'Rechazo lead';
         
-        // Validaciones
         if (esRechazo) {
             if (!data.motivo_perdida_id) {
                 alert('Para rechazar un lead, por favor seleccione un motivo de pérdida');
                 return;
             }
             
-            // Si no hay comentario (por alguna razón), crear uno básico
             if (!data.comentario.trim()) {
                 const motivo = motivosPerdida.find(m => m.id.toString() === data.motivo_perdida_id.toString());
                 setData('comentario', `Lead rechazado - Motivo: ${motivo?.nombre || 'No especificado'}`);
                 
-                // Pequeño delay para asegurar que setData se complete
                 setTimeout(() => {
                     enviarFormulario(true);
                 }, 100);
@@ -563,8 +559,8 @@ export default function NuevoComentarioModal({
                                             id="crea_recordatorio"
                                             className="h-4 w-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
                                             checked={data.crea_recordatorio}
-                                            onChange={() => {}} // 🔥 Vacío porque es OBLIGATORIO, no se puede cambiar
-                                            disabled={true} // 🔥 Deshabilitado - siempre activo
+                                            onChange={() => {}}
+                                            disabled={true}
                                         />
                                         <label htmlFor="crea_recordatorio" className="ml-2 text-sm text-gray-700 flex items-center gap-2">
                                             <Bell className="h-4 w-4" />
@@ -579,7 +575,6 @@ export default function NuevoComentarioModal({
                                                 Días para recordatorio (máx. 90) *
                                             </label>
                                             
-                                            {/* 🔥 BOTONES RÁPIDOS */}
                                             <div className="flex flex-wrap gap-2 mb-3">
                                                 <button
                                                     type="button"
@@ -648,7 +643,6 @@ export default function NuevoComentarioModal({
                                                 disabled={processing}
                                             />
                                             
-                                            {/* 🔥 LEYENDA CON FECHA PROGRAMADA */}
                                             {data.dias_recordatorio > 0 && (
                                                 <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
                                                     <p className="text-sm text-blue-800">

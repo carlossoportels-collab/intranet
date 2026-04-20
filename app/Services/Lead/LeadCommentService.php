@@ -8,6 +8,7 @@ use App\Models\TipoComentario;
 use App\Models\EstadoLead;
 use App\Models\SeguimientoPerdida;
 use App\Models\MotivoPerdida;
+use App\Models\Presupuesto;
 use App\Services\Lead\Notifications\LeadCommentNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -29,8 +30,6 @@ class LeadCommentService
     public function crearComentario(array $data, int $leadId, int $usuarioId): array
     {
         $lead = Lead::findOrFail($leadId);
-        
-        // ELIMINADA la restricción de cliente
         
         DB::beginTransaction();
         
@@ -110,8 +109,6 @@ class LeadCommentService
     {
         $lead = Lead::findOrFail($leadId);
         
-        // ELIMINADA la restricción de cliente
-        
         $comentarios = Comentario::with(['tipoComentario', 'usuario.personal'])
             ->where('lead_id', $leadId)
             ->whereNull('deleted_at')
@@ -155,6 +152,9 @@ class LeadCommentService
             'fecha_posible_recontacto' => $data['fecha_posible_recontacto'] ?? null,
         ]);
         
+        // 🔥 NUEVO: Actualizar presupuestos a estado 4 (Rechazado)
+        $this->actualizarPresupuestosRechazados($lead->id, $usuarioId);
+        
         // Crear notificación de recontacto si aplica
         if (!empty($data['fecha_posible_recontacto']) && ($data['posibilidades_futuras'] ?? 'no') !== 'no') {
             $this->notificationService->crearNotificacionRecontacto(
@@ -170,6 +170,58 @@ class LeadCommentService
         
         // Registrar auditoría
         $this->auditService->registrarRechazoLead($lead, $usuarioId, $data, $comentario->id);
+    }
+    
+    /**
+     * 🔥 NUEVO: Actualizar presupuestos asociados al lead a estado Rechazado (4)
+     */
+    private function actualizarPresupuestosRechazados(int $leadId, int $usuarioId): void
+    {
+        try {
+            // Buscar presupuestos activos del lead que no estén ya rechazados
+            $presupuestos = Presupuesto::where('lead_id', $leadId)
+                ->where('activo', 1)
+                ->whereNull('deleted_at')
+                ->where('estado_id', '!=', 4) // Estado 4 = Rechazado
+                ->get();
+            
+            if ($presupuestos->isEmpty()) {
+                return;
+            }
+            
+            foreach ($presupuestos as $presupuesto) {
+                $presupuesto->estado_id = 4; // Rechazado
+                $presupuesto->modified = now();
+                $presupuesto->modified_by = $usuarioId;
+                $presupuesto->save();
+                
+                // Registrar auditoría del cambio
+                DB::table('auditoria_log')->insert([
+                    'tabla_afectada' => 'presupuestos',
+                    'registro_id' => $presupuesto->id,
+                    'accion' => 'UPDATE',
+                    'usuario_id' => $usuarioId,
+                    'valores_anteriores' => json_encode(['estado_id' => $presupuesto->getOriginal('estado_id')]),
+                    'valores_nuevos' => json_encode(['estado_id' => 4, 'razon' => 'Lead rechazado']),
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                    'created' => now(),
+                ]);
+            }
+            
+            Log::info('Presupuestos actualizados a rechazados', [
+                'lead_id' => $leadId,
+                'usuario_id' => $usuarioId,
+                'cantidad_presupuestos' => $presupuestos->count()
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error al actualizar presupuestos a rechazados', [
+                'lead_id' => $leadId,
+                'error' => $e->getMessage()
+            ]);
+            // No lanzamos excepción para no interrumpir el flujo principal
+        }
     }
     
     /**

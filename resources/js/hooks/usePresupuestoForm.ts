@@ -420,7 +420,7 @@ export const usePresupuestoForm = ({
 
     /**
      * VALIDACIÓN DEL FORMULARIO - ACTUALIZADA
-     * Permite presupuestos con solo tasa, solo abono, o ambos
+     * Permite presupuestos con solo tasa, solo abono, solo productos, o combinaciones
      */
     const validateForm = useCallback((): boolean => {
         // Validar comercial
@@ -429,23 +429,17 @@ export const usePresupuestoForm = ({
             return false;
         }
         
-        // Validar que al menos tenga una tasa o un abono
-        const tieneTasa = state.tasaId && state.tasaId !== 0;
-        const tieneAbono = state.abonoId && state.abonoId !== 0;
-        
-        if (!tieneTasa && !tieneAbono) {
-            toast.error('Debe seleccionar al menos una Tasa de Instalación o un Abono Mensual');
-            return false;
-        }
+        // 🔥 VALIDACIÓN ELIMINADA - Ya no es obligatorio tener Tasa o Abono
+        // Ahora se puede crear presupuesto solo con accesorios o servicios
         
         // Validar método de pago de la tasa (solo si tiene tasa)
-        if (tieneTasa && (!state.tasaMetodoPagoId || state.tasaMetodoPagoId === 0)) {
+        if (state.tasaId && state.tasaId !== 0 && (!state.tasaMetodoPagoId || state.tasaMetodoPagoId === 0)) {
             toast.error('Debe seleccionar un método de pago para la tasa');
             return false;
         }
         
         // Validar método de pago del abono (solo si tiene abono)
-        if (tieneAbono && (!state.abonoMetodoPagoId || state.abonoMetodoPagoId === 0)) {
+        if (state.abonoId && state.abonoId !== 0 && (!state.abonoMetodoPagoId || state.abonoMetodoPagoId === 0)) {
             toast.error('Debe seleccionar un método de pago para el abono');
             return false;
         }

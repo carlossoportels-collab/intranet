@@ -1,5 +1,5 @@
 // resources/js/components/presupuestos/AbonoSelector.tsx
-import { Loader2, CreditCard, FileText } from 'lucide-react';
+import { Loader2, CreditCard, FileText, XCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import {
@@ -42,9 +42,7 @@ export default function AbonoSelector({ value, onChange, error, disabled = false
 
     const handleValueChange = (value: string) => {
         const productoId = Number(value);
-        if (productoId) {
-            onChange(productoId, tipo);
-        }
+        onChange(productoId, tipo);
     };
 
     return (
@@ -109,30 +107,45 @@ export default function AbonoSelector({ value, onChange, error, disabled = false
                             <div className="flex items-center justify-center p-4">
                                 <Loader2 className="h-5 w-5 animate-spin text-local" />
                             </div>
-                        ) : productos.length === 0 ? (
-                            <div className="p-4 text-center text-sm text-gray-500">
-                                No hay {tipo === 'abono' ? 'abonos' : 'convenios'} disponibles
-                            </div>
                         ) : (
-                            productos.map(producto => {
-                                const precio = Number(producto.precio) || 0;
-                                return (
-                                    <SelectItem 
-                                        key={producto.id} 
-                                        value={producto.id.toString()}
-                                        className="py-2 px-3 cursor-pointer hover:bg-gray-50"
-                                    >
-                                        <div className="flex items-center justify-between w-full gap-4">
-                                            <span className="text-sm text-gray-900 truncate max-w-[200px]">
-                                                {producto.nombre}
-                                            </span>
-                                            <span className="text-local font-medium text-sm whitespace-nowrap">
-                                                ${precio.toFixed(2)}
-                                            </span>
-                                        </div>
-                                    </SelectItem>
-                                );
-                            })
+                            <>
+                                {/* 🔥 OPCIÓN "NINGUNO" - Limpiar selección */}
+                                <SelectItem 
+                                    value="0" 
+                                    className="py-2 px-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <XCircle className="h-4 w-4 text-gray-400" />
+                                        <span className="text-gray-500">Ninguno (sin {tipo})</span>
+                                    </div>
+                                </SelectItem>
+                                
+                                {productos.length === 0 ? (
+                                    <div className="p-4 text-center text-sm text-gray-500">
+                                        No hay {tipo === 'abono' ? 'abonos' : 'convenios'} disponibles
+                                    </div>
+                                ) : (
+                                    productos.map(producto => {
+                                        const precio = Number(producto.precio) || 0;
+                                        return (
+                                            <SelectItem 
+                                                key={producto.id} 
+                                                value={producto.id.toString()}
+                                                className="py-2 px-3 cursor-pointer hover:bg-gray-50"
+                                            >
+                                                <div className="flex items-center justify-between w-full gap-4">
+                                                    <span className="text-sm text-gray-900 truncate max-w-[200px]">
+                                                        {producto.nombre}
+                                                    </span>
+                                                    <span className="text-local font-medium text-sm whitespace-nowrap">
+                                                        ${precio.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            </SelectItem>
+                                        );
+                                    })
+                                )}
+                            </>
                         )}
                     </SelectContent>
                 </Select>

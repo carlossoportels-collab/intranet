@@ -1,7 +1,7 @@
 // resources/js/Pages/Comercial/Contratos/Index.tsx
 import { Link, router } from '@inertiajs/react';
-import { FileText, Calendar, User, Building, Truck, Eye, Download, Edit, ChevronDown, ChevronUp, Filter, Tag } from 'lucide-react';
-import React, { useState } from 'react';
+import { FileText, Calendar, User, Building, Truck, Eye, Download, Edit, ChevronDown, ChevronUp, Filter, Tag, Loader } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
 
 import { ContratoFilterBar } from '@/components/contratos/ContratoFilterBar';
 import { Amount } from '@/components/ui/Amount';
@@ -9,6 +9,7 @@ import Pagination from '@/components/ui/Pagination';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/utils/formatters';
+import { useToast } from '@/contexts/ToastContext';
 
 interface Contrato {
     id: number;
@@ -72,9 +73,16 @@ export default function ContratosIndex({
     prefijoUsuario = null,
     estados = []
 }: Props) {
+    const toast = useToast();
     const usuarioEsComercial = !usuario.ve_todas_cuentas;
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [expandedMobileCard, setExpandedMobileCard] = useState<number | null>(null);
+    
+    // Estados para el modal de PDF
+    const [mostrarVistaPDF, setMostrarVistaPDF] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [generandoPDF, setGenerandoPDF] = useState<number | null>(null);
+    const [contratoActual, setContratoActual] = useState<Contrato | null>(null);
 
     const [filters, setFilters] = useState(() => {
         const initialFilters: any = {
@@ -92,6 +100,54 @@ export default function ContratosIndex({
         
         return initialFilters;
     });
+
+    // Función para generar PDF temporal
+    const generarPDFTemporal = useCallback(async (contratoId: number): Promise<string | null> => {
+        return new Promise((resolve) => {
+            router.post(`/comercial/contratos/${contratoId}/generar-pdf-temp`, {}, {
+                preserveState: true,
+                preserveScroll: true,
+                onSuccess: (page: any) => {
+                    const flash = page.props.flash as any;
+                    const data = flash?.pdfData || page.props?.pdfData;
+                    if (data?.success && data.url) {
+                        resolve(data.url);
+                    } else {
+                        toast.error(data?.error || 'Error al generar PDF');
+                        resolve(null);
+                    }
+                },
+                onError: () => {
+                    toast.error('Error al generar el PDF');
+                    resolve(null);
+                }
+            });
+        });
+    }, [toast]);
+
+    // Función para ver PDF en modal
+    const handleVerPDF = useCallback(async (contrato: Contrato, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        setContratoActual(contrato);
+        setMostrarVistaPDF(true);
+        setGenerandoPDF(contrato.id);
+        
+        const url = await generarPDFTemporal(contrato.id);
+        if (url) {
+            setPdfUrl(url);
+        }
+        
+        setGenerandoPDF(null);
+    }, [generarPDFTemporal]);
+
+    // Función para descargar PDF
+    const handleDescargarPDF = useCallback(() => {
+        if (contratoActual) {
+            window.open(`/comercial/contratos/${contratoActual.id}/pdf?download=1`, '_blank');
+        }
+    }, [contratoActual]);
 
     const getEstadoColor = (estadoId?: number) => {
         switch(estadoId) {
@@ -117,24 +173,22 @@ export default function ContratosIndex({
         }
     };
 
-    // Función para obtener el badge del tipo de operación
-const getTipoOperacionBadge = (tipo?: string) => {
-    switch(tipo) {
-        case 'venta_cliente':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
-        case 'alta_nueva':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
-        case 'cambio_titularidad':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
-        case 'cambio_razon_social':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
-        // Nuevo Badge SmartSat
-        case 'cambio_smartsat':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">Cambio SmartSat</span>;
-        default:
-            return null;
-    }
-};
+    const getTipoOperacionBadge = (tipo?: string) => {
+        switch(tipo) {
+            case 'venta_cliente':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Venta a Cliente</span>;
+            case 'alta_nueva':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Alta Nueva</span>;
+            case 'cambio_titularidad':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Cambio Titularidad</span>;
+            case 'cambio_razon_social':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Cambio Razón Social</span>;
+            case 'cambio_smartsat':
+                return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">Cambio SmartSat</span>;
+            default:
+                return null;
+        }
+    };
 
     const handlePageChange = (page: number) => {
         router.get('/comercial/contratos', { 
@@ -182,14 +236,6 @@ const getTipoOperacionBadge = (tipo?: string) => {
         }
         
         return hasFilters;
-    };
-
-    const handleVerPDF = (contratoId: number) => {
-        window.open(`/comercial/contratos/${contratoId}/pdf`, '_blank');
-    };
-
-    const handleDescargarPDF = (contratoId: number) => {
-        window.open(`/comercial/contratos/${contratoId}/pdf?download=1`, '_blank');
     };
 
     const totalPrimerMes = (contrato: Contrato) => {
@@ -359,14 +405,19 @@ const getTipoOperacionBadge = (tipo?: string) => {
                                                         <Eye className="h-4 w-4" />
                                                     </Link>
                                                     <button
-                                                        onClick={() => handleVerPDF(contrato.id)}
-                                                        className="text-orange-600 hover:text-orange-900 p-1 rounded hover:bg-orange-50 transition-colors"
+                                                        onClick={(e) => handleVerPDF(contrato, e)}
+                                                        disabled={generandoPDF === contrato.id}
+                                                        className="text-orange-600 hover:text-orange-900 p-1 rounded hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Ver PDF"
                                                     >
-                                                        <FileText className="h-4 w-4" />
+                                                        {generandoPDF === contrato.id ? (
+                                                            <Loader className="h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <FileText className="h-4 w-4" />
+                                                        )}
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDescargarPDF(contrato.id)}
+                                                        onClick={() => window.open(`/comercial/contratos/${contrato.id}/pdf?download=1`, '_blank')}
                                                         className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors"
                                                         title="Descargar PDF"
                                                     >
@@ -384,7 +435,6 @@ const getTipoOperacionBadge = (tipo?: string) => {
                         <div className="md:hidden divide-y divide-gray-200">
                             {contratos.data.map((contrato) => (
                                 <div key={contrato.id} className="p-4 hover:bg-gray-50">
-                                    {/* Cabecera de la tarjeta */}
                                     <div className="flex items-start justify-between mb-2">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -412,7 +462,6 @@ const getTipoOperacionBadge = (tipo?: string) => {
                                         </button>
                                     </div>
 
-                                    {/* Información resumida */}
                                     <div className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
                                             <Truck className="h-4 w-4 text-gray-400" />
@@ -425,7 +474,6 @@ const getTipoOperacionBadge = (tipo?: string) => {
                                         <Amount value={totalPrimerMes(contrato)} className="font-bold text-orange-600" />
                                     </div>
 
-                                    {/* Detalles expandibles */}
                                     {expandedMobileCard === contrato.id && (
                                         <div className="mt-4 pt-4 border-t border-gray-100">
                                             <div className="grid grid-cols-2 gap-3 mb-4">
@@ -439,7 +487,6 @@ const getTipoOperacionBadge = (tipo?: string) => {
                                                 </div>
                                             </div>
 
-                                            {/* Acciones móvil */}
                                             <div className="flex items-center gap-2">
                                                 <Link
                                                     href={`/comercial/contratos/${contrato.id}`}
@@ -449,14 +496,24 @@ const getTipoOperacionBadge = (tipo?: string) => {
                                                     Ver detalle
                                                 </Link>
                                                 <button
-                                                    onClick={() => handleVerPDF(contrato.id)}
-                                                    className="flex-1 px-3 py-2 bg-orange-50 text-orange-700 text-sm rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-center gap-2"
+                                                    onClick={(e) => handleVerPDF(contrato, e)}
+                                                    disabled={generandoPDF === contrato.id}
+                                                    className="flex-1 px-3 py-2 bg-orange-50 text-orange-700 text-sm rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                                                 >
-                                                    <FileText className="h-4 w-4" />
-                                                    Ver PDF
+                                                    {generandoPDF === contrato.id ? (
+                                                        <>
+                                                            <Loader className="h-4 w-4 animate-spin" />
+                                                            Cargando...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <FileText className="h-4 w-4" />
+                                                            Ver PDF
+                                                        </>
+                                                    )}
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDescargarPDF(contrato.id)}
+                                                    onClick={() => window.open(`/comercial/contratos/${contrato.id}/pdf?download=1`, '_blank')}
                                                     className="flex-1 px-3 py-2 bg-green-50 text-green-700 text-sm rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2"
                                                 >
                                                     <Download className="h-4 w-4" />
@@ -490,6 +547,48 @@ const getTipoOperacionBadge = (tipo?: string) => {
                     </div>
                 )}
             </div>
+
+            {/* Vista PDF Modal - EXACTAMENTE IGUAL que en Show.tsx */}
+            {mostrarVistaPDF && pdfUrl && contratoActual && (
+                <>
+                    <div className="fixed inset-0 bg-black/60 z-[99990]" onClick={() => setMostrarVistaPDF(false)} />
+                    <div className="fixed inset-0 z-[99995] p-4 flex items-center justify-center pointer-events-none">
+                        <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl h-[90vh] pointer-events-auto flex flex-col">
+                            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                                <h3 className="text-lg font-semibold text-gray-900">
+                                    Vista Previa - Contrato {contratoActual.numero_contrato}
+                                </h3>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleDescargarPDF}
+                                        className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 text-sm"
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        Descargar
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setMostrarVistaPDF(false);
+                                            setPdfUrl(null);
+                                            setContratoActual(null);
+                                        }}
+                                        className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                                    >
+                                        Cerrar
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex-1 overflow-auto">
+                                <iframe
+                                    src={pdfUrl}
+                                    className="w-full h-full"
+                                    title={`Contrato ${contratoActual.numero_contrato}`}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </AppLayout>
     );
 }

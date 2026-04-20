@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\ContratoEnviado;
 use App\Mail\PresupuestoEnviado;
+use App\Mail\PresupuestoAdministracionEnviado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
@@ -99,7 +100,7 @@ class EmailController extends Controller
                 'numeroContrato' => $request->numeroContrato,
             ]);
             
-            // 🔥 NORMALIZAR TODOS LOS CAMPOS DE TEXTO
+            // NORMALIZAR TODOS LOS CAMPOS DE TEXTO
             $tipo = $this->normalizeField($request->input('tipo'));
             $body = $this->normalizeField($request->input('body'));
             $numeroContrato = $this->normalizeField($request->input('numeroContrato'));
@@ -163,7 +164,7 @@ class EmailController extends Controller
                 'pdf' => 'nullable|file|mimes:pdf|max:10240'
             ]);
             
-            // 🔥 PROCESAR DESTINATARIOS
+            // PROCESAR DESTINATARIOS
             $to = $this->parseRecipients($request->to);
             $cc = $this->parseRecipients($request->cc);
             $bcc = $this->parseRecipients($request->bcc);
@@ -350,92 +351,189 @@ class EmailController extends Controller
     }
 
     /**
-     * Enviar presupuesto por email
+     * Enviar presupuesto por email (Cliente o Administración)
      */
     public function enviarPresupuesto(Request $request)
     {
         try {
-            $request->validate([
-                'to' => 'required|string|email',
-                'cc' => 'nullable|array',
-                'bcc' => 'nullable|array',
+            Log::info('Datos recibidos para enviar presupuesto:', [
+                'tipo' => $request->tipo,
+                'to' => $request->to,
+                'subject' => $request->subject,
+                'presupuestoId' => $request->presupuestoId,
+                'referencia' => $request->referencia,
+            ]);
+            
+            // Normalizar campos
+            $tipo = $this->normalizeField($request->input('tipo'));
+            $body = $this->normalizeField($request->input('body'));
+            $subject = $this->normalizeField($request->input('subject'));
+            $referencia = $this->normalizeField($request->input('referencia'));
+            
+            // Normalizar tipo
+            if (empty($tipo) || $tipo === 'null' || $tipo === 'undefined') {
+                $tipo = 'cliente';
+            }
+            
+            // Normalizar body (saltos de línea)
+            $body = str_replace(['\\n', '\n'], "\n", $body);
+            $body = str_replace(['\\r', '\r'], "\n", $body);
+            $body = preg_replace("/\r\n|\r|\n/", "\n", $body);
+            
+            // Reemplazar en el request
+            $request->merge([
+                'tipo' => $tipo,
+                'body' => $body,
+                'subject' => $subject,
+                'referencia' => $referencia,
+            ]);
+            
+            // Validación básica
+            $validated = $request->validate([
+                'to' => 'required',
+                'cc' => 'nullable',
+                'bcc' => 'nullable',
                 'subject' => 'required|string|max:255',
                 'body' => 'required|string',
                 'presupuestoId' => 'required|integer',
                 'referencia' => 'required|string',
-                'attachPDF' => 'boolean',
-                'pdfBase64' => 'nullable|string'
+                'tipo' => 'nullable|string|in:cliente,administracion',
+                'pdf' => 'nullable|file|mimes:pdf|max:10240'
             ]);
-
-            $presupuesto = \App\Models\Presupuesto::with([
-                'prefijo.comercial.compania',
-                'prefijo.comercial.personal'
-            ])->find($request->presupuestoId);
+            
+            // PROCESAR DESTINATARIOS
+            $to = $this->parseRecipients($request->to);
+            $cc = $this->parseRecipients($request->cc);
+            $bcc = $this->parseRecipients($request->bcc);
+            
+            if (empty($to)) {
+                throw new \Exception('Debe especificar al menos un destinatario válido');
+            }
+            
+            //  OBTENER EL PRESUPUESTO
+            $presupuesto = \App\Models\Presupuesto::find($request->presupuestoId);
+            
+            //  SI EL TIPO ES ADMINISTRACIÓN, ACTUALIZAR ESTADO A 3
+            if ($tipo === 'administracion' && $presupuesto) {
+                $presupuesto->estado_id = 3; // Estado "aprobado"
+                $presupuesto->save();
+                
+                Log::info('Presupuesto actualizado a estado "Enviado a Administración"', [
+                    'presupuesto_id' => $presupuesto->id,
+                    'referencia' => $referencia,
+                    'estado_anterior' => $presupuesto->getOriginal('estado_id'),
+                    'nuevo_estado' => 3,
+                    'usuario_id' => auth()->id(),
+                ]);
+            }
             
             $compania = $this->getCompaniaDataFromPresupuesto($presupuesto);
-
-            $data = [
-                'subject' => $request->subject,
-                'body' => $request->body,
-                'cc' => $request->cc ?? [],
-                'bcc' => $request->bcc ?? [],
-                'filename' => "Presupuesto_{$request->referencia}.pdf",
-                'compania' => $compania,
-                'incluirBienvenida' => false,
-            ];
-
-            $pdfPath = null;
             
-            if ($request->attachPDF && $request->pdfBase64) {
-                $pdfContent = base64_decode($request->pdfBase64);
+            // Procesar PDF
+            $pdfPath = null;
+            $attachments = [];
+            
+            if ($request->hasFile('pdf')) {
+                $pdfFile = $request->file('pdf');
+                $pdfPath = storage_path("app/temp/presupuesto_{$request->presupuestoId}_" . time() . ".pdf");
                 $tempDir = storage_path('app/temp');
-                
                 if (!file_exists($tempDir)) {
                     mkdir($tempDir, 0755, true);
                 }
-                
-                $pdfPath = $tempDir . "/presupuesto_{$request->presupuestoId}_" . time() . ".pdf";
-                file_put_contents($pdfPath, $pdfContent);
+                file_put_contents($pdfPath, file_get_contents($pdfFile->getRealPath()));
             }
-
+            
+            // Procesar documentos adicionales
+            if ($request->has('documento_local_0') || $request->has('documento_plataforma_0')) {
+                foreach ($request->allFiles() as $key => $file) {
+                    if (str_starts_with($key, 'documento_local_') || str_starts_with($key, 'documento_plataforma_')) {
+                        $tempPath = storage_path("app/temp/attachment_{$request->presupuestoId}_" . time() . "_" . uniqid() . ".pdf");
+                        file_put_contents($tempPath, file_get_contents($file->getRealPath()));
+                        $attachments[] = [
+                            'path' => $tempPath,
+                            'name' => $file->getClientOriginalName(),
+                            'mime' => $file->getMimeType()
+                        ];
+                    }
+                }
+            }
+            
+            $data = [
+                'subject' => $subject,
+                'body' => $body,
+                'cc' => $cc,
+                'bcc' => $bcc,
+                'filename' => "Presupuesto_{$referencia}.pdf",
+                'tipo' => $tipo,
+                'compania' => $compania,
+                'attachments' => $attachments,
+            ];
+            
             $usuario = auth()->user();
             $fromEmail = $usuario->personal->email ?? env('MAIL_FROM_ADDRESS', 'noreply@localsat.com.ar');
             $fromName = $usuario->personal->nombre_completo ?? $usuario->name ?? 'LocalSat';
-
-            Mail::to($request->to)
-                ->send(new PresupuestoEnviado($data, $pdfPath, $fromEmail, $fromName, $compania));
-
+            
+            foreach ($to as $destinatario) {
+                if (filter_var($destinatario, FILTER_VALIDATE_EMAIL)) {
+                    Mail::to($destinatario)
+                        ->send(new PresupuestoEnviado($data, $pdfPath, $fromEmail, $fromName, $compania, $tipo));
+                } else {
+                    Log::warning('Email inválido ignorado:', ['email' => $destinatario]);
+                }
+            }
+            
+            // Limpiar archivos temporales
             if ($pdfPath && file_exists($pdfPath)) {
                 unlink($pdfPath);
             }
-
+            
+            foreach ($attachments as $attachment) {
+                if (file_exists($attachment['path'])) {
+                    unlink($attachment['path']);
+                }
+            }
+            
             Log::info('Presupuesto enviado por email', [
                 'presupuesto_id' => $request->presupuestoId,
-                'destinatario' => $request->to,
+                'destinatarios' => $to,
+                'tipo' => $tipo,
                 'usuario_id' => auth()->id(),
-                'from_email' => $fromEmail,
-                'compania' => $compania['nombre'] ?? 'LocalSat'
             ]);
-
+            
             if ($request->header('X-Inertia')) {
                 return redirect()->back()->with('success', 'Email enviado correctamente');
             }
-
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Email enviado correctamente'
             ]);
-
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Error de validación:', [
+                'errors' => $e->errors(),
+                'received_data' => $request->except(['pdf'])
+            ]);
+            
+            if ($request->header('X-Inertia')) {
+                return redirect()->back()->withErrors($e->errors());
+            }
+            
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors()
+            ], 422);
+            
         } catch (\Exception $e) {
             Log::error('Error enviando presupuesto por email:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-
+            
             if ($request->header('X-Inertia')) {
                 return redirect()->back()->with('error', 'Error al enviar el email: ' . $e->getMessage());
             }
-
+            
             return response()->json([
                 'success' => false,
                 'error' => 'Error al enviar el email: ' . $e->getMessage()

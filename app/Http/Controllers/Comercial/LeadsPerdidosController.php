@@ -4,16 +4,16 @@
 namespace App\Http\Controllers\Comercial;
 
 use App\Http\Controllers\Controller;
+use App\Services\LeadPerdido\LeadPerdidoFilterService;
+use App\Services\LeadPerdido\LeadPerdidoStatsService;
+use App\Services\LeadPerdido\LeadPerdidoSeguimientoService;
 use App\Models\Lead;
 use App\Models\MotivoPerdida;
 use App\Models\TipoComentario;
 use App\Models\EstadoLead;
-use App\Services\LeadPerdido\LeadPerdidoQueryService;
-use App\Services\LeadPerdido\LeadPerdidoStatsService;
-use App\Services\LeadPerdido\LeadPerdidoSeguimientoService;
 use App\Http\Requests\ProcesarSeguimientoRequest;
 use App\DTOs\SeguimientoPerdidoData;
-use App\Traits\Authorizable; 
+use App\Traits\Authorizable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -23,76 +23,143 @@ class LeadsPerdidosController extends Controller
     use Authorizable;
 
     public function __construct(
-        protected LeadPerdidoQueryService $queryService,
+        protected LeadPerdidoFilterService $filterService,
         protected LeadPerdidoStatsService $statsService,
         protected LeadPerdidoSeguimientoService $seguimientoService
     ) {
-        $this->initializeAuthorization(); // INICIALIZAR
+        $this->initializeAuthorization();
     }
 
     /**
      * Vista principal de leads perdidos/recontactados
      */
-    public function index(Request $request)
-    {
-        // VERIFICAR PERMISO
-        $this->authorizePermiso(config('permisos.VER_LEADS_PERDIDOS'));
-        
-        $usuario = auth()->user();
-        
-        $leads = $this->queryService->getLeadsPerdidosPaginated($request, $usuario);
-        $motivos = MotivoPerdida::where('es_activo', 1)->orderBy('nombre')->get(['id', 'nombre']);
-        $estadisticas = $this->statsService->getEstadisticas($usuario);
-
-        return Inertia::render('Comercial/LeadsPerdidos', [
-            'leads' => $leads,
-            'motivos' => $motivos,
-            'estadisticas' => $estadisticas,
-            'filtros' => $request->only([
-                'search', 'estado', 'motivo_id', 'fecha_rechazo_desde',
-                'fecha_rechazo_hasta', 'posibilidades_futuras', 'con_recontacto'
-            ]),
-        ]);
+public function index(Request $request)
+{
+    $this->authorizePermiso(config('permisos.VER_LEADS_PERDIDOS'));
+    
+    $usuario = auth()->user();
+    
+    // Obtener filtros
+    $filters = $request->only(['search', 'localidad', 'estado', 'motivo_id', 'posibilidades_futuras', 'con_recontacto', 'prefijo_id']);
+    
+    // Construir query base
+    $query = $this->filterService->getQueryBase();
+    
+    // Obtener prefijos para filtro de comerciales
+    $prefijosFiltro = $this->filterService->getPrefijosFiltro($usuario);
+    $prefijoUsuario = $this->filterService->getPrefijoUsuarioComercial($usuario);
+    
+    // Aplicar filtro de prefijo si viene en request
+    if ($request->has('prefijo_id') && $request->prefijo_id) {
+        $this->filterService->aplicarFiltros($query, ['prefijo_id' => $request->prefijo_id]);
+    } elseif ($prefijoUsuario && $usuario->rol_id == 5) {
+        $query->where('prefijo_id', $prefijoUsuario['id']);
     }
+    
+    // Aplicar filtros de permisos
+    $this->applyPrefijoFilter($query, $usuario);
+    
+    // Aplicar el resto de los filtros
+    $this->filterService->aplicarFiltros($query, $filters);
+    
+    // Obtener leads paginados
+    $leads = $query->orderBy('created', 'desc')
+        ->paginate(15)
+        ->withQueryString();
+    
+    // Transformar leads
+    $leadsTransformados = $this->transformLeads($leads);
+    
+    // 🔥 Obtener estadísticas CON los filtros aplicados
+    $estadisticas = $this->statsService->getEstadisticas($usuario, $filters);
+    
+    // Obtener datos para filtros
+    $datosFiltros = $this->filterService->getDatosFiltros();
+    
+    // Obtener datos del usuario
+    $usuarioData = $this->getUsuarioData($usuario);
+    // Obtener IDs de leads
+    $leadIds = $leads->pluck('id')->toArray();
 
+    // Obtener conteos de comentarios y presupuestos
+    $comentariosPorLead = $this->filterService->getConteoComentarios($leadIds);
+    $presupuestosPorLead = $this->filterService->getConteoPresupuestos($leadIds);
+
+    return Inertia::render('Comercial/LeadsPerdidos', [
+        'leads' => $leadsTransformados,
+        'estadisticas' => $estadisticas,
+        'filtros' => $filters,
+        'usuario' => $usuarioData,
+        'comentariosPorLead' => $comentariosPorLead,
+        'presupuestosPorLead' => $presupuestosPorLead,
+        'prefijosFiltro' => $prefijosFiltro,
+        'prefijoUsuario' => $prefijoUsuario,
+        ...$datosFiltros,
+    ]);
+}
     /**
-     * Mostrar detalles de un lead perdido/recontactado
+     * Transformar leads al formato de la vista
      */
-    public function show($id)
-    {
-        $seguimiento = $this->queryService->getSeguimientoWithLead($id);
-        $lead = $seguimiento->lead;
+private function transformLeads($leads)
+{
+    $leadsData = $leads->getCollection()->map(function($lead) {
+        $seguimiento = $lead->seguimientoPerdida;
         
-        // Verificar permisos
-        $this->seguimientoService->verificarPermisos($lead);
+        if (!$seguimiento) {
+            return null;
+        }
 
-        $comentarioRechazo = $lead->comentarios->first(fn($c) => 
-            $c->tipoComentario?->nombre === 'Rechazo lead'
-        );
+        return [
+            'id' => $lead->id,
+            'nombre_completo' => $lead->nombre_completo,
+            'email' => $lead->email,
+            'telefono' => $lead->telefono,
+            'estado_lead' => $lead->estadoLead ? [
+                'id' => $lead->estadoLead->id,
+                'nombre' => $lead->estadoLead->nombre,
+                'tipo' => $lead->estadoLead->tipo,
+                'color_hex' => $lead->estadoLead->color_hex,
+            ] : null,
+            'seguimientoPerdida' => [
+                'id' => $seguimiento->id,
+                'motivo' => $seguimiento->motivo ? [
+                    'id' => $seguimiento->motivo->id,
+                    'nombre' => $seguimiento->motivo->nombre,
+                ] : null,
+                'posibilidades_futuras' => $seguimiento->posibilidades_futuras ?? 'no',
+                'fecha_posible_recontacto' => $seguimiento->fecha_posible_recontacto,
+                'created' => $seguimiento->created ?? $lead->created,
+            ],
+            'created' => $lead->created,
+            'origen' => $lead->origen ? [
+                'id' => $lead->origen->id,
+                'nombre' => $lead->origen->nombre,
+            ] : null,
+            'localidad' => $lead->localidad ? [
+                'id' => $lead->localidad->id,
+                'nombre' => $lead->localidad->nombre,
+                'provincia' => $lead->localidad->provincia ? [
+                    'id' => $lead->localidad->provincia->id,
+                    'nombre' => $lead->localidad->provincia->nombre,
+                ] : null,
+            ] : null,
+            'comercial' => $lead->comercial?->personal ? [
+                'personal' => [
+                    'nombre' => $lead->comercial->personal->nombre ?? '',
+                    'apellido' => $lead->comercial->personal->apellido ?? '',
+                ]
+            ] : null,
+        ];
+    })->filter();
 
-        $comentariosSeguimiento = $lead->comentarios->filter(fn($c) => 
-            $c->tipoComentario?->aplica_a === 'recontacto'
-        );
-
-        $notificacion = DB::table('notificaciones')
-            ->where('entidad_tipo', 'seguimiento_perdida')
-            ->where('entidad_id', $seguimiento->id)
-            ->whereNull('deleted_at')
-            ->first();
-
-        $historicoEstados = $this->getHistoricoEstados($lead->id);
-        $tiempoDesdeRechazo = $this->calcularTiempoDesdeRechazo($seguimiento->created);
-
-        return Inertia::render('Comercial/LeadsPerdidos/Show', [
-            'lead' => $lead,
-            'seguimiento' => $seguimiento,
-            'comentarioRechazo' => $comentarioRechazo,
-            'comentariosSeguimiento' => $comentariosSeguimiento,
-            'notificacion' => $notificacion,
-            'historicoEstados' => $historicoEstados,
-            'tiempoDesdeRechazo' => $tiempoDesdeRechazo,
-        ]);
-    }
+    return new \Illuminate\Pagination\LengthAwarePaginator(
+        $leadsData,
+        $leads->total(),
+        $leads->perPage(),
+        $leads->currentPage(),
+        ['path' => $leads->path()]
+    );
+}
 
     /**
      * Mostrar modal para nuevo seguimiento
@@ -101,7 +168,6 @@ class LeadsPerdidosController extends Controller
     {
         $lead = Lead::findOrFail($id);
         
-        // VERIFICAR ACCESO AL LEAD
         $this->authorizeLeadAccess($lead, config('permisos.GESTIONAR_LEADS_PERDIDOS'));
         
         $seguimiento = $lead->seguimientoPerdida()
@@ -114,7 +180,7 @@ class LeadsPerdidosController extends Controller
             ->get();
 
         $estadosLead = EstadoLead::where('activo', 1)
-            ->whereIn('tipo', ['recontacto', 'contactado', 'calificado', 'negociacion', 'propuesta'])
+            ->whereIn('tipo', ['recontacto', 'contactado', 'seguimiento', 'negociacion', 'propuesta'])
             ->orWhere('nombre', 'Perdido')
             ->get();
 
@@ -145,7 +211,6 @@ class LeadsPerdidosController extends Controller
     {
         $lead = Lead::findOrFail($id);
         
-        // VERIFICAR ACCESO AL LEAD Y PERMISO
         $this->authorizeLeadAccess($lead, config('permisos.GESTIONAR_LEADS_PERDIDOS'));
         
         $data = SeguimientoPerdidoData::fromRequest(
@@ -164,41 +229,47 @@ class LeadsPerdidosController extends Controller
     }
 
     /**
-     * Métodos auxiliares privados
+     * Obtener datos del usuario
      */
-    private function getHistoricoEstados(int $leadId)
+    private function getUsuarioData($usuario): array
     {
-        return DB::table('auditoria_log')
-            ->where('tabla_afectada', 'leads')
-            ->where('registro_id', $leadId)
-            ->where('accion', 'UPDATE')
-            ->orderBy('created', 'desc')
-            ->get()
-            ->map(function($log) {
-                try {
-                    $log->valores_nuevos = json_decode($log->valores_nuevos, true);
-                    $log->valores_anteriores = json_decode($log->valores_anteriores, true);
-                } catch (\Exception $e) {
-                    $log->valores_nuevos = [];
-                    $log->valores_anteriores = [];
-                }
-                return $log;
-            });
-    }
-
-    private function calcularTiempoDesdeRechazo($fechaRechazo): ?array
-    {
-        if (!$fechaRechazo) {
-            return null;
-        }
-
-        $fechaRechazo = \Carbon\Carbon::parse($fechaRechazo);
+        $usuario->load('personal');
         
-        return [
-            'dias' => $fechaRechazo->diffInDays(now()),
-            'meses' => $fechaRechazo->diffInMonths(now()),
-            'texto' => $fechaRechazo->diffForHumans(),
+        $prefijosAsignados = [];
+        $cantidadPrefijos = 0;
+        
+        if (!$usuario->ve_todas_cuentas) {
+            $prefijosAsignados = $this->getPrefijosPermitidos($usuario->id) ?? [];
+            $cantidadPrefijos = count($prefijosAsignados);
+        }
+        
+        $data = [
+            've_todas_cuentas' => (bool) $usuario->ve_todas_cuentas,
+            'rol_id' => $usuario->rol_id,
+            'personal_id' => $usuario->personal_id,
+            'prefijos_asignados' => $prefijosAsignados,
+            'cantidad_prefijos' => $cantidadPrefijos,
+            'nombre_completo' => $usuario->personal 
+                ? $usuario->personal->nombre . ' ' . $usuario->personal->apellido
+                : $usuario->nombre_usuario,
         ];
+        
+        // Si es comercial
+        if ($usuario->rol_id == 5) {
+            $comercialUsuario = DB::table('comercial')
+                ->where('personal_id', $usuario->personal_id)
+                ->where('activo', 1)
+                ->first();
+                
+            if ($comercialUsuario) {
+                $data['comercial'] = [
+                    'es_comercial' => true,
+                    'prefijo_id' => $comercialUsuario->prefijo_id,
+                ];
+            }
+        }
+        
+        return $data;
     }
 
     private function handleSuccessResponse(Request $request, string $message)
@@ -232,7 +303,6 @@ class LeadsPerdidosController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $message,
-                'error' => config('app.debug') ? $message : null
             ], 500);
         }
 

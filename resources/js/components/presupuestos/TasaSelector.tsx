@@ -1,5 +1,5 @@
 // resources/js/components/presupuestos/TasaSelector.tsx
-import { Loader2, Truck, Calendar } from 'lucide-react';
+import { Loader2, Truck, Calendar, XCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import {
@@ -24,9 +24,7 @@ export default function TasaSelector({ value, onChange, error, disabled = false,
 
     const handleValueChange = (value: string) => {
         const tasaId = Number(value);
-        if (tasaId) {
-            onChange(tasaId);
-        }
+        onChange(tasaId);
     };
 
     return (
@@ -55,36 +53,51 @@ export default function TasaSelector({ value, onChange, error, disabled = false,
                                 <Loader2 className="h-8 w-8 animate-spin text-local mb-2" />
                                 <p className="text-sm text-gray-500">Cargando tasas...</p>
                             </div>
-                        ) : tasas.length === 0 ? (
-                            <div className="p-8 text-center">
-                                <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                <p className="text-sm text-gray-500">No hay tasas disponibles</p>
-                            </div>
                         ) : (
-                            tasas.map(tasa => {
-                                const precio = Number(tasa.precio) || 0;
-                                return (
-                                    <SelectItem 
-                                        key={tasa.id} 
-                                        value={tasa.id.toString()}
-                                        className="py-3 px-4 cursor-pointer hover:bg-gray-50"
-                                    >
-                                        <div className="flex items-center justify-between w-full">
-                                            <div className="flex items-center gap-3">
-                                                <Truck className="h-4 w-4 text-local" />
-                                                <div>
-                                                    <div className="font-medium text-gray-900">
-                                                        {tasa.nombre}
+                            <>
+                                {/* 🔥 OPCIÓN "NINGUNO" - Limpiar selección */}
+                                <SelectItem 
+                                    value="0" 
+                                    className="py-3 px-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <XCircle className="h-4 w-4 text-gray-400" />
+                                        <span className="text-gray-500">Ninguno (sin tasa)</span>
+                                    </div>
+                                </SelectItem>
+                                
+                                {tasas.length === 0 ? (
+                                    <div className="p-8 text-center">
+                                        <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                        <p className="text-sm text-gray-500">No hay tasas disponibles</p>
+                                    </div>
+                                ) : (
+                                    tasas.map(tasa => {
+                                        const precio = Number(tasa.precio) || 0;
+                                        return (
+                                            <SelectItem 
+                                                key={tasa.id} 
+                                                value={tasa.id.toString()}
+                                                className="py-3 px-4 cursor-pointer hover:bg-gray-50"
+                                            >
+                                                <div className="flex items-center justify-between w-full">
+                                                    <div className="flex items-center gap-3">
+                                                        <Truck className="h-4 w-4 text-local" />
+                                                        <div>
+                                                            <div className="font-medium text-gray-900">
+                                                                {tasa.nombre}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-local font-bold bg-local/10 px-3 py-1 rounded-full text-sm">
+                                                        ${precio.toFixed(2)}
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div className="text-local font-bold bg-local/10 px-3 py-1 rounded-full text-sm">
-                                                ${precio.toFixed(2)}
-                                            </div>
-                                        </div>
-                                    </SelectItem>
-                                );
-                            })
+                                            </SelectItem>
+                                        );
+                                    })
+                                )}
+                            </>
                         )}
                     </SelectContent>
                 </Select>
