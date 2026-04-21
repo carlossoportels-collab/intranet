@@ -4,16 +4,16 @@
 namespace App\Services\Presupuesto;
 
 use App\Models\ProductoServicio;
-use App\Traits\HasPermisosService; // 🔥 IMPORTAR TRAIT
+use App\Traits\HasPermisosService;
 use Illuminate\Support\Collection;
 
 class ProductoServicioService
 {
-    use HasPermisosService; // 🔥 AGREGAR TRAIT
+    use HasPermisosService;
 
     public function __construct()
     {
-        $this->initializePermisoService(); // 🔥 INICIALIZAR
+        $this->initializePermisoService();
     }
 
     /**
@@ -111,6 +111,10 @@ class ProductoServicioService
      */
     public function find($id): ?ProductoServicio
     {
+        if (!$id || $id == 0) {
+            return null;
+        }
+
         $producto = ProductoServicio::with('tipo')
             ->activos()
             ->presupuestables()
@@ -128,5 +132,43 @@ class ProductoServicioService
         }
 
         return $producto;
+    }
+
+    /**
+     * 🔥 NUEVO: Validar que un producto existe y es válido para presupuesto
+     */
+    public function validateProducto($id): bool
+    {
+        if (!$id || $id == 0) {
+            return false;
+        }
+
+        $producto = ProductoServicio::activos()
+            ->presupuestables()
+            ->find($id);
+
+        if (!$producto) {
+            return false;
+        }
+
+        $companiasPermitidas = $this->getCompaniasPermitidas();
+        
+        return in_array($producto->compania_id, $companiasPermitidas);
+    }
+
+    /**
+     * 🔥 NUEVO: Filtrar solo productos válidos de un array
+     */
+    public function filtrarProductosValidos(array $productosIds): array
+    {
+        if (empty($productosIds)) {
+            return [];
+        }
+
+        return ProductoServicio::activos()
+            ->presupuestables()
+            ->whereIn('id', $productosIds)
+            ->pluck('id')
+            ->toArray();
     }
 }

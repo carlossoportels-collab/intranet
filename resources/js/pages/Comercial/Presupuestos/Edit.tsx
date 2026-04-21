@@ -54,6 +54,7 @@ export default function PresupuestosEdit({
     const {
         state,
         valores,
+        setValores,  // 🔥 AGREGADO - viene del hook
         subtotales,
         cantidadMinimaPromo,
         accesoriosConPromocion,
@@ -65,6 +66,7 @@ export default function PresupuestosEdit({
         tasaNombre,
         abonoNombre,
         updateField,
+        updateTasa,  // 🔥 AGREGADO - función para manejar tasa con precio manual
         aplicarPromocion,
         isFieldDisabled,
         setAccesoriosAgregados,
@@ -78,8 +80,8 @@ export default function PresupuestosEdit({
         convenios,
         metodosPago,
         promociones,
-        accesorios,      // ← PASAR ACCESORIOS
-        servicios        // ← PASAR SERVICIOS
+        accesorios,
+        servicios
     });
 
     // Definir los tabs (sin resumen)
@@ -92,10 +94,12 @@ export default function PresupuestosEdit({
                 <div className="space-y-4">
                     <TasaSelector
                         value={state.tasaId}
-                        onChange={(tasaId) => updateField('tasaId', tasaId)}
+                        onChange={updateTasa}  // 🔥 USAR updateTasa en lugar de updateField
                         error={getError('tasa_id')}
                         disabled={isFieldDisabled('tasaId')}
                         tasas={tasas}
+                        valorManual={valores.valorTasa}
+                        onValorManualChange={(valor) => setValores(prev => ({ ...prev, valorTasa: valor }))}
                     />
                     
                     <ResponsiveGrid cols={{ default: 1, md: 2 }} gap={4}>
@@ -390,8 +394,8 @@ export default function PresupuestosEdit({
                                         serviciosConPromocion={serviciosConPromocion}
                                         accesoriosNormales={accesoriosNormales}
                                         serviciosNormales={serviciosNormales}
-                                        tasaNombre={tasaNombre}      // ← NUEVO
-                                        abonoNombre={abonoNombre}    // ← NUEVO
+                                        tasaNombre={tasaNombre}
+                                        abonoNombre={abonoNombre}
                                     />
                                 </ResponsiveCard>
                             </div>

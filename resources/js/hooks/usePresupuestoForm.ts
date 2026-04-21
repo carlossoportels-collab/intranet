@@ -75,6 +75,8 @@ export const usePresupuestoForm = ({
         valorAbono: 0
     });
 
+    const [valorManualTasa, setValorManualTasa] = useState(0);
+
     const [promocionSeleccionada, setPromocionSeleccionada] = useState<PromocionDTO | null>(null);
     const [cantidadMinimaPromo, setCantidadMinimaPromo] = useState<number>(1);
     const [productosPromocionIds, setProductosPromocionIds] = useState<Set<number>>(new Set());
@@ -158,13 +160,30 @@ export const usePresupuestoForm = ({
         }
     }, [state.promocionId, promociones]);
 
-    // Efecto para valores de tasas
+    // Efecto para valores de tasas (respetando valor manual)
     useEffect(() => {
+        // Si hay un valor manual configurado (por "Consultar"), no sobrescribirlo
+        if (valorManualTasa > 0 && state.tasaId !== 0) {
+            // Mantener el valor manual
+            return;
+        }
+        
+        // Si no hay valor manual, obtener el precio del producto
+        const precioBase = getProductoValor(state.tasaId, tasas);
+        
+        // Si el precio base es 0.01 (Consultar), no asignar automáticamente
+        if (precioBase === 0.01) {
+            // No cambiar el valor, esperar input manual
+            setValorManualTasa(0);
+            setValores(prev => ({ ...prev, valorTasa: 0 }));
+            return;
+        }
+        
         setValores(prev => ({ 
             ...prev, 
-            valorTasa: getProductoValor(state.tasaId, tasas) 
+            valorTasa: precioBase 
         }));
-    }, [state.tasaId, tasas, getProductoValor]);
+    }, [state.tasaId, tasas, getProductoValor, valorManualTasa]);
 
     // Efecto para valores de abonos
     useEffect(() => {
@@ -208,6 +227,35 @@ export const usePresupuestoForm = ({
         setState(prev => ({ ...prev, [field]: value }));
     }, [state.promocionId, cantidadMinimaPromo, toast]);
 
+    // Función para actualizar tasa con valor manual
+    const updateTasa = useCallback((tasaId: number, valorManual?: number) => {
+        updateField('tasaId', tasaId);
+        
+        if (tasaId === 0) {
+            // Limpiar
+            setValorManualTasa(0);
+            setValores(prev => ({ ...prev, valorTasa: 0 }));
+            return;
+        }
+        
+        if (valorManual !== undefined && valorManual > 0) {
+            // Valor ingresado manualmente
+            setValorManualTasa(valorManual);
+            setValores(prev => ({ ...prev, valorTasa: valorManual }));
+        } else {
+            // Precio del producto
+            const precio = getProductoValor(tasaId, tasas);
+            if (precio === 0.01) {
+                // Es "Consultar", no asignar automáticamente
+                setValorManualTasa(0);
+                setValores(prev => ({ ...prev, valorTasa: 0 }));
+            } else {
+                setValorManualTasa(0);
+                setValores(prev => ({ ...prev, valorTasa: precio }));
+            }
+        }
+    }, [updateField, getProductoValor, tasas]);
+
     // Función para cargar productos de la promoción
     const cargarProductosPromocion = useCallback((promocion: PromocionDTO) => {
         let minVehiculos = 1;
@@ -224,7 +272,7 @@ export const usePresupuestoForm = ({
             
             switch(productoBase.tipo_id) {
                 case 4: // TASAS
-                    updateField('tasaId', productoBase.id);
+                    updateTasa(productoBase.id, productoBase.precio === 0.01 ? 0 : productoBase.precio);
                     updateField('tasaBonificacion', prod.bonificacion);
                     break;
                     
@@ -273,7 +321,7 @@ export const usePresupuestoForm = ({
         }
 
         toast.success('Productos de la promoción cargados correctamente');
-    }, [updateField, toast]);
+    }, [updateTasa, updateField, toast]);
 
     // Función para aplicar promoción
     const aplicarPromocion = useCallback((promocionId: number | null) => {
@@ -289,6 +337,8 @@ export const usePresupuestoForm = ({
                 accesoriosAgregados: [],
                 serviciosAgregados: []
             }));
+            setValorManualTasa(0);
+            setValores(prev => ({ ...prev, valorTasa: 0 }));
             toast.info('Promoción removida');
             return;
         }
@@ -430,7 +480,6 @@ export const usePresupuestoForm = ({
         }
         
         // 🔥 VALIDACIÓN ELIMINADA - Ya no es obligatorio tener Tasa o Abono
-        // Ahora se puede crear presupuesto solo con accesorios o servicios
         
         // Validar método de pago de la tasa (solo si tiene tasa)
         if (state.tasaId && state.tasaId !== 0 && (!state.tasaMetodoPagoId || state.tasaMetodoPagoId === 0)) {
@@ -455,7 +504,6 @@ export const usePresupuestoForm = ({
 
     /**
      * SUBMIT DEL FORMULARIO - ACTUALIZADO
-     * Solo envía los campos que están seleccionados
      */
     const handleSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
@@ -532,6 +580,7 @@ export const usePresupuestoForm = ({
     return {
         state,
         valores,
+        setValores,
         subtotales,
         esComercial,
         promocionSeleccionada,
@@ -545,7 +594,9 @@ export const usePresupuestoForm = ({
         abonoPromocion,
         tasaNombre,
         abonoNombre,
+        valorManualTasa,
         updateField,
+        updateTasa,
         aplicarPromocion,
         isFieldDisabled,
         hayPromocionEnAbono,

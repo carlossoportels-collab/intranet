@@ -47,7 +47,8 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
         if (campo === 'prd_servicio_id' && valor !== 0) {
             const producto = accesorios.find(a => a.id === valor);
             if (producto) {
-                item.valor = Number(producto.precio) || 0;
+                const precio = Number(producto.precio) || 0;
+                item.valor = precio;
             }
         }
         
@@ -126,7 +127,8 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                 <div className="space-y-3">
                     {items.map((item, index) => {
                         const accesorioSeleccionado = accesorios.find(a => a.id === item.prd_servicio_id);
-                        const esPrecioConsultar = Number(item.valor) === 0.01;
+                        const esPrecioConsultar = accesorioSeleccionado && Number(accesorioSeleccionado.precio) === 0.01;
+                        const tienePrecioManual = esPrecioConsultar && item.valor > 0 && item.valor !== 0.01;
                         
                         return (
                             <div key={index} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
@@ -149,6 +151,11 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                                 producto={accesorioSeleccionado}
                                                 className="ml-2"
                                             />
+                                        )}
+                                        {tienePrecioManual && (
+                                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                                                Precio manual
+                                            </span>
                                         )}
                                     </div>
                                     <button
@@ -174,7 +181,7 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                             <SelectContent className="bg-white max-h-80 min-w-[300px]">
                                                 {accesorios.map(accesorio => {
                                                     const precio = Number(accesorio.precio);
-                                                    const esPrecioConsultar = precio === 0.01;
+                                                    const esConsultar = precio === 0.01;
                                                     
                                                     return (
                                                         <SelectItem key={accesorio.id} value={accesorio.id.toString()}>
@@ -182,7 +189,7 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                                                 <span className="text-sm text-gray-900 truncate max-w-[250px]">
                                                                     {accesorio.nombre}
                                                                 </span>
-                                                                {esPrecioConsultar ? (
+                                                                {esConsultar ? (
                                                                     <span className="text-amber-600 font-medium text-sm whitespace-nowrap bg-amber-50 px-2 py-0.5 rounded-full">
                                                                         Consultar
                                                                     </span>
@@ -199,7 +206,7 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                         </Select>
                                     </div>
 
-                                    {/* Cantidad */}
+                                    {/* Cantidad - 🔥 HABILITADA para "Consultar" */}
                                     <div className="col-span-2">
                                         <input
                                             type="number"
@@ -207,12 +214,12 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                             max="999"
                                             value={item.cantidad}
                                             onChange={(e) => actualizarItem(index, 'cantidad', Number(e.target.value))}
-                                            disabled={item.aplica_a_todos_vehiculos || esPrecioConsultar}
+                                            disabled={item.aplica_a_todos_vehiculos}
                                             className="block w-full px-2 py-2 border border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed text-center"
                                         />
                                     </div>
 
-                                    {/* Bonificación */}
+                                    {/* Bonificación - 🔥 HABILITADA para "Consultar" */}
                                     <div className="col-span-2">
                                         <div className="relative">
                                             <input
@@ -222,8 +229,7 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                                 step="0.01"
                                                 value={item.bonificacion}
                                                 onChange={(e) => actualizarItem(index, 'bonificacion', Number(e.target.value))}
-                                                disabled={esPrecioConsultar}
-                                                className="block w-full px-2 py-2 border border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-center disabled:bg-gray-100"
+                                                className="block w-full px-2 py-2 border border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-center"
                                                 placeholder="0%"
                                             />
                                             <Percent className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -233,15 +239,15 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                     {/* Subtotal */}
                                     <div className="col-span-2">
                                         <div className="px-2 py-2 bg-purple-50 border border-purple-200 rounded-lg text-purple-700 font-bold text-sm text-center">
-                                            {esPrecioConsultar ? (
-                                                <span className="text-amber-600">Consultar</span>
+                                            {esPrecioConsultar && item.valor === 0 ? (
+                                                <span className="text-amber-600">Pendiente</span>
                                             ) : (
                                                 `$${(item.subtotal || 0).toFixed(2)}`
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* Checkbox "Todos" */}
+                                    {/* Checkbox "Todos" - 🔥 DESHABILITADO para "Consultar" (no tiene sentido si es precio manual) */}
                                     <div className="col-span-1 flex justify-center">
                                         <label className="flex items-center gap-1 cursor-pointer group">
                                             <input
@@ -258,6 +264,44 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                     </div>
                                 </div>
 
+                                {/* 🔥 Input para precio manual cuando es "Consultar" */}
+                                {esPrecioConsultar && accesorioSeleccionado && (
+                                    <div className="mt-3 pt-3 border-t border-gray-200">
+                                        <label className="block text-xs font-medium text-amber-700 mb-1">
+                                            Precio manual
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={item.valor === 0.01 ? '' : item.valor}
+                                                onChange={(e) => {
+                                                    const nuevoValor = e.target.value === '' ? 0 : Number(e.target.value);
+                                                    if (!isNaN(nuevoValor)) {
+                                                        actualizarItem(index, 'valor', nuevoValor);
+                                                    }
+                                                }}
+                                                placeholder="Ingrese el precio acordado"
+                                                className="w-full pl-8 pr-4 py-2 border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-sm bg-amber-50"
+                                            />
+                                        </div>
+                                        <p className="text-xs text-amber-600 mt-1">
+                                            Este producto requiere consultar precio. Ingrese el valor informado por administración.                                        </p>
+                                        {tienePrecioManual && (
+                                            <div className="mt-2 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm font-medium text-amber-800">Precio ingresado:</span>
+                                                    <span className="text-base font-bold text-amber-800">
+                                                        ${item.valor.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Versión móvil */}
                                 <div className="block sm:hidden space-y-3">
                                     <Select
@@ -270,13 +314,13 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                         <SelectContent className="bg-white">
                                             {accesorios.map(accesorio => {
                                                 const precio = Number(accesorio.precio);
-                                                const esPrecioConsultar = precio === 0.01;
+                                                const esConsultar = precio === 0.01;
                                                 
                                                 return (
                                                     <SelectItem key={accesorio.id} value={accesorio.id.toString()}>
                                                         <div className="flex items-center justify-between w-full gap-2">
                                                             <span className="text-sm truncate max-w-[150px]">{accesorio.nombre}</span>
-                                                            {esPrecioConsultar ? (
+                                                            {esConsultar ? (
                                                                 <span className="text-amber-600 font-medium">Consultar</span>
                                                             ) : (
                                                                 <span className="text-local font-medium">${precio.toFixed(2)}</span>
@@ -298,7 +342,7 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                                 min="1"
                                                 value={item.cantidad}
                                                 onChange={(e) => actualizarItem(index, 'cantidad', Number(e.target.value))}
-                                                disabled={item.aplica_a_todos_vehiculos || esPrecioConsultar}
+                                                disabled={item.aplica_a_todos_vehiculos}
                                                 className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white disabled:bg-gray-100"
                                             />
                                         </div>
@@ -313,8 +357,7 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                                 step="0.01"
                                                 value={item.bonificacion}
                                                 onChange={(e) => actualizarItem(index, 'bonificacion', Number(e.target.value))}
-                                                disabled={esPrecioConsultar}
-                                                className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:bg-gray-100"
+                                                className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                                             />
                                         </div>
                                     </div>
@@ -335,8 +378,8 @@ export default function AccesoriosList({ accesorios, items, cantidadVehiculos, o
                                         <div className="text-right">
                                             <div className="text-xs text-gray-500">Subtotal</div>
                                             <div className="text-base font-bold text-purple-600">
-                                                {esPrecioConsultar ? (
-                                                    <span className="text-amber-600">Consultar</span>
+                                                {esPrecioConsultar && item.valor === 0 ? (
+                                                    <span className="text-amber-600">Pendiente</span>
                                                 ) : (
                                                     `$${(item.subtotal || 0).toFixed(2)}`
                                                 )}
