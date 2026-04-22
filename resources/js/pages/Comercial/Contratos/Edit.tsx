@@ -154,7 +154,9 @@ useEffect(() => {
             email_fiscal: contrato.empresa.email_fiscal || contrato.empresa_email_fiscal,
             rubro_id: contrato.empresa.rubro_id,
             categoria_fiscal_id: contrato.empresa.cat_fiscal_id || contrato.empresa.categoria_fiscal_id,
+            categoria_fiscal_nombre: contrato.empresa.categoriaFiscal?.nombre || contrato.empresa_situacion_afip,
             plataforma_id: contrato.empresa.plataforma_id,
+            plataforma_nombre: contrato.empresa.plataforma?.nombre || contrato.empresa_plataforma,
             nombre_flota: contrato.empresa.nombre_flota || contrato.empresa_nombre_flota,
         });
         
@@ -568,32 +570,48 @@ const handleSubmit = useCallback((e: React.FormEvent) => {
                                                 ))}
                                             </select>
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Categoría Fiscal</label>
-                                            <select
-                                                value={editEmpresaData.categoria_fiscal_id || ''}
-                                                onChange={(e) => setEditEmpresaData({...editEmpresaData, categoria_fiscal_id: parseInt(e.target.value) || null})}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                            >
-                                                <option value="">Seleccionar</option>
-                                                {categoriasFiscales.map((c: any) => (
-                                                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
-                                            <select
-                                                value={editEmpresaData.plataforma_id || ''}
-                                                onChange={(e) => setEditEmpresaData({...editEmpresaData, plataforma_id: parseInt(e.target.value) || null})}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                            >
-                                                <option value="">Seleccionar</option>
-                                                {plataformas.map((p: any) => (
-                                                    <option key={p.id} value={p.id}>{p.nombre}</option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría Fiscal</label>
+                                                <select
+                                                    value={editEmpresaData.categoria_fiscal_id || ''}
+                                                    onChange={(e) => {
+                                                        const categoriaId = parseInt(e.target.value) || null;
+                                                        const categoria = categoriasFiscales.find(c => c.id === categoriaId);
+                                                        setEditEmpresaData({
+                                                            ...editEmpresaData, 
+                                                            categoria_fiscal_id: categoriaId,
+                                                            categoria_fiscal_nombre: categoria?.nombre || ''  // ✅ AGREGAR ESTO
+                                                        });
+                                                    }}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                                >
+                                                    <option value="">Seleccionar</option>
+                                                    {categoriasFiscales.map((c: any) => (
+                                                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
+                                                <select
+                                                    value={editEmpresaData.plataforma_id || ''}
+                                                    onChange={(e) => {
+                                                        const plataformaId = parseInt(e.target.value) || null;
+                                                        const plataforma = plataformas.find(p => p.id === plataformaId);
+                                                        setEditEmpresaData({
+                                                            ...editEmpresaData, 
+                                                            plataforma_id: plataformaId,
+                                                            plataforma_nombre: plataforma?.nombre || ''  // ✅ AGREGAR ESTO
+                                                        });
+                                                    }}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                                >
+                                                    <option value="">Seleccionar</option>
+                                                    {plataformas.map((p: any) => (
+                                                        <option key={p.id} value={p.id}>{p.nombre}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         <div className="md:col-span-2">
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Dirección Fiscal</label>
                                             <input

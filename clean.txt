@@ -7,7 +7,7 @@ php artisan event:clear
 
 npm run build
 
-
+ 
 cd /home/rcassar1/public_html/intranet/ && /opt/php8-2/bin/php artisan optimize:clear 2>/dev/null
 cd /home/rcassar1/public_html/intranet/ && /opt/php8-2/bin/php artisan config:clear 2>/dev/null
 cd /home/rcassar1/public_html/intranet/ && /opt/php8-2/bin/php artisan config:cache 2>/dev/null

@@ -1449,10 +1449,8 @@ public function update(Request $request, $id)
         
         // 1. Actualizar vehículos
         if ($request->has('vehiculos')) {
-            // Eliminar vehículos existentes
             ContratoVehiculo::where('contrato_id', $contrato->id)->delete();
             
-            // Insertar nuevos vehículos
             foreach ($request->vehiculos as $index => $vehiculo) {
                 if (!empty($vehiculo['patente'])) {
                     ContratoVehiculo::create([
@@ -1471,12 +1469,9 @@ public function update(Request $request, $id)
             }
         }
         
-        // 2. Actualizar método de pago - ELIMINAR EL ANTERIOR
+        // 2. Actualizar método de pago
         if ($request->metodo_pago === 'cbu') {
-            // Eliminar tarjeta si existe (cambio de tarjeta a cbu)
             DebitoTarjeta::where('contrato_id', $contrato->id)->delete();
-            
-            // Actualizar o crear CBU
             DebitoCbu::updateOrCreate(
                 ['contrato_id' => $contrato->id],
                 [
@@ -1490,10 +1485,7 @@ public function update(Request $request, $id)
                 ]
             );
         } elseif ($request->metodo_pago === 'tarjeta') {
-            // Eliminar CBU si existe (cambio de cbu a tarjeta)
             DebitoCbu::where('contrato_id', $contrato->id)->delete();
-            
-            // Actualizar o crear Tarjeta
             DebitoTarjeta::updateOrCreate(
                 ['contrato_id' => $contrato->id],
                 [
@@ -1509,12 +1501,12 @@ public function update(Request $request, $id)
                 ]
             );
         } else {
-            // No hay método de pago seleccionado, eliminar ambos
             DebitoCbu::where('contrato_id', $contrato->id)->delete();
             DebitoTarjeta::where('contrato_id', $contrato->id)->delete();
         }
         
         // 3. Actualizar datos del lead (cliente)
+        $lead = null;
         if ($request->has('lead_data') && $request->lead_data && $contrato->lead_id) {
             $lead = \App\Models\Lead::find($contrato->lead_id);
             if ($lead) {
@@ -1526,7 +1518,6 @@ public function update(Request $request, $id)
                     'origen_id' => $request->lead_data['origen_id'] ?? $lead->origen_id,
                 ]);
                 
-                // Actualizar localidad si se seleccionó
                 if (!empty($request->lead_data['localidad_id'])) {
                     $lead->localidad_id = $request->lead_data['localidad_id'];
                     $lead->save();
@@ -1534,7 +1525,7 @@ public function update(Request $request, $id)
             }
         }
         
-        // 4. Actualizar datos del contacto
+        // 4. 🔥 CORREGIDO: Actualizar datos del contacto y SÍ actualizar los campos denormalizados
         if ($request->has('contacto_data') && $request->contacto_data) {
             $contactoId = $request->contacto_data['id'] ?? null;
             if ($contactoId) {
@@ -1549,6 +1540,15 @@ public function update(Request $request, $id)
                         'direccion_personal' => $request->contacto_data['direccion_personal'] ?? $contacto->direccion_personal,
                         'codigo_postal_personal' => $request->contacto_data['codigo_postal_personal'] ?? $contacto->codigo_postal_personal,
                     ]);
+                    
+                    // 🔥 ACTUALIZAR TAMBIÉN LOS CAMPOS DEL CONTACTO EN EL CONTRATO
+                    $contrato->contacto_tipo_responsabilidad = $contacto->tipoResponsabilidad?->nombre;
+                    $contrato->contacto_tipo_documento = $contacto->tipoDocumento?->nombre;
+                    $contrato->contacto_nro_documento = $contacto->nro_documento;
+                    $contrato->contacto_nacionalidad = $contacto->nacionalidad?->pais;
+                    $contrato->contacto_fecha_nacimiento = $contacto->fecha_nacimiento;
+                    $contrato->contacto_direccion_personal = $contacto->direccion_personal;
+                    $contrato->contacto_codigo_postal_personal = $contacto->codigo_postal_personal;
                 }
             }
         }
@@ -1570,7 +1570,6 @@ public function update(Request $request, $id)
                     'nombre_flota' => $request->empresa_data['nombre_flota'] ?? $empresa->nombre_flota,
                 ]);
                 
-                // Actualizar localidad fiscal
                 if (!empty($request->empresa_data['localidad_fiscal_id'])) {
                     $empresa->localidad_fiscal_id = $request->empresa_data['localidad_fiscal_id'];
                     $empresa->save();
@@ -1578,8 +1577,8 @@ public function update(Request $request, $id)
             }
         }
         
-        // 6. Actualizar datos denormalizados del contrato
-        $contrato->update([
+        // 6. 🔥 ACTUALIZAR TODOS LOS CAMPOS DENORMALIZADOS DEL CONTRATO
+        $updateData = [
             'cliente_nombre_completo' => $request->lead_data['nombre_completo'] ?? $contrato->cliente_nombre_completo,
             'cliente_email' => $request->lead_data['email'] ?? $contrato->cliente_email,
             'cliente_telefono' => $request->lead_data['telefono'] ?? $contrato->cliente_telefono,
@@ -1600,159 +1599,97 @@ public function update(Request $request, $id)
             'empresa_plataforma' => $request->empresa_data['plataforma_nombre'] ?? $contrato->empresa_plataforma,
             'empresa_nombre_flota' => $request->empresa_data['nombre_flota'] ?? $contrato->empresa_nombre_flota,
             'modified' => now(),
-        ]);
+        ];
         
- // 7. Actualizar responsables adicionales
-if ($request->has('responsables')) {
-    Log::info('=== PROCESANDO RESPONSABLES ===');
-    Log::info('Responsables recibidos:', $request->responsables);
-    
-    $idsToKeep = [];
-    
-    foreach ($request->responsables as $responsableData) {
-        // 🔥 VERIFICAR SI ESTÁ MARCADO PARA ELIMINAR
-        $estaEliminado = isset($responsableData['deleted']) && $responsableData['deleted'] === true;
+        $contrato->update($updateData);
         
-        // Si está eliminado, lo saltamos (no se agrega a $idsToKeep)
-        if ($estaEliminado) {
-            Log::info('Responsable marcado para eliminar, se ignorará:', $responsableData);
-            continue;
-        }
-        
-        // Verificar si es un ID temporal (del frontend) o un ID real
-        $esIdTemporal = isset($responsableData['id']) && $responsableData['id'] > 1000000000;
-        
-        // Si tiene ID real Y no está marcado para eliminar
-        if (isset($responsableData['id']) && !$esIdTemporal) {
-            Log::info('Actualizando responsable existente ID: ' . $responsableData['id']);
-            $responsable = EmpresaResponsable::find($responsableData['id']);
-            if ($responsable) {
-                $responsable->update([
-                    'tipo_responsabilidad_id' => $responsableData['tipo_responsabilidad_id'],
-                    'nombre_completo' => $responsableData['nombre_completo'],
-                    'telefono' => $responsableData['telefono'] ?? null,
-                    'email' => $responsableData['email'] ?? null,
-                    'modified_by' => auth()->id(),
-                    'modified' => now(),
-                ]);
-                $idsToKeep[] = $responsable->id;
-            }
-        } 
-        // Si es nuevo (tiene is_new true O es ID temporal O no tiene ID)
-        elseif (isset($responsableData['is_new']) && $responsableData['is_new'] === true || $esIdTemporal || !isset($responsableData['id'])) {
-            Log::info('Creando nuevo responsable:', $responsableData);
+        // 7. Actualizar responsables adicionales
+        if ($request->has('responsables')) {
+            $idsToKeep = [];
             
-            // Verificar que no exista ya un responsable activo del mismo tipo
-            $existeActivo = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
-                ->where('tipo_responsabilidad_id', $responsableData['tipo_responsabilidad_id'])
+            foreach ($request->responsables as $responsableData) {
+                $estaEliminado = isset($responsableData['deleted']) && $responsableData['deleted'] === true;
+                
+                if ($estaEliminado) {
+                    continue;
+                }
+                
+                $esIdTemporal = isset($responsableData['id']) && $responsableData['id'] > 1000000000;
+                
+                if (isset($responsableData['id']) && !$esIdTemporal) {
+                    $responsable = EmpresaResponsable::find($responsableData['id']);
+                    if ($responsable) {
+                        $responsable->update([
+                            'tipo_responsabilidad_id' => $responsableData['tipo_responsabilidad_id'],
+                            'nombre_completo' => $responsableData['nombre_completo'],
+                            'telefono' => $responsableData['telefono'] ?? null,
+                            'email' => $responsableData['email'] ?? null,
+                            'modified_by' => auth()->id(),
+                            'modified' => now(),
+                        ]);
+                        $idsToKeep[] = $responsable->id;
+                    }
+                } elseif (isset($responsableData['is_new']) && $responsableData['is_new'] === true || $esIdTemporal || !isset($responsableData['id'])) {
+                    $existeActivo = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
+                        ->where('tipo_responsabilidad_id', $responsableData['tipo_responsabilidad_id'])
+                        ->where('es_activo', true)
+                        ->exists();
+                    
+                    if (!$existeActivo) {
+                        $nuevo = EmpresaResponsable::create([
+                            'empresa_id' => $contrato->empresa_id,
+                            'tipo_responsabilidad_id' => $responsableData['tipo_responsabilidad_id'],
+                            'nombre_completo' => $responsableData['nombre_completo'],
+                            'telefono' => $responsableData['telefono'] ?? null,
+                            'email' => $responsableData['email'] ?? null,
+                            'es_activo' => true,
+                            'created_by' => auth()->id(),
+                            'created' => now(),
+                        ]);
+                        $idsToKeep[] = $nuevo->id;
+                    }
+                }
+            }
+            
+            EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
                 ->where('es_activo', true)
-                ->exists();
-            
-            if (!$existeActivo) {
-                $nuevo = EmpresaResponsable::create([
-                    'empresa_id' => $contrato->empresa_id,
-                    'tipo_responsabilidad_id' => $responsableData['tipo_responsabilidad_id'],
-                    'nombre_completo' => $responsableData['nombre_completo'],
-                    'telefono' => $responsableData['telefono'] ?? null,
-                    'email' => $responsableData['email'] ?? null,
-                    'es_activo' => true,
-                    'created_by' => auth()->id(),
-                    'created' => now(),
+                ->whereNotIn('id', $idsToKeep)
+                ->update([
+                    'es_activo' => false,
+                    'deleted_by' => auth()->id(),
+                    'deleted_at' => now(),
                 ]);
-                $idsToKeep[] = $nuevo->id;
-                Log::info('Responsable creado ID: ' . $nuevo->id);
-            } else {
-                Log::info('Ya existe un responsable activo de este tipo, no se crea duplicado');
-            }
         }
-    }
-    
-    // 🔥 CORREGIDO: Eliminar responsables que NO están en la lista de ids a mantener
-    // YA NO excluimos tipos 3,4,5 porque pueden ser responsables adicionales que queremos eliminar
-    // Solo excluimos si el responsable es el contacto principal (eso se maneja aparte)
-    $eliminados = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
-        ->where('es_activo', true)
-        ->whereNotIn('id', $idsToKeep)
-        ->update([
-            'es_activo' => false,
-            'deleted_by' => auth()->id(),
-            'deleted_at' => now(),
-        ]);
-    
-    Log::info('Responsables eliminados (marcados como inactivos): ' . $eliminados);
-}
-
-// 🔥 8. ACTUALIZAR CAMPOS DENORMALIZADOS DEL CONTRATO CON LOS RESPONSABLES
-$responsableFlota = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
-    ->where('es_activo', true)
-    ->whereIn('tipo_responsabilidad_id', [3, 5])
-    ->first();
-
-$responsablePagos = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
-    ->where('es_activo', true)
-    ->whereIn('tipo_responsabilidad_id', [4, 5])
-    ->first();
-
-// También verificar el contacto principal si tiene responsabilidades
-$contactoPrincipal = null;
-if ($contrato->lead_id) {
-    $lead = \App\Models\Lead::find($contrato->lead_id);
-    if ($lead) {
-        $contactoPrincipal = EmpresaContacto::where('lead_id', $lead->id)
-            ->where('es_contacto_principal', true)
+        
+        // 8. 🔥 ACTUALIZAR RESPONSABLES FLOTA Y PAGOS EN EL CONTRATO
+        $responsableFlota = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
+            ->where('es_activo', true)
+            ->whereIn('tipo_responsabilidad_id', [3, 5])
             ->first();
-    }
-}
-
-// Determinar valores finales para flota
-if ($contactoPrincipal && $contactoPrincipal->tipo_responsabilidad_id == 5) {
-    // Contacto principal es responsable de flota y pagos
-    $contrato->responsable_flota_nombre = $contactoPrincipal->nombre_completo;
-    $contrato->responsable_flota_telefono = $contactoPrincipal->telefono;
-    $contrato->responsable_flota_email = $contactoPrincipal->email;
-    $contrato->responsable_pagos_nombre = $contactoPrincipal->nombre_completo;
-    $contrato->responsable_pagos_telefono = $contactoPrincipal->telefono;
-    $contrato->responsable_pagos_email = $contactoPrincipal->email;
-} elseif ($contactoPrincipal && $contactoPrincipal->tipo_responsabilidad_id == 3) {
-    // Contacto principal solo responsable de flota
-    $contrato->responsable_flota_nombre = $contactoPrincipal->nombre_completo;
-    $contrato->responsable_flota_telefono = $contactoPrincipal->telefono;
-    $contrato->responsable_flota_email = $contactoPrincipal->email;
-} elseif ($contactoPrincipal && $contactoPrincipal->tipo_responsabilidad_id == 4) {
-    // Contacto principal solo responsable de pagos
-    $contrato->responsable_pagos_nombre = $contactoPrincipal->nombre_completo;
-    $contrato->responsable_pagos_telefono = $contactoPrincipal->telefono;
-    $contrato->responsable_pagos_email = $contactoPrincipal->email;
-}
-
-// Si el contacto principal no tiene esas responsabilidades, usar los responsables de la empresa
-if (!$contrato->responsable_flota_nombre && $responsableFlota) {
-    $contrato->responsable_flota_nombre = $responsableFlota->nombre_completo;
-    $contrato->responsable_flota_telefono = $responsableFlota->telefono;
-    $contrato->responsable_flota_email = $responsableFlota->email;
-}
-
-if (!$contrato->responsable_pagos_nombre && $responsablePagos) {
-    $contrato->responsable_pagos_nombre = $responsablePagos->nombre_completo;
-    $contrato->responsable_pagos_telefono = $responsablePagos->telefono;
-    $contrato->responsable_pagos_email = $responsablePagos->email;
-}
-
-// Guardar los cambios en el contrato
-$contrato->save();
-
+        
+        $responsablePagos = EmpresaResponsable::where('empresa_id', $contrato->empresa_id)
+            ->where('es_activo', true)
+            ->whereIn('tipo_responsabilidad_id', [4, 5])
+            ->first();
+        
+        $contrato->responsable_flota_nombre = $responsableFlota?->nombre_completo;
+        $contrato->responsable_flota_telefono = $responsableFlota?->telefono;
+        $contrato->responsable_flota_email = $responsableFlota?->email;
+        $contrato->responsable_pagos_nombre = $responsablePagos?->nombre_completo;
+        $contrato->responsable_pagos_telefono = $responsablePagos?->telefono;
+        $contrato->responsable_pagos_email = $responsablePagos?->email;
+        
+        $contrato->save();
         
         DB::commit();
         
-        // 🔥 IMPORTANTE: Devolver una respuesta Inertia, NO json
         return redirect()->back()->with('success', 'Contrato actualizado exitosamente');
-
+        
     } catch (\Exception $e) {
         DB::rollBack();
         Log::error('Error al actualizar contrato: ' . $e->getMessage());
         Log::error('Trace: ' . $e->getTraceAsString());
         
-        // 🔥 Devolver error como respuesta Inertia
         return redirect()->back()->with('error', 'Error al actualizar contrato: ' . $e->getMessage());
     }
 }
