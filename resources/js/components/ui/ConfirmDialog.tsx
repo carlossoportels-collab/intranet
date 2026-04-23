@@ -1,5 +1,4 @@
 // resources/js/components/ui/ConfirmDialog.tsx
-
 import { X, AlertTriangle } from 'lucide-react';
 import React from 'react';
 
@@ -8,11 +7,22 @@ interface ConfirmDialogProps {
     onClose: () => void;
     onConfirm: () => void;
     title: string;
-    message: string;
+    message?: string;  // ✅ Hacer opcional
     confirmText?: string;
     cancelText?: string;
     type?: 'danger' | 'warning' | 'info';
+    size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+    children?: React.ReactNode;  // ✅ Agregar children
+    isLoading?: boolean;  // ✅ Estado de carga
 }
+
+const sizeClasses = {
+    sm: 'max-w-md',
+    md: 'max-w-lg',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl',
+    full: 'max-w-[90vw] w-full'
+};
 
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     isOpen,
@@ -22,7 +32,10 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     message,
     confirmText = 'Confirmar',
     cancelText = 'Cancelar',
-    type = 'danger'
+    type = 'danger',
+    size = 'md',
+    children,
+    isLoading = false
 }) => {
     if (!isOpen) return null;
 
@@ -66,9 +79,9 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <div className="fixed inset-0 bg-black/60 z-[99990] animate-in fade-in duration-200" onClick={onClose} />
             
             <div className="fixed inset-0 flex items-center justify-center p-4 z-[99999] pointer-events-none">
-                <div className="bg-white rounded-lg shadow-2xl w-full max-w-md animate-in fade-in-0 zoom-in-95 duration-200 pointer-events-auto">
+                <div className={`bg-white rounded-lg shadow-2xl ${sizeClasses[size]} max-h-[90vh] flex flex-col animate-in fade-in-0 zoom-in-95 duration-200 pointer-events-auto`}>
                     {/* Header */}
-                    <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                    <div className="flex items-center justify-between p-4 border-b border-gray-200 shrink-0">
                         <div className="flex items-center gap-3">
                             <div className={`p-2 ${styles.iconBg} rounded-full`}>
                                 {styles.icon}
@@ -85,27 +98,27 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                         </button>
                     </div>
 
-                    {/* Body */}
-                    <div className="p-6">
-                        <p className="text-gray-600">{message}</p>
+                    {/* Body - con scroll si es necesario */}
+                    <div className="flex-1 overflow-y-auto p-4">
+                        {message && <p className="text-gray-600">{message}</p>}
+                        {children}
                     </div>
 
                     {/* Footer */}
-                    <div className="flex justify-end gap-3 p-4 border-t border-gray-200 bg-gray-50">
+                    <div className="flex justify-end gap-3 p-4 border-t border-gray-200 bg-gray-50 shrink-0">
                         <button
                             onClick={onClose}
-                            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                            disabled={isLoading}
+                            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
                         >
                             {cancelText}
                         </button>
                         <button
-                            onClick={() => {
-                                onConfirm();
-                                onClose();
-                            }}
-                            className={`px-4 py-2 rounded-md text-sm font-medium text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${styles.confirmBg} ${styles.confirmFocus}`}
+                            onClick={onConfirm}
+                            disabled={isLoading}
+                            className={`px-4 py-2 rounded-md text-sm font-medium text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${styles.confirmBg} ${styles.confirmFocus}`}
                         >
-                            {confirmText}
+                            {isLoading ? 'Procesando...' : confirmText}
                         </button>
                     </div>
                 </div>

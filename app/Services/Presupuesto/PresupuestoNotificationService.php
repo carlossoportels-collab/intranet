@@ -13,43 +13,7 @@ use Illuminate\Support\Facades\Log;
 class PresupuestoNotificationService
 {
     
-    /**
-     * Crear notificación para presupuesto que vence mañana
-     */
-    public function notificarVenceManana(Presupuesto $presupuesto): void
-    {
-        // Verificar si ya existe una notificación similar no leída
-        $existe = Notificacion::where('usuario_id', $presupuesto->created_by)
-            ->where('entidad_tipo', 'presupuesto')
-            ->where('entidad_id', $presupuesto->id)
-            ->where('tipo', 'presupuesto_por_vencer')
-            ->where('leida', false)
-            ->exists();
 
-        if ($existe) {
-            return;
-        }
-
-        $referencia = $this->getReferencia($presupuesto);
-        
-        Notificacion::create([
-            'usuario_id' => $presupuesto->created_by,
-            'titulo' => '⏰ Presupuesto vence mañana',
-            'mensaje' => "El presupuesto {$referencia} para {$presupuesto->lead->nombre_completo} vence mañana. No olvides dar seguimiento.",
-            'tipo' => 'presupuesto_por_vencer',
-            'entidad_tipo' => 'presupuesto',
-            'entidad_id' => $presupuesto->id,
-            'leida' => false,
-            'fecha_notificacion' => now(),
-            'prioridad' => 'alta',
-            'created' => now()
-        ]);
-
-        Log::info('Notificación de presupuesto que vence mañana', [
-            'presupuesto_id' => $presupuesto->id,
-            'referencia' => $referencia
-        ]);
-    }
 
     /**
      * Crear notificación para presupuesto vencido (genérico)

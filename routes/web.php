@@ -245,7 +245,7 @@ Route::prefix('temp')->name('temp.')->group(function () {
             
             // Ruta para crear contrato desde presupuesto (la que ya tenías)
             Route::get('/crear/{presupuestoId}', [ContratoController::class, 'create'])->name('create')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
-            
+            Route::post('/{id}/recotizar', [ContratoController::class, 'recotizar'])->name('recotizar');
             // Ruta para crear contrato desde lead (la que estás usando)
             Route::get('/create-from-lead/{presupuestoId}', [ContratoController::class, 'createFromLead'])->name('create-from-lead')->middleware('permiso:' . config('permisos.GESTIONAR_CONTRATOS'));
             

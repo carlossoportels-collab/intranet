@@ -76,7 +76,7 @@ class PresupuestosController extends Controller
         //APLICAR FILTRO DE PREFIJOS usando el trait
         $this->applyPrefijoFilter($query, $usuario);
         
-        $presupuestos = $query->orderBy('created', 'desc')->paginate(5);
+        $presupuestos = $query->orderBy('created', 'desc')->paginate(15);
 
         $presupuestos->through(function ($presupuesto) {
             $presupuesto->referencia = sprintf('LS-%s-%s', date('Y', strtotime($presupuesto->created)), $presupuesto->id);

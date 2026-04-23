@@ -64,7 +64,21 @@ public function index(Request $request)
     $user = auth()->user();
     $usuarioEsComercial = $user->rol_id === 5;
     
-    $query = Contrato::with(['estado', 'empresa'])
+    $query = Contrato::select([
+            'id',
+            'cliente_nombre_completo',
+            'empresa_nombre_fantasia',
+            'presupuesto_cantidad_vehiculos',
+            'presupuesto_total_inversion', 
+            'presupuesto_total_mensual',     
+            'presupuesto_referencia',
+            'fecha_emision',
+            'tipo_operacion',
+            'estado_id',
+            'created',
+            'modified'
+        ])
+        ->with(['estado', 'empresa'])
         ->orderBy('created', 'desc');
 
     $prefijosUsuario = [];
@@ -386,7 +400,8 @@ public function index(Request $request)
             $contrato = Contrato::create($contratoData);
             
             // Actualizar empresa
-            $empresa->update(['numeroalfa' => $contratoId]);
+            $this->contratoService->asignarNumeroAlfaSiNoExiste($empresa, $contratoId);
+
             
             // Guardar responsables
             $this->contratoService->guardarResponsablesContrato($contrato, $empresa->id);
@@ -935,8 +950,8 @@ public function storeFromEmpresa(Request $request)
         // Totales del presupuesto o cotización
         if ($presupuesto) {
             $contrato->presupuesto_cantidad_vehiculos = $presupuesto->cantidad_vehiculos;
-            $contrato->presupuesto_total_inversion = ($presupuesto->subtotal_tasa ?? 0) + ($presupuesto->subtotal_productos_agregados ?? 0);
-            $contrato->presupuesto_total_mensual = $presupuesto->subtotal_abono ?? 0;
+            $contrato->presupuesto_total_inversion = $this->contratoService->calcularTotalInversionInicial($presupuesto);
+            $contrato->presupuesto_total_mensual = $this->contratoService->calcularTotalCostoMensual($presupuesto);
         } else {
             $contrato->presupuesto_cantidad_vehiculos = count($request->vehiculos ?? []);
             $contrato->presupuesto_total_inversion = $request->cotizacion['total_inversion_inicial'] ?? 0;
@@ -954,7 +969,7 @@ public function storeFromEmpresa(Request $request)
         if ($lead && $lead->id) {
             $this->contratoService->actualizarLeadACliente($lead->id);
         }
-        
+        $this->contratoService->asignarNumeroAlfaSiNoExiste($empresa, $contratoId);
         // ============================================
         // ACTUALIZAR ESTADO DEL PRESUPUESTO
         // ============================================
@@ -1383,11 +1398,9 @@ public function edit($id)
             $query->with([
                 'localidadFiscal.provincia', 
                 'rubro', 
-                'categoriaFiscal' => function($q) {
-                    $q->select('id', 'nombre', 'codigo');
-                }, 
+                'categoriaFiscal',
                 'plataforma',
-                'responsables' => function($q) {  // ← IMPORTANTE: Cargar responsables activos
+                'responsables' => function($q) {
                     $q->where('es_activo', true)
                       ->with('tipoResponsabilidad');
                 }
@@ -1396,21 +1409,19 @@ public function edit($id)
         'vehiculos', 
         'debitoCbu', 
         'debitoTarjeta',
-        'presupuesto', 
+        'presupuesto' => function($q) {
+            $q->with(['tasa', 'abono', 'agregados.productoServicio']);
+        }, 
         'estado'
     ])->findOrFail($id);
     
-    // Verificar permisos
     $this->authorizePermiso(config('permisos.GESTIONAR_CONTRATOS'));
     
     // Obtener listas para selects
     $tiposResponsabilidad = TipoResponsabilidad::where('es_activo', 1)->get();
     $tiposDocumento = TipoDocumento::where('es_activo', 1)->get();
     $nacionalidades = Nacionalidad::all();
-    
-    // 🔥 CORREGIDO: usar el scope activo
     $categoriasFiscales = CategoriaFiscal::activo()->get(['id', 'nombre', 'codigo']);
-    
     $plataformas = Plataforma::where('es_activo', 1)->get();
     $rubros = Rubro::where('activo', 1)->get();
     $provincias = Provincia::where('activo', 1)->orderBy('nombre')->get();
@@ -1420,8 +1431,16 @@ public function edit($id)
     $origenes = \App\Models\OrigenContacto::where('activo', 1)
         ->orderBy('nombre')
         ->get(['id', 'nombre']);
-
     
+    // 🔥 PRODUCTOS PARA COTIZACIÓN
+    $productoService = app(\App\Services\Presupuesto\ProductoServicioService::class);
+    $tasas = $productoService->getTasas();
+    $abonos = $productoService->getAbonos();
+    $convenios = $productoService->getConvenios();
+    $accesorios = $productoService->getAccesorios();
+    $servicios = $productoService->getServicios();
+    $metodosPago = \App\Models\MedioPago::where('es_activo', 1)->get(['id', 'nombre']);
+
     return Inertia::render('Comercial/Contratos/Edit', [
         'contrato' => $contrato,
         'tiposResponsabilidad' => $tiposResponsabilidad,
@@ -1433,6 +1452,13 @@ public function edit($id)
         'provincias' => $provincias,
         'localidades' => $localidades,
         'origenes' => $origenes,
+        // 🔥 Nuevos datos para cotización
+        'tasas' => $tasas,
+        'abonos' => $abonos,
+        'convenios' => $convenios,
+        'accesorios' => $accesorios,
+        'servicios' => $servicios,
+        'metodosPago' => $metodosPago,
     ]);
 }
 /**
@@ -1691,6 +1717,96 @@ public function update(Request $request, $id)
         Log::error('Trace: ' . $e->getTraceAsString());
         
         return redirect()->back()->with('error', 'Error al actualizar contrato: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Recotizar - Actualizar presupuesto asociado al contrato
+ */
+public function recotizar(Request $request, $id)
+{
+    $this->authorizePermiso(config('permisos.GESTIONAR_CONTRATOS'));
+    
+    try {
+        DB::beginTransaction();
+        
+        $contrato = Contrato::findOrFail($id);
+        
+        if (!$contrato->presupuesto_id) {
+            throw new \Exception('Este contrato no tiene un presupuesto asociado');
+        }
+        
+        $presupuesto = Presupuesto::findOrFail($contrato->presupuesto_id);
+        
+        // Validar datos
+        $validated = $request->validate([
+            'cantidad_vehiculos' => 'required|integer|min:1',
+            'tasa_id' => 'nullable|exists:productos_servicios,id',
+            'valor_tasa' => 'nullable|numeric|min:0',
+            'tasa_bonificacion' => 'nullable|numeric|min:0|max:100',
+            'abono_id' => 'nullable|exists:productos_servicios,id',
+            'valor_abono' => 'nullable|numeric|min:0',
+            'abono_bonificacion' => 'nullable|numeric|min:0|max:100',
+            'agregados' => 'nullable|array',
+        ]);
+        
+        // 🔥 CORREGIDO: Agregar prefijo_id y mantener lead_id y otros campos necesarios
+        $updateData = [
+            'prefijo_id' => $presupuesto->prefijo_id, // 🔥 Usar el prefijo existente
+            'lead_id' => $presupuesto->lead_id,
+            'promocion_id' => $presupuesto->promocion_id,
+            'cantidad_vehiculos' => $validated['cantidad_vehiculos'],
+            'validez' => $presupuesto->validez, // Mantener la validez actual
+            'tasa_id' => $validated['tasa_id'],
+            'valor_tasa' => $validated['valor_tasa'] ?? 0,
+            'tasa_bonificacion' => $validated['tasa_bonificacion'] ?? 0,
+            'tasa_metodo_pago_id' => $presupuesto->tasa_metodo_pago_id,
+            'abono_id' => $validated['abono_id'],
+            'valor_abono' => $validated['valor_abono'] ?? 0,
+            'abono_bonificacion' => $validated['abono_bonificacion'] ?? 0,
+            'abono_metodo_pago_id' => $presupuesto->abono_metodo_pago_id,
+            'agregados' => $validated['agregados'] ?? [],
+        ];
+        
+        $presupuestoService = app(\App\Services\Presupuesto\PresupuestoService::class);
+        $presupuestoActualizado = $presupuestoService->updatePresupuesto($presupuesto, $updateData);
+        
+        // Actualizar los campos denormalizados del contrato
+        $contrato->presupuesto_cantidad_vehiculos = $validated['cantidad_vehiculos'];
+        $contrato->presupuesto_total_inversion = $this->contratoService->calcularTotalInversionInicial($presupuestoActualizado);
+        $contrato->presupuesto_total_mensual = $this->contratoService->calcularTotalCostoMensual($presupuestoActualizado);
+        $contrato->save();
+        
+        DB::commit();
+        
+        // Cargar relaciones para la respuesta
+        $presupuestoActualizado->load([
+            'tasa',
+            'abono',
+            'agregados.productoServicio',
+        ]);
+        
+        $codigoPrefijo = $presupuestoActualizado->prefijo?->codigo ?? 'LS';
+        $anio = date('Y', strtotime($presupuestoActualizado->created));
+        $presupuestoActualizado->referencia = sprintf('%s-%s-%s', $codigoPrefijo, $anio, $presupuestoActualizado->id);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Presupuesto actualizado exitosamente',
+            'presupuesto' => $presupuestoActualizado,
+        ]);
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error al recotizar:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 422);
     }
 }
 }

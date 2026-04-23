@@ -3,7 +3,8 @@
 import { Head, router } from '@inertiajs/react';
 import { 
     User, Building, CreditCard, Truck, FileText, 
-    Plus, Trash2, Save, ArrowLeft, ArrowUpCircle, X,  
+    Plus, Trash2, Save, ArrowLeft, ArrowUpCircle, X,
+    Calculator, Package, Wrench, Edit2
 } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
@@ -11,6 +12,7 @@ import MetodoPagoSection from '@/components/contratos/sections/MetodoPagoSection
 import ResponsablesSection from '@/components/contratos/sections/ResponsablesSection';
 import { useToast } from '@/contexts/ToastContext';
 import AppLayout from '@/layouts/app-layout';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
     contrato: any;
@@ -23,6 +25,12 @@ interface Props {
     provincias: any[];
     localidades?: any[];
     origenes?: any[];
+    tasas?: any[];
+    abonos?: any[];
+    convenios?: any[];
+    accesorios?: any[];
+    servicios?: any[];
+    metodosPago?: any[];
 }
 
 type SensitiveField = 'cbu' | 'tarjeta_numero' | 'tarjeta_codigo' | 'tarjeta_expiracion';
@@ -38,8 +46,15 @@ export default function EditContrato({
     provincias,
     localidades = [],
     origenes = [],
+    tasas = [],
+    abonos = [],
+    convenios = [],
+    accesorios = [],
+    servicios = [],
 }: Props) {
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSavingCotizacion, setIsSavingCotizacion] = useState(false);
+    const [modoEdicionCotizacion, setModoEdicionCotizacion] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
     const [vehiculoToDelete, setVehiculoToDelete] = useState<{ index: number } | null>(null);
     const toast = useToast();
@@ -48,7 +63,7 @@ export default function EditContrato({
     const [vehiculos, setVehiculos] = useState<any[]>(contrato.vehiculos || []);
 
     // Estado para responsables adicionales
-const [responsables, setResponsables] = useState<any[]>(contrato.empresa?.responsables || []);
+    const [responsables, setResponsables] = useState<any[]>(contrato.empresa?.responsables || []);
 
     // Estado para método de pago
     const [metodoPago, setMetodoPago] = useState<'cbu' | 'tarjeta' | null>(
@@ -86,19 +101,126 @@ const [responsables, setResponsables] = useState<any[]>(contrato.empresa?.respon
     const [editContactoData, setEditContactoData] = useState<any>(null);
     const [editEmpresaData, setEditEmpresaData] = useState<any>(null);
 
-    // Localidades filtradas por provincia para cliente
+    // 🔥 Estados para cotización
+    const [tasaId, setTasaId] = useState<number | null>(contrato.presupuesto?.tasa_id || null);
+    const [tasaCantidad, setTasaCantidad] = useState<number>(contrato.presupuesto?.cantidad_vehiculos || 1);
+    const [tasaBonificacion, setTasaBonificacion] = useState(contrato.presupuesto?.tasa_bonificacion || 0);
+    const [tasaValorManual, setTasaValorManual] = useState<number>(() => {
+        const tasa = tasas.find(t => t.id === contrato.presupuesto?.tasa_id);
+        if (tasa && Number(tasa.precio) === 0.01) {
+            return contrato.presupuesto?.valor_tasa || 0;
+        }
+        return contrato.presupuesto?.valor_tasa || 0;
+    });
+    
+    const [abonoId, setAbonoId] = useState<number | null>(contrato.presupuesto?.abono_id || null);
+    const [abonoCantidad, setAbonoCantidad] = useState<number>(contrato.presupuesto?.cantidad_vehiculos || 1);
+    const [abonoBonificacion, setAbonoBonificacion] = useState(contrato.presupuesto?.abono_bonificacion || 0);
+    const [abonoTipo, setAbonoTipo] = useState<'abono' | 'convenio'>('abono');
+    const [abonoValorManual, setAbonoValorManual] = useState<number>(() => {
+        const abonoItem = [...abonos, ...convenios].find(a => a.id === contrato.presupuesto?.abono_id);
+        if (abonoItem && Number(abonoItem.precio) === 0.01) {
+            return contrato.presupuesto?.valor_abono || 0;
+        }
+        return contrato.presupuesto?.valor_abono || 0;
+    });
+    
+    // 🔥 Cargar accesorios y servicios desde presupuesto.agregados
+    const [serviciosItems, setServiciosItems] = useState<any[]>(() => {
+        if (contrato.presupuesto?.agregados && contrato.presupuesto.agregados.length > 0) {
+            return contrato.presupuesto.agregados
+                .filter((a: any) => {
+                    // Verificar por tipo_id desde producto_servicio
+                    const tipoId = a.producto_servicio?.tipo_id;
+                    return tipoId === 3; // Servicios
+                })
+                .map((a: any) => ({
+                    id: a.id,
+                    productoId: a.prd_servicio_id,
+                    cantidad: a.cantidad,
+                    bonificacion: a.bonificacion || 0,
+                    valor: a.valor,
+                    subtotal: a.subtotal,
+                    aplica_a_todos_vehiculos: a.aplica_a_todos_vehiculos || false,
+                    producto_nombre: a.producto_servicio?.nombre || ''
+                }));
+        }
+        return [];
+    });
+    
+    const [accesoriosItems, setAccesoriosItems] = useState<any[]>(() => {
+        if (contrato.presupuesto?.agregados && contrato.presupuesto.agregados.length > 0) {
+            return contrato.presupuesto.agregados
+                .filter((a: any) => {
+                    const tipoId = a.producto_servicio?.tipo_id;
+                    return tipoId === 5; // Accesorios
+                })
+                .map((a: any) => ({
+                    id: a.id,
+                    productoId: a.prd_servicio_id,
+                    cantidad: a.cantidad,
+                    bonificacion: a.bonificacion || 0,
+                    valor: a.valor,
+                    subtotal: a.subtotal,
+                    aplica_a_todos_vehiculos: a.aplica_a_todos_vehiculos || false,
+                    producto_nombre: a.producto_servicio?.nombre || ''
+                }));
+        }
+        return [];
+    });
+
+    // Cálculos
+    const tasaSeleccionada = useMemo(() => {
+        if (!tasaId) return null;
+        return tasas.find(t => t.id === tasaId);
+    }, [tasas, tasaId]);
+
+    const esTasaConsultar = tasaSeleccionada && Number(tasaSeleccionada.precio) === 0.01;
+    const valorTasa = esTasaConsultar ? tasaValorManual : (tasaSeleccionada?.precio || 0);
+    const totalTasa = valorTasa * tasaCantidad * (1 - tasaBonificacion / 100);
+    
+    const abonoSeleccionado = useMemo(() => {
+        if (!abonoId) return null;
+        const lista = abonoTipo === 'abono' ? abonos : convenios;
+        return lista.find(a => a.id === abonoId);
+    }, [abonos, convenios, abonoId, abonoTipo]);
+
+    const esAbonoConsultar = abonoSeleccionado && Number(abonoSeleccionado.precio) === 0.01;
+    const valorAbono = esAbonoConsultar ? abonoValorManual : (abonoSeleccionado?.precio || 0);
+    const totalAbono = valorAbono * abonoCantidad * (1 - abonoBonificacion / 100);
+    
+    const subtotalServicios = serviciosItems.reduce((total, item) => {
+        const producto = servicios.find(s => s.id === item.productoId);
+        const esConsultar = producto && Number(producto.precio) === 0.01;
+        const precio = esConsultar ? item.valor : (producto?.precio || 0);
+        const cantidad = item.aplica_a_todos_vehiculos ? tasaCantidad : item.cantidad;
+        const subtotal = precio * cantidad;
+        return total + (subtotal * (1 - (item.bonificacion || 0) / 100));
+    }, 0);
+    
+    const subtotalAccesorios = accesoriosItems.reduce((total, item) => {
+        const producto = accesorios.find(a => a.id === item.productoId);
+        const esConsultar = producto && Number(producto.precio) === 0.01;
+        const precio = esConsultar ? item.valor : (producto?.precio || 0);
+        const cantidad = item.aplica_a_todos_vehiculos ? tasaCantidad : item.cantidad;
+        const subtotal = precio * cantidad;
+        return total + (subtotal * (1 - (item.bonificacion || 0) / 100));
+    }, 0);
+    
+    const totalInversionInicial = totalTasa + subtotalAccesorios;
+    const totalCostoMensual = totalAbono + subtotalServicios;
+
+    // Localidades filtradas
     const localidadesFiltradasCliente = useMemo(() => {
         if (!editLeadData?.provincia_id) return [];
         return localidades.filter((l: any) => l.provincia_id === editLeadData.provincia_id);
     }, [localidades, editLeadData?.provincia_id]);
 
-    // Localidades filtradas por provincia para empresa
     const localidadesFiltradasEmpresa = useMemo(() => {
         if (!editEmpresaData?.provincia_fiscal_id) return [];
         return localidades.filter((l: any) => l.provincia_id === editEmpresaData.provincia_fiscal_id);
     }, [localidades, editEmpresaData?.provincia_fiscal_id]);
 
-    // Scroll to top button visibility
     useEffect(() => {
         const toggleVisibility = () => {
             setIsVisible(window.scrollY > 300);
@@ -106,165 +228,264 @@ const [responsables, setResponsables] = useState<any[]>(contrato.empresa?.respon
         window.addEventListener('scroll', toggleVisibility);
         return () => window.removeEventListener('scroll', toggleVisibility);
     }, []);
-// Inicializar datos editables
-useEffect(() => {
-    if (contrato.lead) {
-        setEditLeadData({
-            id: contrato.lead.id,
-            nombre_completo: contrato.lead.nombre_completo || contrato.cliente_nombre_completo,
-            email: contrato.lead.email || contrato.cliente_email,
-            telefono: contrato.lead.telefono || contrato.cliente_telefono,
-            provincia_id: contrato.lead.localidad?.provincia_id || null,
-            provincia_nombre: contrato.lead.localidad?.provincia?.nombre || contrato.cliente_provincia,
-            localidad_id: contrato.lead.localidad_id || null,
-            localidad_nombre: contrato.lead.localidad?.nombre || contrato.cliente_localidad,
-            rubro_id: contrato.lead.rubro_id || null,
-            rubro_nombre: contrato.lead.rubro?.nombre || contrato.cliente_rubro,
-            origen_id: contrato.lead.origen_id || null,
-            origen_nombre: contrato.lead.origen?.nombre || contrato.cliente_origen,
-        });
-    }
 
-    const contacto = contrato.lead?.empresa_contacto || contrato.contacto;
-    if (contacto) {
-        setEditContactoData({
-            id: contacto.id,
-            tipo_responsabilidad_id: contacto.tipo_responsabilidad_id,
-            tipo_documento_id: contacto.tipo_documento_id,
-            nro_documento: contacto.nro_documento || contrato.contacto_nro_documento,
-            nacionalidad_id: contacto.nacionalidad_id,
-            fecha_nacimiento: contacto.fecha_nacimiento || contrato.contacto_fecha_nacimiento,
-            direccion_personal: contacto.direccion_personal || contrato.contacto_direccion_personal,
-            codigo_postal_personal: contacto.codigo_postal_personal || contrato.contacto_codigo_postal_personal,
-        });
-    }
-
-    if (contrato.empresa) {
-        setEditEmpresaData({
-            id: contrato.empresa.id,
-            nombre_fantasia: contrato.empresa.nombre_fantasia || contrato.empresa_nombre_fantasia,
-            razon_social: contrato.empresa.razon_social || contrato.empresa_razon_social,
-            cuit: contrato.empresa.cuit || contrato.empresa_cuit,
-            direccion_fiscal: contrato.empresa.direccion_fiscal || contrato.empresa_domicilio_fiscal,
-            provincia_fiscal_id: contrato.empresa.localidad_fiscal?.provincia_id || null,
-            provincia_fiscal_nombre: contrato.empresa.localidad_fiscal?.provincia?.nombre || contrato.empresa_provincia_fiscal,
-            localidad_fiscal_id: contrato.empresa.localidad_fiscal_id || null,
-            localidad_fiscal_nombre: contrato.empresa.localidad_fiscal?.nombre || contrato.empresa_localidad_fiscal,
-            telefono_fiscal: contrato.empresa.telefono_fiscal || contrato.empresa_telefono_fiscal,
-            email_fiscal: contrato.empresa.email_fiscal || contrato.empresa_email_fiscal,
-            rubro_id: contrato.empresa.rubro_id,
-            categoria_fiscal_id: contrato.empresa.cat_fiscal_id || contrato.empresa.categoria_fiscal_id,
-            categoria_fiscal_nombre: contrato.empresa.categoriaFiscal?.nombre || contrato.empresa_situacion_afip,
-            plataforma_id: contrato.empresa.plataforma_id,
-            plataforma_nombre: contrato.empresa.plataforma?.nombre || contrato.empresa_plataforma,
-            nombre_flota: contrato.empresa.nombre_flota || contrato.empresa_nombre_flota,
-        });
-        
-        // 🔥 CARGAR RESPONSABLES DESDE LA EMPRESA
-        if (contrato.empresa.responsables) {
-            setResponsables(contrato.empresa.responsables);
+    // Inicializar datos editables
+    useEffect(() => {
+        if (contrato.lead) {
+            setEditLeadData({
+                id: contrato.lead.id,
+                nombre_completo: contrato.lead.nombre_completo || contrato.cliente_nombre_completo,
+                email: contrato.lead.email || contrato.cliente_email,
+                telefono: contrato.lead.telefono || contrato.cliente_telefono,
+                provincia_id: contrato.lead.localidad?.provincia_id || null,
+                provincia_nombre: contrato.lead.localidad?.provincia?.nombre || contrato.cliente_provincia,
+                localidad_id: contrato.lead.localidad_id || null,
+                localidad_nombre: contrato.lead.localidad?.nombre || contrato.cliente_localidad,
+                rubro_id: contrato.lead.rubro_id || null,
+                rubro_nombre: contrato.lead.rubro?.nombre || contrato.cliente_rubro,
+                origen_id: contrato.lead.origen_id || null,
+                origen_nombre: contrato.lead.origen?.nombre || contrato.cliente_origen,
+            });
         }
-    }
-}, [contrato]);
 
-    const scrollToTop = useCallback(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, []);
+        const contacto = contrato.lead?.empresa_contacto || contrato.contacto;
+        if (contacto) {
+            setEditContactoData({
+                id: contacto.id,
+                tipo_responsabilidad_id: contacto.tipo_responsabilidad_id,
+                tipo_documento_id: contacto.tipo_documento_id,
+                nro_documento: contacto.nro_documento || contrato.contacto_nro_documento,
+                nacionalidad_id: contacto.nacionalidad_id,
+                fecha_nacimiento: contacto.fecha_nacimiento || contrato.contacto_fecha_nacimiento,
+                direccion_personal: contacto.direccion_personal || contrato.contacto_direccion_personal,
+                codigo_postal_personal: contacto.codigo_postal_personal || contrato.contacto_codigo_postal_personal,
+            });
+        }
 
-    const agregarVehiculo = useCallback(() => {
+        if (contrato.empresa) {
+            setEditEmpresaData({
+                id: contrato.empresa.id,
+                nombre_fantasia: contrato.empresa.nombre_fantasia || contrato.empresa_nombre_fantasia,
+                razon_social: contrato.empresa.razon_social || contrato.empresa_razon_social,
+                cuit: contrato.empresa.cuit || contrato.empresa_cuit,
+                direccion_fiscal: contrato.empresa.direccion_fiscal || contrato.empresa_domicilio_fiscal,
+                provincia_fiscal_id: contrato.empresa.localidad_fiscal?.provincia_id || null,
+                provincia_fiscal_nombre: contrato.empresa.localidad_fiscal?.provincia?.nombre || contrato.empresa_provincia_fiscal,
+                localidad_fiscal_id: contrato.empresa.localidad_fiscal_id || null,
+                localidad_fiscal_nombre: contrato.empresa.localidad_fiscal?.nombre || contrato.empresa_localidad_fiscal,
+                telefono_fiscal: contrato.empresa.telefono_fiscal || contrato.empresa_telefono_fiscal,
+                email_fiscal: contrato.empresa.email_fiscal || contrato.empresa_email_fiscal,
+                rubro_id: contrato.empresa.rubro_id,
+                categoria_fiscal_id: contrato.empresa.cat_fiscal_id || contrato.empresa.categoria_fiscal_id,
+                categoria_fiscal_nombre: contrato.empresa.categoriaFiscal?.nombre || contrato.empresa_situacion_afip,
+                plataforma_id: contrato.empresa.plataforma_id,
+                plataforma_nombre: contrato.empresa.plataforma?.nombre || contrato.empresa_plataforma,
+                nombre_flota: contrato.empresa.nombre_flota || contrato.empresa_nombre_flota,
+            });
+            
+            if (contrato.empresa.responsables) {
+                setResponsables(contrato.empresa.responsables);
+            }
+        }
+    }, [contrato]);
+
+    // Handlers
+    const agregarVehiculo = () => {
         setVehiculos(prev => [...prev, { 
             patente: '', marca: '', modelo: '', anio: '', color: '', identificador: '', tipo: '' 
         }]);
-    }, []);
+    };
 
-    const actualizarVehiculo = useCallback((index: number, field: string, value: string) => {
+    const actualizarVehiculo = (index: number, field: string, value: string) => {
         setVehiculos(prev => {
             const nuevos = [...prev];
             nuevos[index] = { ...nuevos[index], [field]: value };
             return nuevos;
         });
-    }, []);
+    };
 
-    const confirmarEliminarVehiculo = useCallback((index: number) => {
+    const confirmarEliminarVehiculo = (index: number) => {
         if (vehiculos.length === 1) {
             toast.error('Debe haber al menos un vehículo');
             return;
         }
         setVehiculoToDelete({ index });
-    }, [vehiculos.length, toast]);
+    };
 
-    const eliminarVehiculo = useCallback(() => {
+    const eliminarVehiculo = () => {
         if (vehiculoToDelete && vehiculos.length > 1) {
             setVehiculos(prev => prev.filter((_, i) => i !== vehiculoToDelete.index));
         }
         setVehiculoToDelete(null);
-    }, [vehiculos.length, vehiculoToDelete]);
-
-    const toggleSensitive = useCallback((field: string) => {
-        const validFields: SensitiveField[] = ['cbu', 'tarjeta_numero', 'tarjeta_codigo', 'tarjeta_expiracion'];
-        if (validFields.includes(field as SensitiveField)) {
-            setShowSensitive(prev => ({ 
-                ...prev, 
-                [field as SensitiveField]: !prev[field as SensitiveField] 
-            }));
-        }
-    }, []);
-
-    const maskData = useCallback((value: string, show: boolean, maskLength: number = 16) => {
-        if (show || !value) return value;
-        if (value.length <= 4) return '*'.repeat(value.length);
-        const asteriskCount = Math.max(0, value.length - 4);
-        return '*'.repeat(asteriskCount) + value.slice(-4);
-    }, []);
-
-const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (vehiculos.length === 0) {
-        toast.error('Debe cargar al menos un vehículo');
-        return;
-    }
-
-    const vehiculosSinPatente = vehiculos.filter(v => !v.patente || v.patente.trim() === '');
-    if (vehiculosSinPatente.length > 0) {
-        toast.error('Todos los vehículos deben tener patente');
-        return;
-    }
-    
-    setIsSubmitting(true);
-
-    const payload: any = {
-        vehiculos,
-        responsables,
-        metodo_pago: metodoPago,
-        ...(metodoPago === 'cbu' && { datos_cbu: datosCbu }),
-        ...(metodoPago === 'tarjeta' && { datos_tarjeta: datosTarjeta }),
-        lead_data: editLeadData,
-        contacto_data: editContactoData,
-        empresa_data: editEmpresaData,
     };
 
-    router.put(`/comercial/contratos/${contrato.id}`, payload, {
-        onSuccess: (page) => {
-            toast.success('Contrato actualizado exitosamente');
-            setIsSubmitting(false);
-            // Redirigir a la vista show
-            router.visit(`/comercial/contratos/${contrato.id}`);
-        },
-        onError: (errors) => {
-            console.error(errors);
-            const errorMessage = typeof errors === 'string' ? errors : 'Error al actualizar contrato';
-            toast.error(errorMessage);
-            setIsSubmitting(false);
+    const agregarServicio = () => {
+        setServiciosItems([...serviciosItems, { 
+            productoId: null, 
+            cantidad: 1, 
+            bonificacion: 0, 
+            valor: 0,
+            aplica_a_todos_vehiculos: false 
+        }]);
+    };
+    
+    const actualizarServicio = (index: number, field: string, value: any) => {
+        const nuevos = [...serviciosItems];
+        nuevos[index] = { ...nuevos[index], [field]: value };
+        setServiciosItems(nuevos);
+    };
+    
+    const eliminarServicio = (index: number) => {
+        setServiciosItems(serviciosItems.filter((_, i) => i !== index));
+    };
+    
+    const agregarAccesorio = () => {
+        setAccesoriosItems([...accesoriosItems, { 
+            productoId: null, 
+            cantidad: 1, 
+            bonificacion: 0, 
+            valor: 0,
+            aplica_a_todos_vehiculos: false 
+        }]);
+    };
+    
+    const actualizarAccesorio = (index: number, field: string, value: any) => {
+        const nuevos = [...accesoriosItems];
+        nuevos[index] = { ...nuevos[index], [field]: value };
+        setAccesoriosItems(nuevos);
+    };
+    
+    const eliminarAccesorio = (index: number) => {
+        setAccesoriosItems(accesoriosItems.filter((_, i) => i !== index));
+    };
+
+    const guardarCotizacion = () => {
+        if (!tasaId && !abonoId && accesoriosItems.length === 0 && serviciosItems.length === 0) {
+            toast.error('Debe seleccionar al menos un producto');
+            return;
         }
-    });
-}, [vehiculos, responsables, metodoPago, datosCbu, datosTarjeta, editLeadData, editContactoData, editEmpresaData, contrato.id, toast, router]);
+        
+        setIsSavingCotizacion(true);
+        
+        const agregados = [
+            ...serviciosItems.filter(item => item.productoId).map(item => {
+                const producto = servicios.find(s => s.id === item.productoId);
+                const esConsultar = producto && Number(producto.precio) === 0.01;
+                return {
+                    prd_servicio_id: item.productoId,
+                    cantidad: item.cantidad,
+                    aplica_a_todos_vehiculos: item.aplica_a_todos_vehiculos || false,
+                    valor: esConsultar ? item.valor : (producto?.precio || 0),
+                    bonificacion: item.bonificacion || 0
+                };
+            }),
+            ...accesoriosItems.filter(item => item.productoId).map(item => {
+                const producto = accesorios.find(a => a.id === item.productoId);
+                const esConsultar = producto && Number(producto.precio) === 0.01;
+                return {
+                    prd_servicio_id: item.productoId,
+                    cantidad: item.cantidad,
+                    aplica_a_todos_vehiculos: item.aplica_a_todos_vehiculos || false,
+                    valor: esConsultar ? item.valor : (producto?.precio || 0),
+                    bonificacion: item.bonificacion || 0
+                };
+            })
+        ];
+        
+        const cotizacionData = {
+            cantidad_vehiculos: tasaCantidad,
+            tasa_id: tasaId || null,
+            valor_tasa: valorTasa,
+            tasa_bonificacion: tasaBonificacion,
+            abono_id: abonoId || null,
+            valor_abono: valorAbono,
+            abono_bonificacion: abonoBonificacion,
+            agregados: agregados
+        };
+        
+        fetch(`/comercial/contratos/${contrato.id}/recotizar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(cotizacionData)
+        })
+        .then(async response => {
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                toast.success('Presupuesto actualizado exitosamente');
+                setModoEdicionCotizacion(false);
+                router.reload();
+            } else {
+                toast.error(data.error || 'Error al actualizar el presupuesto');
+            }
+            setIsSavingCotizacion(false);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            toast.error('Error al actualizar el presupuesto');
+            setIsSavingCotizacion(false);
+        });
+    };
+
+    const cancelarEdicionCotizacion = () => {
+        setModoEdicionCotizacion(false);
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (vehiculos.length === 0) {
+            toast.error('Debe cargar al menos un vehículo');
+            return;
+        }
+
+        const vehiculosSinPatente = vehiculos.filter(v => !v.patente || v.patente.trim() === '');
+        if (vehiculosSinPatente.length > 0) {
+            toast.error('Todos los vehículos deben tener patente');
+            return;
+        }
+        
+        setIsSubmitting(true);
+
+        const payload: any = {
+            vehiculos,
+            responsables,
+            metodo_pago: metodoPago,
+            ...(metodoPago === 'cbu' && { datos_cbu: datosCbu }),
+            ...(metodoPago === 'tarjeta' && { datos_tarjeta: datosTarjeta }),
+            lead_data: editLeadData,
+            contacto_data: editContactoData,
+            empresa_data: editEmpresaData,
+        };
+
+        router.put(`/comercial/contratos/${contrato.id}`, payload, {
+            onSuccess: () => {
+                toast.success('Contrato actualizado exitosamente');
+                setIsSubmitting(false);
+                router.visit(`/comercial/contratos/${contrato.id}`);
+            },
+            onError: (errors) => {
+                console.error(errors);
+                toast.error('Error al actualizar contrato');
+                setIsSubmitting(false);
+            }
+        });
+    };
+
+    const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     return (
         <AppLayout title={`Editar Contrato #${contrato.numero_contrato}`}>
             <Head title={`Editar Contrato #${contrato.numero_contrato}`} />
             
             <form onSubmit={handleSubmit}>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+                <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
                     {/* Header */}
                     <div className="mb-6 flex flex-wrap items-center justify-between gap-4 bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
                         <div className="flex items-center gap-4">
@@ -305,11 +526,11 @@ const handleSubmit = useCallback((e: React.FormEvent) => {
                         </div>
                     </div>
 
-                    {/* Contenido - Grid de 2 columnas */}
+                    {/* Grid principal - más ancho */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Columna principal - 2/3 */}
+                        {/* Columna izquierda - 2/3 */}
                         <div className="lg:col-span-2 space-y-6">
-                            {/* Datos del Cliente - EDITABLE */}
+                            {/* Datos del Cliente */}
                             {editLeadData && (
                                 <div className="bg-white rounded-lg border border-gray-200 p-4">
                                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -435,7 +656,7 @@ const handleSubmit = useCallback((e: React.FormEvent) => {
                                 </div>
                             )}
                             
-                            {/* Datos Personales del Cliente - EDITABLE */}
+                            {/* Datos Personales del Cliente */}
                             {editContactoData && (
                                 <div className="bg-white rounded-lg border border-gray-200 p-4">
                                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -522,7 +743,7 @@ const handleSubmit = useCallback((e: React.FormEvent) => {
                                 </div>
                             )}
                             
-                            {/* Datos de la Empresa - EDITABLE */}
+                            {/* Datos de la Empresa */}
                             {editEmpresaData && (
                                 <div className="bg-white rounded-lg border border-gray-200 p-4">
                                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -570,48 +791,48 @@ const handleSubmit = useCallback((e: React.FormEvent) => {
                                                 ))}
                                             </select>
                                         </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría Fiscal</label>
-                                                <select
-                                                    value={editEmpresaData.categoria_fiscal_id || ''}
-                                                    onChange={(e) => {
-                                                        const categoriaId = parseInt(e.target.value) || null;
-                                                        const categoria = categoriasFiscales.find(c => c.id === categoriaId);
-                                                        setEditEmpresaData({
-                                                            ...editEmpresaData, 
-                                                            categoria_fiscal_id: categoriaId,
-                                                            categoria_fiscal_nombre: categoria?.nombre || ''  // ✅ AGREGAR ESTO
-                                                        });
-                                                    }}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                                >
-                                                    <option value="">Seleccionar</option>
-                                                    {categoriasFiscales.map((c: any) => (
-                                                        <option key={c.id} value={c.id}>{c.nombre}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
-                                                <select
-                                                    value={editEmpresaData.plataforma_id || ''}
-                                                    onChange={(e) => {
-                                                        const plataformaId = parseInt(e.target.value) || null;
-                                                        const plataforma = plataformas.find(p => p.id === plataformaId);
-                                                        setEditEmpresaData({
-                                                            ...editEmpresaData, 
-                                                            plataforma_id: plataformaId,
-                                                            plataforma_nombre: plataforma?.nombre || ''  // ✅ AGREGAR ESTO
-                                                        });
-                                                    }}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                                >
-                                                    <option value="">Seleccionar</option>
-                                                    {plataformas.map((p: any) => (
-                                                        <option key={p.id} value={p.id}>{p.nombre}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Categoría Fiscal</label>
+                                            <select
+                                                value={editEmpresaData.categoria_fiscal_id || ''}
+                                                onChange={(e) => {
+                                                    const categoriaId = parseInt(e.target.value) || null;
+                                                    const categoria = categoriasFiscales.find(c => c.id === categoriaId);
+                                                    setEditEmpresaData({
+                                                        ...editEmpresaData, 
+                                                        categoria_fiscal_id: categoriaId,
+                                                        categoria_fiscal_nombre: categoria?.nombre || ''
+                                                    });
+                                                }}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            >
+                                                <option value="">Seleccionar</option>
+                                                {categoriasFiscales.map((c: any) => (
+                                                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
+                                            <select
+                                                value={editEmpresaData.plataforma_id || ''}
+                                                onChange={(e) => {
+                                                    const plataformaId = parseInt(e.target.value) || null;
+                                                    const plataforma = plataformas.find(p => p.id === plataformaId);
+                                                    setEditEmpresaData({
+                                                        ...editEmpresaData, 
+                                                        plataforma_id: plataformaId,
+                                                        plataforma_nombre: plataforma?.nombre || ''
+                                                    });
+                                                }}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            >
+                                                <option value="">Seleccionar</option>
+                                                {plataformas.map((p: any) => (
+                                                    <option key={p.id} value={p.id}>{p.nombre}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                         <div className="md:col-span-2">
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Dirección Fiscal</label>
                                             <input
@@ -828,57 +1049,482 @@ const handleSubmit = useCallback((e: React.FormEvent) => {
                             />
                         </div>
                         
-                        {/* Columna lateral - 1/3 */}
-                        <div className="space-y-6">
-                            {/* Resumen del Presupuesto */}
-                            <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    Presupuesto Asociado
-                                </h3>
-                                <div className="space-y-2 text-sm">
-                                    <p className="text-gray-600">
-                                        <span className="font-medium">Referencia:</span> {contrato.presupuesto_referencia || contrato.presupuesto?.referencia || '-'}
-                                    </p>
-                                    <p className="text-gray-600">
-                                        <span className="font-medium">Fecha:</span> {contrato.presupuesto?.created ? new Date(contrato.presupuesto.created).toLocaleDateString() : '-'}
-                                    </p>
-                                    <div className="border-t pt-2 mt-2">
-                                        <p className="text-gray-600">
-                                            <span className="font-medium">💰 Inversión inicial:</span>
-                                            <span className="ml-2 text-green-600 font-semibold">
-                                                ${(contrato.presupuesto_total_inversion || 0).toLocaleString()}
-                                            </span>
-                                        </p>
-                                        <p className="text-gray-600">
-                                            <span className="font-medium">📅 Costo mensual:</span>
-                                            <span className="ml-2 text-blue-600 font-semibold">
-                                                ${(contrato.presupuesto_total_mensual || 0).toLocaleString()}
-                                            </span>
-                                        </p>
+                        {/* Columna derecha - PRESUPUESTO ASOCIADO */}
+                        <div className="lg:col-span-1">
+                            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden sticky top-4">
+                                <div className="px-5 py-4 bg-gradient-to-r from-indigo-50 to-violet-50 border-b border-indigo-100">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <FileText className="h-5 w-5 text-indigo-600" />
+                                            <h2 className="text-lg font-semibold text-gray-900">
+                                                Presupuesto Asociado
+                                            </h2>
+                                        </div>
+                                        {!modoEdicionCotizacion && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setModoEdicionCotizacion(true)}
+                                                className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                                            >
+                                                <Edit2 className="h-3 w-3" />
+                                                Recotizar
+                                            </button>
+                                        )}
                                     </div>
-                                    {contrato.presupuesto?.cantidad_vehiculos && (
-                                        <p className="text-gray-600">
-                                            <span className="font-medium">🚗 Cantidad vehículos:</span>
-                                            <span className="ml-2">{contrato.presupuesto.cantidad_vehiculos}</span>
+                                    {contrato.presupuesto_referencia && (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            #{contrato.presupuesto_referencia}
                                         </p>
                                     )}
                                 </div>
-                            </div>
-                            
-                            {/* Información adicional */}
-                            <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                <h3 className="font-semibold text-gray-900 mb-3">Información adicional</h3>
-                                <div className="space-y-2 text-sm">
-                                    <p className="text-gray-600">
-                                        <span className="font-medium">Creado:</span> {contrato.created ? new Date(contrato.created).toLocaleDateString() : '-'}
-                                    </p>
-                                    <p className="text-gray-600">
-                                        <span className="font-medium">Última modificación:</span> {contrato.modified ? new Date(contrato.modified).toLocaleDateString() : '-'}
-                                    </p>
-                                    <p className="text-gray-600">
-                                        <span className="font-medium">Vendedor:</span> {contrato.vendedor_nombre || '-'}
-                                    </p>
+                                
+                                <div className="p-5">
+                                    {!modoEdicionCotizacion ? (
+                                        // MODO VISTA - Resumen
+                                        <div className="space-y-4">
+                                            <div className="space-y-2 text-sm">
+                                                <div className="flex justify-between py-2 border-b border-gray-100">
+                                                    <span className="text-gray-600">Vehículos:</span>
+                                                    <span className="font-medium">{contrato.presupuesto?.cantidad_vehiculos || tasaCantidad}</span>
+                                                </div>
+                                                <div className="flex justify-between py-2 border-b border-gray-100">
+                                                    <span className="text-gray-600">💰 Inversión inicial:</span>
+                                                    <span className="font-medium text-blue-600">
+                                                        ${(contrato.presupuesto_total_inversion || totalInversionInicial).toLocaleString('es-AR')}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between py-2 border-b border-gray-100">
+                                                    <span className="text-gray-600">📅 Costo mensual:</span>
+                                                    <span className="font-medium text-green-600">
+                                                        ${(contrato.presupuesto_total_mensual || totalCostoMensual).toLocaleString('es-AR')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Mostrar productos adicionales */}
+                                            {((serviciosItems.length > 0) || (accesoriosItems.length > 0)) && (
+                                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                                    <p className="text-xs text-gray-500 mb-2">Productos adicionales:</p>
+                                                    <div className="space-y-1">
+                                                        {serviciosItems.map((item, idx) => (
+                                                            <div key={`serv-${idx}`} className="text-sm flex justify-between">
+                                                                <span className="text-gray-600">{item.producto_nombre}</span>
+                                                                <span className="font-medium">
+                                                                    ${(Number(item.valor) * item.cantidad).toLocaleString('es-AR')}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                        {accesoriosItems.map((item, idx) => (
+                                                            <div key={`acc-${idx}`} className="text-sm flex justify-between">
+                                                                <span className="text-gray-600">{item.producto_nombre}</span>
+                                                                <span className="font-medium">
+                                                                    ${(Number(item.valor) * item.cantidad).toLocaleString('es-AR')}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        // MODO EDICIÓN - Formulario completo
+                                        <div className="space-y-5">
+                                            {/* Cantidad de Vehículos */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                    Cantidad de Vehículos
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={tasaCantidad}
+                                                    onChange={(e) => setTasaCantidad(Number(e.target.value))}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                                                />
+                                            </div>
+
+                                            {/* TASA */}
+                                            <div className="border-t pt-3">
+                                                <h3 className="text-sm font-semibold text-gray-700 mb-2">Tasa de Instalación</h3>
+                                                <Select
+                                                    value={tasaId?.toString() || ''}
+                                                    onValueChange={(value) => setTasaId(value ? Number(value) : null)}
+                                                >
+                                                    <SelectTrigger className="bg-white border border-gray-300 rounded-md shadow-sm w-full">
+                                                        <SelectValue placeholder="Seleccionar tasa" />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-white z-50">
+                                                        <SelectItem value="0">Ninguno</SelectItem>
+                                                        {tasas.map(tasa => {
+                                                            const esConsultar = Number(tasa.precio) === 0.01;
+                                                            return (
+                                                                <SelectItem key={tasa.id} value={tasa.id.toString()}>
+                                                                    <div className="flex justify-between w-full">
+                                                                        <span>{tasa.nombre}</span>
+                                                                        {esConsultar ? (
+                                                                            <span className="text-amber-600">Consultar</span>
+                                                                        ) : (
+                                                                            <span className="text-indigo-600">${Number(tasa.precio).toLocaleString('es-AR')}</span>
+                                                                        )}
+                                                                    </div>
+                                                                </SelectItem>
+                                                            );
+                                                        })}
+                                                    </SelectContent>
+                                                </Select>
+                                                
+                                                {esTasaConsultar && (
+                                                    <div className="mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                                        <label className="block text-xs font-medium text-amber-700 mb-1">Precio manual</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            value={tasaValorManual || ''}
+                                                            onChange={(e) => setTasaValorManual(Number(e.target.value))}
+                                                            placeholder="Ingrese el precio acordado"
+                                                            className="w-full px-3 py-2 border border-amber-300 rounded-md bg-white"
+                                                        />
+                                                    </div>
+                                                )}
+                                                
+                                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                                    <div>
+                                                        <label className="text-xs text-gray-500">Bonif. %</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            value={tasaBonificacion}
+                                                            onChange={(e) => setTasaBonificacion(Number(e.target.value))}
+                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                                                        />
+                                                    </div>
+                                                    <div className="text-right pt-5">
+                                                        <span className="text-sm font-medium">${totalTasa.toLocaleString('es-AR')}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* ACCESORIOS */}
+                                            <div className="border-t pt-3">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <h3 className="text-sm font-semibold text-gray-700">Accesorios</h3>
+                                                    <button
+                                                        type="button"
+                                                        onClick={agregarAccesorio}
+                                                        className="text-xs text-purple-600 hover:text-purple-700"
+                                                    >
+                                                        + Agregar
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    {accesoriosItems.map((item, idx) => {
+                                                        const producto = accesorios.find(a => a.id === item.productoId);
+                                                        const esConsultar = producto && Number(producto.precio) === 0.01;
+                                                        
+                                                        return (
+                                                            <div key={idx} className="border border-gray-200 rounded-lg p-3">
+                                                                <div className="flex gap-2 items-center mb-2">
+                                                                    <Select
+                                                                        value={item.productoId?.toString() || ''}
+                                                                        onValueChange={(v) => actualizarAccesorio(idx, 'productoId', Number(v))}
+                                                                    >
+                                                                        <SelectTrigger className="bg-white border border-gray-300 rounded-md shadow-sm flex-1">
+                                                                            <SelectValue placeholder="Seleccionar accesorio" />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent className="bg-white z-50">
+                                                                            {accesorios.map(a => (
+                                                                                <SelectItem key={a.id} value={a.id.toString()}>
+                                                                                    <div className="flex justify-between w-full">
+                                                                                        <span>{a.nombre}</span>
+                                                                                        {Number(a.precio) === 0.01 ? (
+                                                                                            <span className="text-amber-600">Consultar</span>
+                                                                                        ) : (
+                                                                                            <span>${Number(a.precio).toLocaleString('es-AR')}</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => eliminarAccesorio(idx)}
+                                                                        className="text-red-500 p-1"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </button>
+                                                                </div>
+                                                                
+                                                                {esConsultar && (
+                                                                    <div className="mb-2">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            step="0.01"
+                                                                            value={item.valor || ''}
+                                                                            onChange={(e) => actualizarAccesorio(idx, 'valor', Number(e.target.value))}
+                                                                            placeholder="Precio manual"
+                                                                            className="w-full px-3 py-1 text-sm border border-amber-300 rounded-md bg-amber-50"
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                                
+                                                                <div className="grid grid-cols-3 gap-2">
+                                                                    <div>
+                                                                        <label className="text-xs text-gray-500">Cantidad</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="1"
+                                                                            value={item.cantidad}
+                                                                            onChange={(e) => actualizarAccesorio(idx, 'cantidad', Number(e.target.value))}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs text-gray-500">Bonif. %</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            max="100"
+                                                                            value={item.bonificacion}
+                                                                            onChange={(e) => actualizarAccesorio(idx, 'bonificacion', Number(e.target.value))}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="text-right pt-5">
+                                                                        <span className="text-sm font-medium text-purple-600">
+                                                                            ${(item.valor * item.cantidad * (1 - item.bonificacion / 100)).toLocaleString('es-AR')}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {accesoriosItems.length === 0 && (
+                                                        <p className="text-sm text-gray-400 text-center py-2">No hay accesorios agregados</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* ABONO */}
+                                            <div className="border-t pt-3">
+                                                <h3 className="text-sm font-semibold text-gray-700 mb-2">Abono Mensual</h3>
+                                                <div className="flex gap-1 mb-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAbonoTipo('abono')}
+                                                        className={`flex-1 px-2 py-1 text-xs rounded ${abonoTipo === 'abono' ? 'bg-green-600 text-white' : 'bg-gray-100'}`}
+                                                    >
+                                                        Abono
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAbonoTipo('convenio')}
+                                                        className={`flex-1 px-2 py-1 text-xs rounded ${abonoTipo === 'convenio' ? 'bg-green-600 text-white' : 'bg-gray-100'}`}
+                                                    >
+                                                        Convenio
+                                                    </button>
+                                                </div>
+                                                <Select
+                                                    value={abonoId?.toString() || ''}
+                                                    onValueChange={(value) => setAbonoId(value ? Number(value) : null)}
+                                                >
+                                                    <SelectTrigger className="bg-white border border-gray-300 rounded-md shadow-sm w-full">
+                                                        <SelectValue placeholder={`Seleccionar ${abonoTipo}`} />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-white z-50">
+                                                        <SelectItem value="0">Ninguno</SelectItem>
+                                                        {(abonoTipo === 'abono' ? abonos : convenios).map(item => {
+                                                            const esConsultar = Number(item.precio) === 0.01;
+                                                            return (
+                                                                <SelectItem key={item.id} value={item.id.toString()}>
+                                                                    <div className="flex justify-between w-full">
+                                                                        <span>{item.nombre}</span>
+                                                                        {esConsultar ? (
+                                                                            <span className="text-amber-600">Consultar</span>
+                                                                        ) : (
+                                                                            <span className="text-green-600">${Number(item.precio).toLocaleString('es-AR')}</span>
+                                                                        )}
+                                                                    </div>
+                                                                </SelectItem>
+                                                            );
+                                                        })}
+                                                    </SelectContent>
+                                                </Select>
+                                                
+                                                {esAbonoConsultar && (
+                                                    <div className="mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                                        <label className="block text-xs font-medium text-amber-700 mb-1">Precio manual</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            value={abonoValorManual || ''}
+                                                            onChange={(e) => setAbonoValorManual(Number(e.target.value))}
+                                                            placeholder="Ingrese el precio acordado"
+                                                            className="w-full px-3 py-2 border border-amber-300 rounded-md bg-white"
+                                                        />
+                                                    </div>
+                                                )}
+                                                
+                                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                                    <div>
+                                                        <label className="text-xs text-gray-500">Bonif. %</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            value={abonoBonificacion}
+                                                            onChange={(e) => setAbonoBonificacion(Number(e.target.value))}
+                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                                                        />
+                                                    </div>
+                                                    <div className="text-right pt-5">
+                                                        <span className="text-sm font-medium">${totalAbono.toLocaleString('es-AR')}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* SERVICIOS */}
+                                            <div className="border-t pt-3">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <h3 className="text-sm font-semibold text-gray-700">Servicios Adicionales</h3>
+                                                    <button
+                                                        type="button"
+                                                        onClick={agregarServicio}
+                                                        className="text-xs text-orange-600 hover:text-orange-700"
+                                                    >
+                                                        + Agregar
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    {serviciosItems.map((item, idx) => {
+                                                        const producto = servicios.find(s => s.id === item.productoId);
+                                                        const esConsultar = producto && Number(producto.precio) === 0.01;
+                                                        
+                                                        return (
+                                                            <div key={idx} className="border border-gray-200 rounded-lg p-3">
+                                                                <div className="flex gap-2 items-center mb-2">
+                                                                    <Select
+                                                                        value={item.productoId?.toString() || ''}
+                                                                        onValueChange={(v) => actualizarServicio(idx, 'productoId', Number(v))}
+                                                                    >
+                                                                        <SelectTrigger className="bg-white border border-gray-300 rounded-md shadow-sm flex-1">
+                                                                            <SelectValue placeholder="Seleccionar servicio" />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent className="bg-white z-50">
+                                                                            {servicios.map(s => (
+                                                                                <SelectItem key={s.id} value={s.id.toString()}>
+                                                                                    <div className="flex justify-between w-full">
+                                                                                        <span>{s.nombre}</span>
+                                                                                        {Number(s.precio) === 0.01 ? (
+                                                                                            <span className="text-amber-600">Consultar</span>
+                                                                                        ) : (
+                                                                                            <span>${Number(s.precio).toLocaleString('es-AR')}</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => eliminarServicio(idx)}
+                                                                        className="text-red-500 p-1"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </button>
+                                                                </div>
+                                                                
+                                                                {esConsultar && (
+                                                                    <div className="mb-2">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            step="0.01"
+                                                                            value={item.valor || ''}
+                                                                            onChange={(e) => actualizarServicio(idx, 'valor', Number(e.target.value))}
+                                                                            placeholder="Precio manual"
+                                                                            className="w-full px-3 py-1 text-sm border border-amber-300 rounded-md bg-amber-50"
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                                
+                                                                <div className="grid grid-cols-3 gap-2">
+                                                                    <div>
+                                                                        <label className="text-xs text-gray-500">Cantidad</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="1"
+                                                                            value={item.cantidad}
+                                                                            onChange={(e) => actualizarServicio(idx, 'cantidad', Number(e.target.value))}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs text-gray-500">Bonif. %</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            max="100"
+                                                                            value={item.bonificacion}
+                                                                            onChange={(e) => actualizarServicio(idx, 'bonificacion', Number(e.target.value))}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="text-right pt-5">
+                                                                        <span className="text-sm font-medium text-orange-600">
+                                                                            ${(item.valor * item.cantidad * (1 - item.bonificacion / 100)).toLocaleString('es-AR')}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {serviciosItems.length === 0 && (
+                                                        <p className="text-sm text-gray-400 text-center py-2">No hay servicios agregados</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* TOTALES */}
+                                            <div className="border-t pt-3 space-y-2">
+                                                <div className="bg-blue-50 p-3 rounded-lg">
+                                                    <div className="flex justify-between text-sm font-semibold">
+                                                        <span>💰 Inversión Inicial:</span>
+                                                        <span className="text-blue-700">${totalInversionInicial.toLocaleString('es-AR')}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-green-50 p-3 rounded-lg">
+                                                    <div className="flex justify-between text-sm font-semibold">
+                                                        <span>📅 Costo Mensual:</span>
+                                                        <span className="text-green-700">${totalCostoMensual.toLocaleString('es-AR')}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Botones */}
+                                            <div className="flex gap-2 pt-2 border-t">
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelarEdicionCotizacion}
+                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={guardarCotizacion}
+                                                    disabled={isSavingCotizacion}
+                                                    className="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                                                >
+                                                    {isSavingCotizacion ? 'Guardando...' : 'Guardar Cambios'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -914,7 +1560,7 @@ const handleSubmit = useCallback((e: React.FormEvent) => {
                 </div>
             )}
 
-            {/* Botón flotante para volver arriba */}
+            {/* Botón flotante */}
             <button
                 type="button"
                 onClick={scrollToTop}

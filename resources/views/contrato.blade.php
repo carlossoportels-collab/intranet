@@ -111,15 +111,15 @@
         }
 
         .company-info {
-            font-size: 6px;
+            font-size: 7px;
             color: #555;
-            line-height: 1.2;
-            margin-top: 1px;
+            line-height: 1.3;
+            margin-top: 2px;
         }
         
         .company-info strong {
             font-weight: 700;
-            font-size: 6px;
+            font-size: 7px;
         }
 
         .contract-title {
@@ -811,13 +811,7 @@
             </table>
         </div>
 
-<!-- Responsables de Flota y Pagos (solo mostrar si hay datos) -->
-@php
-    $tieneResponsableFlota = !empty($contrato->responsable_flota_nombre) || !empty($contrato->responsable_flota_telefono) || !empty($contrato->responsable_flota_email);
-    $tieneResponsablePagos = !empty($contrato->responsable_pagos_nombre) || !empty($contrato->responsable_pagos_telefono) || !empty($contrato->responsable_pagos_email);
-@endphp
-
-@if($tieneResponsableFlota || $tieneResponsablePagos)
+<!-- Responsables de Flota y Pagos -->
 <div class="section">
     <div class="section-title">Responsables</div>
     
@@ -856,7 +850,6 @@
         </div>
     </div>
 </div>
-@endif
 
         <!-- Datos Fiscales -->
         <div class="section">

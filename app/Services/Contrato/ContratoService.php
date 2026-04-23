@@ -183,8 +183,8 @@ class ContratoService
             'empresa_nombre_flota' => $empresa->nombre_flota,
             'presupuesto_referencia' => $presupuesto->referencia,
             'presupuesto_cantidad_vehiculos' => $presupuesto->cantidad_vehiculos,
-            'presupuesto_total_inversion' => $presupuesto->total_presupuesto,
-            'presupuesto_total_mensual' => $presupuesto->subtotal_abono,
+            'presupuesto_total_inversion' => $this->calcularTotalInversionInicial($presupuesto),
+            'presupuesto_total_mensual' => $this->calcularTotalCostoMensual($presupuesto),
             'presupuesto_promocion' => $presupuesto->promocion?->nombre,
             'created_by' => auth()->id(),
         ];
@@ -403,5 +403,62 @@ public function actualizarLeadACliente($leadId): void
         ]);
     }
 }
+    /**
+ * Calcular total de inversión inicial (tasa + solo accesorios)
+ */
+public function calcularTotalInversionInicial($presupuesto): float
+{
+    $totalTasa = $presupuesto->subtotal_tasa ?? 0;
+    $totalAccesorios = 0;
     
+    if ($presupuesto->agregados && $presupuesto->agregados->count() > 0) {
+        foreach ($presupuesto->agregados as $agregado) {
+            // Verificar si es accesorio (tipo_id = 5)
+            $tipoId = $agregado->productoServicio?->tipo_id;
+            if ($tipoId == 5) {
+                $totalAccesorios += $agregado->subtotal ?? 0;
+            }
+        }
+    }
+    
+    return $totalTasa + $totalAccesorios;
+}
+
+/**
+ * Calcular total de costo mensual (abono + solo servicios)
+ */
+public function calcularTotalCostoMensual($presupuesto): float
+{
+    $totalAbono = $presupuesto->subtotal_abono ?? 0;
+    $totalServicios = 0;
+    
+    if ($presupuesto->agregados && $presupuesto->agregados->count() > 0) {
+        foreach ($presupuesto->agregados as $agregado) {
+            // Verificar si es servicio (tipo_id = 3)
+            $tipoId = $agregado->productoServicio?->tipo_id;
+            if ($tipoId == 3) {
+                $totalServicios += $agregado->subtotal ?? 0;
+            }
+        }
+    }
+    
+    return $totalAbono + $totalServicios;
+}
+
+public function asignarNumeroAlfaSiNoExiste(Empresa $empresa, string $numeroAlfa): void
+{
+    if (empty($empresa->numeroalfa)) {
+        $empresa->update(['numeroalfa' => $numeroAlfa]);
+        Log::info('numeroalfa asignado por primera vez', [
+            'empresa_id' => $empresa->id,
+            'numeroalfa' => $numeroAlfa
+        ]);
+    } else {
+        Log::info('numeroalfa ya existía, no se actualiza', [
+            'empresa_id' => $empresa->id,
+            'numeroalfa_actual' => $empresa->numeroalfa,
+            'intento_asignar' => $numeroAlfa
+        ]);
+    }
+}
 }

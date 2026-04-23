@@ -1,5 +1,5 @@
 // resources/js/Pages/Comercial/Contratos/Index.tsx
-import { Link, router } from '@inertiajs/react';
+import { Link, router,  } from '@inertiajs/react';
 import { FileText, Calendar, User, Building, Truck, Eye, Download, Edit, ChevronDown, ChevronUp, Filter, Tag, Loader } from 'lucide-react';
 import React, { useState, useCallback } from 'react';
 
@@ -239,8 +239,10 @@ export default function ContratosIndex({
     };
 
     const totalPrimerMes = (contrato: Contrato) => {
-        return (contrato.presupuesto_total_inversion || 0) + (contrato.presupuesto_total_mensual || 0);
-    };
+    const inversion = Number(contrato.presupuesto_total_inversion) || 0;
+    const mensual = Number(contrato.presupuesto_total_mensual) || 0;
+    return inversion + mensual;
+};
 
     const toggleMobileCard = (id: number) => {
         setExpandedMobileCard(expandedMobileCard === id ? null : id);
