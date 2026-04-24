@@ -1,6 +1,6 @@
 // resources/js/Pages/Comercial/Presupuestos/Show.tsx
 
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { 
     ArrowLeft, 
     Calendar, 
@@ -74,6 +74,44 @@ export default function PresupuestosShow({
 
     const cantidadVehiculos = presupuesto.cantidad_vehiculos || 1;
 
+    // 🔥 Función para volver a la página anterior (preservando filtros)
+    const handleGoBack = () => {
+        const referrer = document.referrer;
+        
+        // Si venimos de presupuestos, restaurar filtros
+        if (referrer.includes('/comercial/presupuestos')) {
+            const savedFilters = sessionStorage.getItem('presupuestos_filters');
+            const returnUrl = sessionStorage.getItem('presupuestos_filters_return_url');
+            
+            if (returnUrl && savedFilters) {
+                sessionStorage.removeItem('presupuestos_filters_return_url');
+                router.visit(returnUrl, {
+                    preserveState: true,
+                    preserveScroll: true
+                });
+                return;
+            }
+        }
+        
+        // Si venimos de actividad, volver a actividad
+        if (referrer.includes('/comercial/actividad')) {
+            const savedFilters = sessionStorage.getItem('actividad_filters');
+            const returnUrl = sessionStorage.getItem('actividad_filters_return_url');
+            
+            if (returnUrl && savedFilters) {
+                sessionStorage.removeItem('actividad_filters_return_url');
+                router.visit(returnUrl, {
+                    preserveState: true,
+                    preserveScroll: true
+                });
+                return;
+            }
+        }
+        
+        // Fallback: volver atrás en el historial
+        window.history.back();
+    };
+
     return (
         <AppLayout title={`Presupuesto #${data.referencia}`}>
             <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
@@ -82,7 +120,7 @@ export default function PresupuestosShow({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => router.visit('/comercial/presupuestos')}
+                                onClick={handleGoBack}
                                 className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
                             >
                                 <ArrowLeft className="h-5 w-5" />
@@ -127,6 +165,8 @@ export default function PresupuestosShow({
                     </div>
                 </div>
 
+                {/* Resto del contenido igual... */}
+                <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
                 {/* Información del Cliente */}
                 <DataCard title="Información del Cliente" icon={<User className="h-5 w-5" />}>
                     <ResponsiveGrid cols={{ default: 1, md: 2 }} gap={6}>
@@ -155,7 +195,7 @@ export default function PresupuestosShow({
                     </ResponsiveGrid>
                 </DataCard>
 
-                {/* DETALLE DE INVERSIÓN - CON CANTIDADES EXPLÍCITAS */}
+                {/* DETALLE DE INVERSIÓN */}
                 <DataCard title="Detalle de Inversión">
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -407,6 +447,7 @@ export default function PresupuestosShow({
                     </div>
                 </DataCard>
             </div>
+        </div>
         </AppLayout>
     );
 }

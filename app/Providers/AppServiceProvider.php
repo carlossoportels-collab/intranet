@@ -15,6 +15,7 @@ use App\Services\Lead\LeadDetailsService;
 use App\Services\PermisoService;
 use App\Services\Presupuesto\PresupuestoNotificationService;
 use App\Services\Error\ErrorNotificationService;
+use App\Services\Comercial\ActividadService;
 use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
@@ -34,6 +35,9 @@ class AppServiceProvider extends ServiceProvider
         
         // Registrar el servicio de notificaciones de error
         $this->app->singleton(ErrorNotificationService::class);
+        $this->app->singleton(ActividadService::class, function ($app) {
+        return new ActividadService();
+    });
         
         // Registrar paquetes de desarrollo SOLO en local
         if ($this->app->environment('local')) {

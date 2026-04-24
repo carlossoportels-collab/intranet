@@ -1,440 +1,578 @@
 // resources/js/Pages/Comercial/Actividad.tsx
+import { router } from '@inertiajs/react';
 import { 
-    Calendar, Users, FileText, FileSignature, Building, 
-    ChevronRight, Filter, Plus, TrendingUp,
-    UserPlus, Truck, Briefcase
+    Calendar, Users, FileText, FileSignature, 
+    Filter, TrendingUp, UserPlus, Eye, RefreshCw, X
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { es } from 'date-fns/locale';
 
 import AppLayout from '@/layouts/app-layout';
-
-interface ActividadComercialProps {
-    // Props si las necesitas
-}
+import Pagination from '@/components/ui/Pagination';
+import FiltroFechasRapido from '@/components/ui/FiltroFechasRapido';
 
 interface ActividadItem {
     id: number;
     fecha: string;
-    tipo_entidad: 'CONTACTO' | 'PRESUPUESTO' | 'CONTRATO' | 'COMENTARIO';
+    fecha_formateada: string;
+    tipo_entidad: 'LEAD' | 'PRESUPUESTO' | 'CONTRATO';
     nombre: string;
-    empresa?: string;
-    estado: string;
+    estado?: string;
+    estado_id?: number;
+    tipo_operacion?: string;
+    color_hex?: string;
     informacion: string;
-    cantidad?: number;
-    color_estado: string;
+    prefijo?: string;
+    url: string;
 }
 
-interface EstadisticasCard {
-    titulo: string;
-    total: number;
-    nuevos: number;
-    color: string;
-    icono: React.ReactNode;
-    detalles: Array<{label: string; valor: number}>;
+interface EstadisticasData {
+    contactos: {
+        total: number;
+        nuevos: number;
+        por_estado: Array<{label: string; valor: number; color_hex: string}>;
+    };
+    presupuestos: {
+        total: number;
+        nuevos: number;
+        por_estado: Array<{label: string; valor: number}>;
+    };
+    contratos: {
+        total: number;
+        nuevos: number;
+        por_tipo_operacion: Array<{label: string; valor: number}>;
+    };
 }
 
-export default function ActividadComercial({}: ActividadComercialProps) {
-    // Estados para filtros
-    const [rangoFecha, setRangoFecha] = useState<string>('mes');
-    const [fechaPersonalizada, setFechaPersonalizada] = useState<string>('');
-    const [filtroActividad, setFiltroActividad] = useState<string>('todas');
+interface Props {
+    estadisticas: EstadisticasData;
+    actividadReciente: ActividadItem[];
+    comerciales: Array<{id: number; nombre: string; prefijo_id?: number}>;
+    opcionesFechas: Array<{id: string; nombre: string}>;
+    comercialActual: {id: number; nombre: string; prefijo_codigo?: string} | null;
+    esComercial: boolean;
+    filtros: {
+        comercial_id: number | null;
+        fecha_inicio: string | null;
+        fecha_fin: string | null;
+        rango_rapido: string | null;
+    };
+    pagination: {
+        current_page: number;
+        last_page: number;
+        total: number;
+        per_page: number;
+        from: number;
+        to: number;
+    };
+    usuario: {
+        rol_id: number;
+        ve_todas_cuentas: boolean;
+        es_comercial: boolean;
+    };
+}
+
+// FUNCIÓN PARA COLORES DE LEADS - USA EL color_hex DE LA DB
+const getLeadEstadoColor = (colorHex?: string): string => {
+    if (!colorHex) return 'bg-gray-100 text-gray-800 border-gray-200';
     
-    // Datos de ejemplo
-    const [estadisticasData] = useState<EstadisticasCard[]>([
-        {
-            titulo: 'Contactos',
-            total: 248,
-            nuevos: 12,
-            color: 'bg-blue-500',
-            icono: <Users className="h-5 w-5" />,
-            detalles: [
-                { label: 'Nuevos', valor: 12 },
-                { label: 'En negociación', valor: 45 },
-                { label: 'Calificados', valor: 89 },
-                { label: 'Descartados', valor: 102 }
-            ]
-        },
-        {
-            titulo: 'Presupuestos',
-            total: 156,
-            nuevos: 8,
-            color: 'bg-green-500',
-            icono: <FileText className="h-5 w-5" />,
-            detalles: [
-                { label: 'Enviados', valor: 32 },
-                { label: 'Aprobados', valor: 18 },
-                { label: 'Rechazados', valor: 45 },
-                { label: 'Vencidos', valor: 61 }
-            ]
-        },
-        {
-            titulo: 'Contratos',
-            total: 89,
-            nuevos: 5,
-            color: 'bg-purple-500',
-            icono: <FileSignature className="h-5 w-5" />,
-            detalles: [
-                { label: 'Activos', valor: 67 },
-                { label: 'Pendientes', valor: 8 },
-                { label: 'Finalizados', valor: 12 },
-                { label: 'Cancelados', valor: 2 }
-            ]
-        },
-        {
-            titulo: 'Empresas',
-            total: 45,
-            nuevos: 3,
-            color: 'bg-amber-500',
-            icono: <Building className="h-5 w-5" />,
-            detalles: [
-                { label: '1-5 vehículos', valor: 18 },
-                { label: '6-15 vehículos', valor: 12 },
-                { label: '16-30 vehículos', valor: 9 },
-                { label: '+30 vehículos', valor: 6 }
-            ]
-        }
-    ]);
+    // Mapeo de colores hex a clases de Tailwind (según tu DB)
+    const colorMap: Record<string, string> = {
+        // Grises (Nuevo, Vencido, Sin Potencial, Históricos)
+        '#6B7280': 'bg-gray-100 text-gray-800 border-gray-200',
+        '#4B5563': 'bg-gray-100 text-gray-800 border-gray-200',
+        '#9E9E9E': 'bg-gray-100 text-gray-800 border-gray-200',
+        
+        // Azules (Contactado, Recontactando)
+        '#3B82F6': 'bg-blue-100 text-blue-800 border-blue-200',
+        
+        // Celestes / Cian (Seguimiento, Info Enviada)
+        '#06B6D4': 'bg-cyan-100 text-cyan-800 border-cyan-200',
+        
+        // Morados (Propuesta Enviada, Reagendado)
+        '#A855F7': 'bg-purple-100 text-purple-800 border-purple-200',
+        '#8B5CF6': 'bg-purple-100 text-purple-800 border-purple-200',
+        
+        // Naranjas (Negociación)
+        '#F97316': 'bg-orange-100 text-orange-800 border-orange-200',
+        
+        // Verdes (Aprobado, Ganado)
+        '#10B981': 'bg-green-100 text-green-800 border-green-200',
+        
+        // Rojos (Perdido, Sin contactar)
+        '#EF4444': 'bg-red-100 text-red-800 border-red-200',
+        
+        // Amarillos (Pausado)
+        '#F59E0B': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        
+        // Marrón (Rechazo Definitivo)
+        '#7C2D12': 'bg-amber-800 text-amber-100 border-amber-700',
+    };
+    
+    return colorMap[colorHex] || 'bg-gray-100 text-gray-800 border-gray-200';
+};
 
-    const [actividadReciente] = useState<ActividadItem[]>([
-        {
-            id: 1,
-            fecha: '07/01/26',
-            tipo_entidad: 'CONTACTO',
-            nombre: 'JOSE SANCHEZ',
-            empresa: 'Transportes Sanchez',
-            estado: 'Negociación',
-            informacion: 'Facebook ad',
-            cantidad: 1,
-            color_estado: 'bg-yellow-100 text-yellow-800'
-        },
-        {
-            id: 2,
-            fecha: '05/01/26',
-            tipo_entidad: 'PRESUPUESTO',
-            nombre: 'MARTINEZ LOGISTICA',
-            estado: 'Vencido',
-            informacion: '8 vehículos',
-            cantidad: 85000,
-            color_estado: 'bg-red-100 text-red-800'
-        },
-        {
-            id: 3,
-            fecha: '03/01/26',
-            tipo_entidad: 'CONTRATO',
-            nombre: 'JOSE MARIA TRANSPORT',
-            estado: 'Consolidado',
-            informacion: '32 vehículos',
-            cantidad: 320000,
-            color_estado: 'bg-green-100 text-green-800'
-        },
-        {
-            id: 4,
-            fecha: '02/01/26',
-            tipo_entidad: 'COMENTARIO',
-            nombre: 'ARGENTRUCKING',
-            estado: 'Cerrado',
-            informacion: 'Capacitación',
-            cantidad: 1,
-            color_estado: 'bg-gray-100 text-gray-800'
-        }
-    ]);
+// COLORES PARA PRESUPUESTOS
+const getEstadoColor = (estadoId?: number): string => {
+    switch(estadoId) {
+        case 1: return 'bg-green-100 text-green-800 border-green-200';
+        case 2: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        case 3: return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 4: return 'bg-red-100 text-red-800 border-red-200';
+        default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+};
 
-    // Manejadores de filtros
+const getEstadoNombre = (estadoId?: number): string => {
+    switch(estadoId) {
+        case 1: return 'Activo';
+        case 2: return 'Vencido';
+        case 3: return 'Aprobado';
+        case 4: return 'Rechazado';
+        default: return 'Sin estado';
+    }
+};
+
+// COLORES PARA CONTRATOS POR TIPO DE OPERACIÓN
+const getTipoOperacionColor = (tipo?: string): string => {
+    switch(tipo) {
+        case 'venta_cliente': return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 'alta_nueva': return 'bg-green-100 text-green-800 border-green-200';
+        case 'cambio_titularidad': return 'bg-orange-100 text-orange-800 border-orange-200';
+        case 'cambio_razon_social': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        case 'cambio_smartsat': return 'bg-purple-100 text-purple-800 border-purple-200';
+        default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+};
+
+const getTipoOperacionNombre = (tipo?: string): string => {
+    switch(tipo) {
+        case 'venta_cliente': return 'Venta a Cliente';
+        case 'alta_nueva': return 'Alta Nueva';
+        case 'cambio_titularidad': return 'Cambio Titularidad';
+        case 'cambio_razon_social': return 'Cambio Razón Social';
+        case 'cambio_smartsat': return 'Cambio SmartSat';
+        default: return 'Sin tipo';
+    }
+};
+
+export default function ActividadComercial({ 
+    estadisticas, 
+    actividadReciente, 
+    comerciales,
+    opcionesFechas,
+    comercialActual,
+    esComercial,
+    filtros,
+    pagination,
+    usuario 
+}: Props) {
+    const [comercialId, setComercialId] = useState<string>(filtros.comercial_id?.toString() || '');
+    const [fechaInicio, setFechaInicio] = useState<Date | null>(filtros.fecha_inicio ? new Date(filtros.fecha_inicio) : null);
+    const [fechaFin, setFechaFin] = useState<Date | null>(filtros.fecha_fin ? new Date(filtros.fecha_fin) : null);
+    const [rangoRapido, setRangoRapido] = useState<string>(filtros.rango_rapido || '');
+    const [cargando, setCargando] = useState(false);
+
     const aplicarFiltros = () => {
-        console.log('Aplicando filtros:', { rangoFecha, fechaPersonalizada, filtroActividad });
-        // Aquí iría la lógica real para filtrar
+        setCargando(true);
+        const params: Record<string, string> = {};
+        
+        if (comercialId && !esComercial) params.comercial_id = comercialId;
+        if (rangoRapido) {
+            params.rango_rapido = rangoRapido;
+        } else {
+            if (fechaInicio) params.fecha_inicio = fechaInicio.toISOString().split('T')[0];
+            if (fechaFin) params.fecha_fin = fechaFin.toISOString().split('T')[0];
+        }
+        
+        router.get('/comercial/actividad', params, {
+            preserveState: true,
+            preserveScroll: true,
+            onFinish: () => setCargando(false)
+        });
     };
 
-    // Obtener icono según tipo de entidad
-    const getIcono = (tipo: string) => {
+    const limpiarFiltros = () => {
+        setComercialId('');
+        setFechaInicio(null);
+        setFechaFin(null);
+        setRangoRapido('');
+        router.get('/comercial/actividad', {}, {
+            preserveState: true,
+            preserveScroll: true
+        });
+    };
+
+    const handleRangoRapidoChange = (value: string) => {
+        setRangoRapido(value);
+        setFechaInicio(null);
+        setFechaFin(null);
+    };
+
+    const getTipoIcono = (tipo: string) => {
         switch (tipo) {
-            case 'CONTACTO': return <Users className="h-4 w-4" />;
+            case 'LEAD': return <Users className="h-4 w-4" />;
             case 'PRESUPUESTO': return <FileText className="h-4 w-4" />;
             case 'CONTRATO': return <FileSignature className="h-4 w-4" />;
-            case 'COMENTARIO': return <Briefcase className="h-4 w-4" />;
             default: return <Users className="h-4 w-4" />;
         }
     };
 
+    const getTipoNombre = (tipo: string) => {
+        switch (tipo) {
+            case 'LEAD': return 'Lead';
+            case 'PRESUPUESTO': return 'Presupuesto';
+            case 'CONTRATO': return 'Contrato';
+            default: return tipo;
+        }
+    };
+
+    // Determinar título según rol
+    const titulo = esComercial ? 'Mi Actividad Comercial' : 'Actividades Comerciales';
+    const subtitulo = esComercial ? 'Gestión de tu actividad comercial' : 'Gestión y seguimiento de actividades comerciales';
+useEffect(() => {
+    // Guardar filtros actuales en sessionStorage cuando la página carga
+    const currentParams = new URLSearchParams(window.location.search);
+    const filtrosObj: Record<string, string> = {};
+    currentParams.forEach((value, key) => {
+        filtrosObj[key] = value;
+    });
+    
+    sessionStorage.setItem('actividad_filters', JSON.stringify(filtrosObj));
+    sessionStorage.setItem('actividad_filters_return_url', window.location.pathname + window.location.search);
+}, [window.location.search]);
     return (
-        <AppLayout title="Actividad Comercial">
-            {/* Header - Ajustado para ser consistente con Dashboard */}
-            <div className="mb-4"> {/* Reducido de mb-6 a mb-4 para coincidir con Dashboard */}
-                <h1 className="text-3xl font-bold text-gray-900"> {/* Aumentado a text-3xl */}
-                    Actividad Comercial
-                </h1>
-                <p className="mt-1 text-gray-600 text-base"> {/* Aumentado a text-base */}
-                    Gestión y seguimiento de actividades comerciales
-                </p>
-            </div>
+        <AppLayout title={titulo}>
+            <div className="max-w-8xl mx-auto px-4 sm:px-6 py-6">
+                <div className="mb-6">
+                    <h1 className="text-3xl font-bold text-gray-900">
+                        {titulo}
+                    </h1>
+                    <p className="mt-1 text-gray-600 text-base">
+                        {subtitulo}
+                    </p>
+                </div>
 
-            {/* Barra de filtros - COMPLETAMENTE RESPONSIVE */}
-            <div className="mb-4 p-4 bg-white rounded-lg shadow-sm border border-gray-200"> {/* Reducido mb */}
-                <div className="flex flex-col lg:flex-row lg:items-center gap-3"> {/* Reducido gap */}
-                    <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700">Rango:</span>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            onClick={() => setRangoFecha('mes')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${rangoFecha === 'mes' ? 'bg-sat text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                        >
-                            Mes actual
-                        </button>
-                        <button
-                            onClick={() => setRangoFecha('15dias')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${rangoFecha === '15dias' ? 'bg-sat text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                        >
-                            15 días
-                        </button>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setRangoFecha('personalizado')}
-                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${rangoFecha === 'personalizado' ? 'bg-sat text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                            >
-                                Fecha exacta
-                            </button>
-                            {rangoFecha === 'personalizado' && (
-                                <input
-                                    type="date"
-                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-sat focus:border-sat w-40"
-                                    value={fechaPersonalizada}
-                                    onChange={(e) => setFechaPersonalizada(e.target.value)}
+                {/* Barra de filtros */}
+                <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                        {!esComercial && comerciales.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                <select 
+                                    className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-sat focus:border-sat"
+                                    value={comercialId}
+                                    onChange={(e) => setComercialId(e.target.value)}
+                                >
+                                    <option value="">Todos los comerciales</option>
+                                    {comerciales.map(comercial => (
+                                        <option key={comercial.id} value={comercial.id}>
+                                            {comercial.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        <FiltroFechasRapido
+                            opciones={opcionesFechas}
+                            value={rangoRapido}
+                            onChange={handleRangoRapidoChange}
+                        />
+
+                        {!rangoRapido && (
+                            <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                <DatePicker
+                                    selected={fechaInicio}
+                                    onChange={(date: Date | null) => setFechaInicio(date)}
+                                    selectsStart
+                                    startDate={fechaInicio || undefined}
+                                    endDate={fechaFin || undefined}
+                                    placeholderText="Fecha inicio"
+                                    dateFormat="dd/MM/yyyy"
+                                    className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-36 focus:ring-sat focus:border-sat"
+                                    popperClassName="z-[100000]"
+                                    locale={es}
                                 />
-                            )}
-                        </div>
-                    </div>
+                                <span className="text-gray-500">a</span>
+                                <DatePicker
+                                    selected={fechaFin}
+                                    onChange={(date: Date | null) => setFechaFin(date)}
+                                    selectsEnd
+                                    startDate={fechaInicio || undefined}
+                                    endDate={fechaFin || undefined}
+                                    minDate={fechaInicio || undefined}
+                                    placeholderText="Fecha fin"
+                                    dateFormat="dd/MM/yyyy"
+                                    className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-36 focus:ring-sat focus:border-sat"
+                                    popperClassName="z-[100000]"
+                                    locale={es}
+                                />
+                            </div>
+                        )}
 
-                    <div className="lg:ml-auto flex flex-col xs:flex-row items-start xs:items-center gap-3 mt-2 lg:mt-0">
-                        <div className="flex items-center gap-2">
-                            <Filter className="h-4 w-4 text-gray-500" />
-                            <select 
-                                className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-sat focus:border-sat w-full xs:w-auto"
-                                value={filtroActividad}
-                                onChange={(e) => setFiltroActividad(e.target.value)}
+                        <div className="lg:ml-auto flex gap-2">
+                            <button 
+                                onClick={aplicarFiltros}
+                                disabled={cargando}
+                                className="px-4 py-1.5 text-sm font-medium text-white bg-sat rounded-md hover:bg-sat-600 disabled:opacity-50 flex items-center gap-2"
                             >
-                                <option value="todas">Todas</option>
-                                <option value="contactos">Contactos</option>
-                                <option value="presupuestos">Presupuestos</option>
-                                <option value="contratos">Contratos</option>
-                                <option value="empresas">Empresas</option>
-                            </select>
+                                {cargando ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Filter className="h-4 w-4" />}
+                                Aplicar
+                            </button>
+                            <button 
+                                onClick={limpiarFiltros}
+                                className="px-4 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 flex items-center gap-1"
+                            >
+                                <X className="h-4 w-4" />
+                                Limpiar
+                            </button>
                         </div>
-                        
-                        <button 
-                            onClick={aplicarFiltros}
-                            className="px-4 py-1.5 text-sm font-medium text-white bg-sat rounded-md hover:bg-sat-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sat whitespace-nowrap"
-                        >
-                            Aplicar
-                        </button>
                     </div>
                 </div>
-            </div>
 
-            {/* Cards de estadísticas - RESPONSIVE COMO DASHBOARD */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4"> {/* Mismo grid que Dashboard */}
-                {estadisticasData.map((item, index) => (
-                    <div key={index} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-sat transition-all"> {/* Estilo igual a Dashboard */}
+                {/* Cards de estadísticas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    {/* Contactos Card */}
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-sat transition-all">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-base font-medium text-gray-700"> {/* text-base igual que Dashboard */}
-                                    {item.titulo}
-                                </p>
-                                <p className="text-3xl font-bold text-local mt-1"> {/* text-3xl igual que Dashboard */}
-                                    {item.total}
-                                </p>
+                                <p className="text-base font-medium text-gray-700">Contactos</p>
+                                <p className="text-3xl font-bold text-local mt-1">{estadisticas.contactos.total}</p>
                             </div>
-                            <div className={`h-12 w-12 ${item.color.replace('bg-', 'bg-').replace('500', '100')} rounded-lg flex items-center justify-center`}>
-                                <div className={`h-9 w-9 ${item.color} rounded-md flex items-center justify-center`}>
-                                    <span className="text-white font-bold text-sm">
-                                        {item.icono}
-                                    </span>
-                                </div>
+                            <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <Users className="h-6 w-6 text-blue-600" />
                             </div>
                         </div>
                         
-                        {/* Nuevos */}
                         <div className="flex items-center justify-between mt-3 p-2 bg-gray-50 rounded">
                             <div className="flex items-center">
                                 <UserPlus className="h-3 w-3 mr-1 text-green-600" />
-                                <span className="text-sm text-gray-600">Nuevos:</span>
+                                <span className="text-sm text-gray-600">Nuevos (30 días):</span>
                             </div>
-                            <span className="font-semibold text-green-700">{item.nuevos}</span>
+                            <span className="font-semibold text-green-700">{estadisticas.contactos.nuevos}</span>
                         </div>
 
-                        {/* Lista de estados - Responsive */}
-                        <div className="mt-3 grid grid-cols-2 gap-2">
-                            {item.detalles.map((detalle, idx) => (
-                                <div key={idx} className="text-center p-2 bg-gray-50 rounded">
-                                    <div className="text-xs text-gray-500 mb-1">{detalle.label}</div>
-                                    <div className="text-sm font-medium text-gray-900">{detalle.valor}</div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Botón de acción */}
-                        <button className="w-full mt-3 text-center text-sm text-gray-600 hover:text-sat hover:bg-gray-50 py-2 rounded border border-gray-200 hover:border-sat transition-colors flex items-center justify-center">
-                            Ver {item.titulo.toLowerCase()}
-                            <ChevronRight className="h-3 w-3 ml-1" />
-                        </button>
-                    </div>
-                ))}
-            </div>
-
-            {/* Última actividad - Tabla RESPONSIVE */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden">
-                <div className="p-4 border-b border-gray-200">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                        <div className="flex items-center">
-                            <TrendingUp className="h-5 w-5 mr-2 text-gray-600" />
-                            <h2 className="text-xl font-semibold text-gray-900"> {/* text-xl igual que Dashboard */}
-                                Última actividad
-                            </h2>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500 hidden sm:block">
-                                Actualizado: {new Date().toLocaleDateString('es-ES')}
-                            </span>
-                            <button className="px-3 py-1.5 text-sm bg-sat text-white rounded hover:bg-sat-600 transition-colors">
-                                Ver Todo
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="p-4">
-                    {/* Tabla responsiva */}
-                    <div className="overflow-x-auto">
-                        <div className="min-w-full">
-                            <div className="hidden lg:block">
-                                {/* Desktop table */}
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="py-3 px-4 text-left font-medium text-gray-700">Fecha</th>
-                                            <th className="py-3 px-4 text-left font-medium text-gray-700">Entidad</th>
-                                            <th className="py-3 px-4 text-left font-medium text-gray-700">Empresa / Contacto</th>
-                                            <th className="py-3 px-4 text-left font-medium text-gray-700">Estado</th>
-                                            <th className="py-3 px-4 text-left font-medium text-gray-700">Información</th>
-                                            <th className="py-3 px-4 text-left font-medium text-gray-700">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {actividadReciente.map((item) => (
-                                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="py-3 px-4 font-medium text-gray-900">{item.fecha}</td>
-                                                <td className="py-3 px-4">
-                                                    <div className="flex items-center">
-                                                        <div className="mr-2 text-gray-500">
-                                                            {getIcono(item.tipo_entidad)}
-                                                        </div>
-                                                        <span className="text-gray-700">{item.tipo_entidad}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    <div>
-                                                        <div className="font-medium text-gray-900">{item.nombre}</div>
-                                                        {item.empresa && (
-                                                            <div className="text-sm text-gray-500">{item.empresa}</div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.color_estado}`}>
-                                                        {item.estado}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3 px-4 text-gray-600">
-                                                    <div>
-                                                        {item.informacion}
-                                                        {item.cantidad && item.cantidad > 1 && (
-                                                            <div className="flex items-center mt-1 text-xs">
-                                                                <Truck className="h-3 w-3 mr-1 text-gray-400" />
-                                                                <span className="text-gray-500">
-                                                                    {item.tipo_entidad === 'CONTRATO' ? '$ ' : ''}
-                                                                    {item.cantidad.toLocaleString('es-ES')}
-                                                                    {item.tipo_entidad === 'CONTRATO' ? '' : ' vehículos'}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    <div className="flex gap-2">
-                                                        <button className="text-sat hover:text-sat-600 text-sm font-medium hover:underline">
-                                                            Ver
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Mobile cards */}
-                            <div className="lg:hidden space-y-3">
-                                {actividadReciente.map((item) => (
-                                    <div key={item.id} className="p-4 border border-gray-200 rounded-lg hover:border-sat transition-colors">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex items-center">
-                                                <div className="mr-2 text-gray-500">
-                                                    {getIcono(item.tipo_entidad)}
-                                                </div>
-                                                <span className="font-medium text-gray-900">{item.tipo_entidad}</span>
-                                            </div>
-                                            <span className="text-sm text-gray-500">{item.fecha}</span>
-                                        </div>
-                                        
-                                        <div className="mb-2">
-                                            <div className="font-medium text-gray-900">{item.nombre}</div>
-                                            {item.empresa && (
-                                                <div className="text-sm text-gray-500">{item.empresa}</div>
-                                            )}
-                                        </div>
-                                        
-                                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.color_estado}`}>
-                                                {item.estado}
-                                            </span>
-                                            <div className="text-sm text-gray-600">
-                                                {item.informacion}
-                                                {item.cantidad && (
-                                                    <div className="text-xs text-gray-500">
-                                                        {item.tipo_entidad === 'CONTRATO' ? '$' : ''}
-                                                        {item.cantidad.toLocaleString('es-ES')}
-                                                        {item.tipo_entidad === 'CONTRATO' ? '' : ' vehículos'}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="flex gap-2">
-                                            <button className="flex-1 px-3 py-1.5 text-sm text-sat border border-sat rounded hover:bg-sat-50 transition-colors">
-                                                Ver detalles
-                                            </button>
-                                        </div>
-                                    </div>
+                        <div className="mt-3">
+                            <p className="text-xs text-gray-500 mb-2">Por estado:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {estadisticas.contactos.por_estado.map((estado, idx) => (
+                                    <span key={idx} className={`px-2 py-1 rounded-full text-xs font-medium ${getLeadEstadoColor(estado.color_hex)}`}>
+                                        {estado.label}: {estado.valor}
+                                    </span>
                                 ))}
                             </div>
                         </div>
                     </div>
 
-                    {/* Paginación */}
-                    <div className="flex flex-col sm:flex-row justify-between items-center mt-4 pt-4 border-t border-gray-200 gap-2">
-                        <div className="text-sm text-gray-600">
-                            Mostrando {actividadReciente.length} actividades
+                    {/* Presupuestos Card */}
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-sat transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-base font-medium text-gray-700">Presupuestos</p>
+                                <p className="text-3xl font-bold text-local mt-1">{estadisticas.presupuestos.total}</p>
+                            </div>
+                            <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                <FileText className="h-6 w-6 text-green-600" />
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <button className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-                                Anterior
-                            </button>
-                            <button className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-                                Siguiente
-                            </button>
+                        
+                        <div className="flex items-center justify-between mt-3 p-2 bg-gray-50 rounded">
+                            <div className="flex items-center">
+                                <UserPlus className="h-3 w-3 mr-1 text-green-600" />
+                                <span className="text-sm text-gray-600">Nuevos (30 días):</span>
+                            </div>
+                            <span className="font-semibold text-green-700">{estadisticas.presupuestos.nuevos}</span>
                         </div>
+
+                        <div className="mt-3">
+                            <p className="text-xs text-gray-500 mb-2">Por estado:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {estadisticas.presupuestos.por_estado.map((estado, idx) => {
+                                    let estadoId = 0;
+                                    if (estado.label === 'Activo') estadoId = 1;
+                                    else if (estado.label === 'Vencido') estadoId = 2;
+                                    else if (estado.label === 'Aprobado') estadoId = 3;
+                                    else if (estado.label === 'Rechazado') estadoId = 4;
+                                    return (
+                                        <span key={idx} className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoColor(estadoId)}`}>
+                                            {estado.label}: {estado.valor}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Contratos Card */}
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-sat transition-all">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-base font-medium text-gray-700">Contratos</p>
+                                <p className="text-3xl font-bold text-local mt-1">{estadisticas.contratos.total}</p>
+                            </div>
+                            <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <FileSignature className="h-6 w-6 text-purple-600" />
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mt-3 p-2 bg-gray-50 rounded">
+                            <div className="flex items-center">
+                                <UserPlus className="h-3 w-3 mr-1 text-green-600" />
+                                <span className="text-sm text-gray-600">Nuevos (30 días):</span>
+                            </div>
+                            <span className="font-semibold text-green-700">{estadisticas.contratos.nuevos}</span>
+                        </div>
+
+                        <div className="mt-3">
+                            <p className="text-xs text-gray-500 mb-2">Por tipo de operación:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {estadisticas.contratos.por_tipo_operacion.map((tipo, idx) => {
+                                    let tipoKey = '';
+                                    if (tipo.label === 'Venta a Cliente') tipoKey = 'venta_cliente';
+                                    else if (tipo.label === 'Alta Nueva') tipoKey = 'alta_nueva';
+                                    else if (tipo.label === 'Cambio Titularidad') tipoKey = 'cambio_titularidad';
+                                    else if (tipo.label === 'Cambio Razón Social') tipoKey = 'cambio_razon_social';
+                                    else if (tipo.label === 'Cambio SmartSat') tipoKey = 'cambio_smartsat';
+                                    return (
+                                        <span key={idx} className={`px-2 py-1 rounded-full text-xs font-medium ${getTipoOperacionColor(tipoKey)}`}>
+                                            {tipo.label}: {tipo.valor}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Última actividad */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="p-4 border-b border-gray-200">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div className="flex items-center">
+                                <TrendingUp className="h-5 w-5 mr-2 text-gray-600" />
+                                <h2 className="text-xl font-semibold text-gray-900">
+                                    Última actividad
+                                </h2>
+                            </div>
+                            <div className="text-sm text-gray-500">
+                                {pagination.total} registros encontrados
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="p-4">
+                        {actividadReciente.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                No hay actividad para mostrar
+                            </div>
+                        ) : (
+                            <>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="py-3 px-4 text-left font-medium text-gray-700">Fecha</th>
+                                                {!esComercial && (
+                                                    <th className="py-3 px-4 text-left font-medium text-gray-700">Prefijo</th>
+                                                )}
+                                                <th className="py-3 px-4 text-left font-medium text-gray-700">Tipo</th>
+                                                <th className="py-3 px-4 text-left font-medium text-gray-700">Nombre</th>
+                                                <th className="py-3 px-4 text-left font-medium text-gray-700">Estado/Tipo</th>
+                                                <th className="py-3 px-4 text-left font-medium text-gray-700">Información</th>
+                                                <th className="py-3 px-4"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {actividadReciente.map((item, idx) => {
+                                                let estadoClassName = '';
+                                                let estadoTexto = '';
+                                                
+                                                if (item.tipo_entidad === 'LEAD') {
+                                                    estadoClassName = getLeadEstadoColor(item.color_hex);
+                                                    estadoTexto = item.estado || 'Sin estado';
+                                                } else if (item.tipo_entidad === 'PRESUPUESTO') {
+                                                    estadoClassName = getEstadoColor(item.estado_id);
+                                                    estadoTexto = getEstadoNombre(item.estado_id);
+                                                } else {
+                                                    estadoClassName = getTipoOperacionColor(item.tipo_operacion);
+                                                    estadoTexto = getTipoOperacionNombre(item.tipo_operacion);
+                                                }
+                                                
+                                                return (
+                                                    <tr key={`${item.tipo_entidad}-${item.id}-${idx}`} className="hover:bg-gray-50 transition-colors">
+                                                        <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
+                                                            {item.fecha_formateada}
+                                                        </td>
+                                                        {!esComercial && (
+                                                            <td className="py-3 px-4">
+                                                                <span className="text-xs text-gray-400">{item.prefijo || '-'}</span>
+                                                            </td>
+                                                        )}
+                                                        <td className="py-3 px-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-gray-500">{getTipoIcono(item.tipo_entidad)}</span>
+                                                                <span className="text-gray-700">{getTipoNombre(item.tipo_entidad)}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <div className="font-medium text-gray-900">{item.nombre}</div>
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${estadoClassName}`}>
+                                                                {estadoTexto}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-4 text-gray-600">
+                                                            <div className="max-w-md truncate" title={item.informacion}>
+                                                                {item.informacion}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <button 
+                                                                onClick={() => router.visit(item.url)}
+                                                                className="text-sat hover:text-sat-600 text-sm font-medium flex items-center gap-1"
+                                                            >
+                                                                <Eye className="h-3 w-3" />
+                                                                Ver
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Paginación */}
+                                {pagination.last_page > 1 && (
+                                    <div className="mt-6">
+                                        <Pagination
+                                            currentPage={pagination.current_page}
+                                            lastPage={pagination.last_page}
+                                            total={pagination.total}
+                                            perPage={pagination.per_page}
+                                            useLinks={false}
+                                            onPageChange={(page) => {
+                                                const params: Record<string, string> = {};
+                                                if (comercialId && !esComercial) params.comercial_id = comercialId;
+                                                if (rangoRapido) {
+                                                    params.rango_rapido = rangoRapido;
+                                                } else {
+                                                    if (fechaInicio) params.fecha_inicio = fechaInicio?.toISOString().split('T')[0];
+                                                    if (fechaFin) params.fecha_fin = fechaFin?.toISOString().split('T')[0];
+                                                }
+                                                params.page = page.toString();
+                                                router.get('/comercial/actividad', params, { preserveState: true, preserveScroll: true });
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

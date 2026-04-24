@@ -1,7 +1,7 @@
 // resources/js/Pages/Comercial/Presupuestos/Index.tsx
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { Gift, Eye, Edit, FileText, ChevronDown, ChevronUp, Filter, Calendar, Truck, DollarSign, User } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect  } from 'react';
 
 import { PresupuestoFilterBar } from '@/components/presupuestos/PresupuestoFilterBar';
 import Pagination from '@/components/ui/Pagination';
@@ -209,6 +209,20 @@ export default function PresupuestosIndex({
     const getLeadTelefono = (lead: Presupuesto['lead']) => {
         return lead?.telefono || 'Teléfono no disponible';
     };
+
+    const { url } = usePage();
+
+useEffect(() => {
+    // Guardar filtros actuales en sessionStorage cuando la página carga
+    const currentParams = new URLSearchParams(window.location.search);
+    const filtrosObj: Record<string, string> = {};
+    currentParams.forEach((value, key) => {
+        filtrosObj[key] = value;
+    });
+    
+    sessionStorage.setItem('contratos_filters', JSON.stringify(filtrosObj));
+    sessionStorage.setItem('contratos_filters_return_url', window.location.pathname + window.location.search);
+}, [url]);
 
     return (
         <AppLayout title="Presupuestos">

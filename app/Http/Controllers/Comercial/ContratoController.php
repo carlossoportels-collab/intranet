@@ -416,7 +416,14 @@ public function index(Request $request)
             if ($lead && $lead->id) {
                 $this->contratoService->actualizarLeadACliente($lead->id);
             }
-            
+            if ($presupuesto) {
+                $presupuesto->estado_id = 3; // Aprobado
+                $presupuesto->save();
+                Log::info('Presupuesto actualizado a estado 3', [
+                    'presupuesto_id' => $presupuesto->id,
+                    'contrato_id' => $contrato->id
+                ]);
+            }
             DB::commit();
 
             Log::info('Contrato creado exitosamente', ['contrato_id' => $contrato->id]);

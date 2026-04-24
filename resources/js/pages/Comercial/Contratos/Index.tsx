@@ -1,7 +1,7 @@
 // resources/js/Pages/Comercial/Contratos/Index.tsx
-import { Link, router,  } from '@inertiajs/react';
+import { Link, router, usePage  } from '@inertiajs/react';
 import { FileText, Calendar, User, Building, Truck, Eye, Download, Edit, ChevronDown, ChevronUp, Filter, Tag, Loader } from 'lucide-react';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect  } from 'react';
 
 import { ContratoFilterBar } from '@/components/contratos/ContratoFilterBar';
 import { Amount } from '@/components/ui/Amount';
@@ -198,12 +198,25 @@ export default function ContratosIndex({
     };
 
     const handleFilterChange = (key: string, value: string) => {
-        if (usuarioEsComercial && key === 'prefijo_id') return;
-        
-        const newFilters = { ...filters, [key]: value, page: 1 };
-        setFilters(newFilters);
-        router.get('/comercial/contratos', newFilters, { preserveState: true });
-    };
+    if (usuarioEsComercial && key === 'prefijo_id') return;
+    
+    const newFilters = { ...filters, [key]: value, page: 1 };
+    setFilters(newFilters);
+    
+    // Guardar filtros en sessionStorage - convertir todo a string
+    const filtrosObj: Record<string, string> = {};
+    Object.entries(newFilters).forEach(([k, v]) => {
+        if (v && v !== '') {
+            filtrosObj[k] = String(v);
+        }
+    });
+    sessionStorage.setItem('contratos_filters', JSON.stringify(filtrosObj));
+    
+    const queryString = new URLSearchParams(filtrosObj).toString();
+    sessionStorage.setItem('contratos_filters_return_url', '/comercial/contratos' + (queryString ? `?${queryString}` : ''));
+    
+    router.get('/comercial/contratos', newFilters, { preserveState: true });
+};
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -211,22 +224,27 @@ export default function ContratosIndex({
     };
 
     const clearFilters = () => {
-        const newFilters: any = { 
-            estado_id: '', 
-            fecha_inicio: '', 
-            fecha_fin: '',
-            search: ''
-        };
-        
-        if (usuarioEsComercial && prefijoUsuario?.id) {
-            newFilters.prefijo_id = prefijoUsuario.id;
-        } else if (!usuarioEsComercial) {
-            newFilters.prefijo_id = '';
-        }
-        
-        setFilters(newFilters);
-        router.get('/comercial/contratos', newFilters, { preserveState: true });
+    const newFilters: any = { 
+        estado_id: '', 
+        fecha_inicio: '', 
+        fecha_fin: '',
+        search: ''
     };
+    
+    if (usuarioEsComercial && prefijoUsuario?.id) {
+        newFilters.prefijo_id = prefijoUsuario.id;
+    } else if (!usuarioEsComercial) {
+        newFilters.prefijo_id = '';
+    }
+    
+    setFilters(newFilters);
+    
+    // Limpiar filtros guardados
+    sessionStorage.removeItem('contratos_filters');
+    sessionStorage.removeItem('contratos_filters_return_url');
+    
+    router.get('/comercial/contratos', newFilters, { preserveState: true });
+};
 
     const hayFiltrosActivos = () => {
         let hasFilters = filters.estado_id || filters.fecha_inicio || filters.fecha_fin || filters.search;
@@ -247,6 +265,23 @@ export default function ContratosIndex({
     const toggleMobileCard = (id: number) => {
         setExpandedMobileCard(expandedMobileCard === id ? null : id);
     };
+
+
+    const { url } = usePage();
+
+useEffect(() => {
+    // Guardar filtros actuales en sessionStorage cuando la página carga
+    const currentParams = new URLSearchParams(window.location.search);
+    const filtrosObj: Record<string, string> = {};
+    currentParams.forEach((value, key) => {
+        filtrosObj[key] = value;
+    });
+    
+    if (Object.keys(filtrosObj).length > 0) {
+        sessionStorage.setItem('contratos_filters', JSON.stringify(filtrosObj));
+    }
+    sessionStorage.setItem('contratos_filters_return_url', window.location.pathname + window.location.search);
+}, [url]);
 
     return (
         <AppLayout title="Contratos">

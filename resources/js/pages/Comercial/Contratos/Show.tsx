@@ -59,7 +59,43 @@ export default function ContratoShow({ contrato }: Props) {
             default: return 'gray';
         }
     };
-
+    // Función para volver a la página anterior (preservando filtros)
+    const handleGoBack = () => {
+        const referrer = document.referrer;
+        
+        // Si venimos de contratos, restaurar filtros
+        if (referrer.includes('/comercial/contratos')) {
+            const savedFilters = sessionStorage.getItem('contratos_filters');
+            const returnUrl = sessionStorage.getItem('contratos_filters_return_url');
+            
+            if (returnUrl && savedFilters) {
+                sessionStorage.removeItem('contratos_filters_return_url');
+                router.visit(returnUrl, {
+                    preserveState: true,
+                    preserveScroll: true
+                });
+                return;
+            }
+        }
+        
+        // Si venimos de actividad, volver a actividad
+        if (referrer.includes('/comercial/actividad')) {
+            const savedFilters = sessionStorage.getItem('actividad_filters');
+            const returnUrl = sessionStorage.getItem('actividad_filters_return_url');
+            
+            if (returnUrl && savedFilters) {
+                sessionStorage.removeItem('actividad_filters_return_url');
+                router.visit(returnUrl, {
+                    preserveState: true,
+                    preserveScroll: true
+                });
+                return;
+            }
+        }
+        
+        // Fallback: volver atrás en el historial
+        window.history.back();
+    };
     const generarPDFTemporal = async (): Promise<string | null> => {
         return new Promise((resolve) => {
             router.post(`/comercial/contratos/${contrato.id}/generar-pdf-temp`, {}, {
@@ -167,7 +203,7 @@ export default function ContratoShow({ contrato }: Props) {
                 <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <button
-                            onClick={() => router.visit('/comercial/contratos')}
+                            onClick={handleGoBack}
                             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                         >
                             <ArrowLeft className="h-5 w-5" />
