@@ -411,7 +411,7 @@ export default function CambioTitularidad({
         <AppLayout title="Cambio de Titularidad">
             <Head title="Cambio de Titularidad" />
 
-            <div className="px-4 sm:px-6 lg:px-8 py-6">
+            <div className="max-w-8xl mx-auto px-4 sm:px-6 py-6">
                 <div className="mb-6">
                     <h1 className="text-2xl font-bold text-gray-900">Cambio de Titularidad</h1>
                     <p className="mt-1 text-sm text-gray-600">Transfiera vehículos a otra empresa</p>

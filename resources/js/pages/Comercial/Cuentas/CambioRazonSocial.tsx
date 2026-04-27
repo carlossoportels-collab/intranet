@@ -439,7 +439,7 @@ export default function CambioRazonSocial({
         <AppLayout title="Cambio de Razón Social">
             <Head title="Cambio de Razón Social" />
 
-            <div className="mb-6">
+            <div className="max-w-8xl mx-auto px-4 sm:px-6 py-6">
                 <h1 className="text-2xl font-bold text-slate-900">Cambio de Razón Social</h1>
                 <p className="mt-1 text-slate-500 text-sm">Complete todos los datos de la empresa para generar el contrato</p>
             </div>

@@ -290,7 +290,7 @@ const handleBack = () => {
     <AppLayout title={`Lead #${lead.id} - ${lead.nombre_completo}`}>
       <Head title={`Lead #${lead.id} - ${lead.nombre_completo}`} />
       
-      <div className="w-full px-2 sm:px-4 py-3 sm:py-6">
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 py-6">
 
         <div className="mb-4 sm:mb-6">
           <LeadHeader

@@ -188,7 +188,7 @@ export default function CertificadosFlota({
             <Head title="Certificados de Flota" />
             
             {/* Header */}
-            <div className="mb-6">
+            <div className="max-w-8xl mx-auto px-4 sm:px-6 py-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <div>
                         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">

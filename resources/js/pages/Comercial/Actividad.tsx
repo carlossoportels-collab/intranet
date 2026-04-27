@@ -5,9 +5,6 @@ import {
     Filter, TrendingUp, UserPlus, Eye, RefreshCw, X
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { es } from 'date-fns/locale';
 
 import AppLayout from '@/layouts/app-layout';
 import Pagination from '@/components/ui/Pagination';
@@ -78,43 +75,24 @@ interface Props {
 const getLeadEstadoColor = (colorHex?: string): string => {
     if (!colorHex) return 'bg-gray-100 text-gray-800 border-gray-200';
     
-    // Mapeo de colores hex a clases de Tailwind (según tu DB)
     const colorMap: Record<string, string> = {
-        // Grises (Nuevo, Vencido, Sin Potencial, Históricos)
         '#6B7280': 'bg-gray-100 text-gray-800 border-gray-200',
         '#4B5563': 'bg-gray-100 text-gray-800 border-gray-200',
         '#9E9E9E': 'bg-gray-100 text-gray-800 border-gray-200',
-        
-        // Azules (Contactado, Recontactando)
         '#3B82F6': 'bg-blue-100 text-blue-800 border-blue-200',
-        
-        // Celestes / Cian (Seguimiento, Info Enviada)
         '#06B6D4': 'bg-cyan-100 text-cyan-800 border-cyan-200',
-        
-        // Morados (Propuesta Enviada, Reagendado)
         '#A855F7': 'bg-purple-100 text-purple-800 border-purple-200',
         '#8B5CF6': 'bg-purple-100 text-purple-800 border-purple-200',
-        
-        // Naranjas (Negociación)
         '#F97316': 'bg-orange-100 text-orange-800 border-orange-200',
-        
-        // Verdes (Aprobado, Ganado)
         '#10B981': 'bg-green-100 text-green-800 border-green-200',
-        
-        // Rojos (Perdido, Sin contactar)
         '#EF4444': 'bg-red-100 text-red-800 border-red-200',
-        
-        // Amarillos (Pausado)
         '#F59E0B': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        
-        // Marrón (Rechazo Definitivo)
         '#7C2D12': 'bg-amber-800 text-amber-100 border-amber-700',
     };
     
     return colorMap[colorHex] || 'bg-gray-100 text-gray-800 border-gray-200';
 };
 
-// COLORES PARA PRESUPUESTOS
 const getEstadoColor = (estadoId?: number): string => {
     switch(estadoId) {
         case 1: return 'bg-green-100 text-green-800 border-green-200';
@@ -135,7 +113,6 @@ const getEstadoNombre = (estadoId?: number): string => {
     }
 };
 
-// COLORES PARA CONTRATOS POR TIPO DE OPERACIÓN
 const getTipoOperacionColor = (tipo?: string): string => {
     switch(tipo) {
         case 'venta_cliente': return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -170,9 +147,9 @@ export default function ActividadComercial({
     usuario 
 }: Props) {
     const [comercialId, setComercialId] = useState<string>(filtros.comercial_id?.toString() || '');
-    const [fechaInicio, setFechaInicio] = useState<Date | null>(filtros.fecha_inicio ? new Date(filtros.fecha_inicio) : null);
-    const [fechaFin, setFechaFin] = useState<Date | null>(filtros.fecha_fin ? new Date(filtros.fecha_fin) : null);
     const [rangoRapido, setRangoRapido] = useState<string>(filtros.rango_rapido || '');
+    const [fechaInicio, setFechaInicio] = useState<string>(filtros.fecha_inicio || '');
+    const [fechaFin, setFechaFin] = useState<string>(filtros.fecha_fin || '');
     const [cargando, setCargando] = useState(false);
 
     const aplicarFiltros = () => {
@@ -180,11 +157,12 @@ export default function ActividadComercial({
         const params: Record<string, string> = {};
         
         if (comercialId && !esComercial) params.comercial_id = comercialId;
+        
         if (rangoRapido) {
             params.rango_rapido = rangoRapido;
-        } else {
-            if (fechaInicio) params.fecha_inicio = fechaInicio.toISOString().split('T')[0];
-            if (fechaFin) params.fecha_fin = fechaFin.toISOString().split('T')[0];
+        } else if (fechaInicio && fechaFin) {
+            params.fecha_inicio = fechaInicio;
+            params.fecha_fin = fechaFin;
         }
         
         router.get('/comercial/actividad', params, {
@@ -196,19 +174,24 @@ export default function ActividadComercial({
 
     const limpiarFiltros = () => {
         setComercialId('');
-        setFechaInicio(null);
-        setFechaFin(null);
         setRangoRapido('');
+        setFechaInicio('');
+        setFechaFin('');
         router.get('/comercial/actividad', {}, {
             preserveState: true,
             preserveScroll: true
         });
     };
 
-    const handleRangoRapidoChange = (value: string) => {
+    const handleFechaRapidaChange = (value: string, inicio?: string, fin?: string) => {
         setRangoRapido(value);
-        setFechaInicio(null);
-        setFechaFin(null);
+        if (value === 'custom' && inicio && fin) {
+            setFechaInicio(inicio);
+            setFechaFin(fin);
+        } else if (value !== 'custom') {
+            setFechaInicio('');
+            setFechaFin('');
+        }
     };
 
     const getTipoIcono = (tipo: string) => {
@@ -229,20 +212,20 @@ export default function ActividadComercial({
         }
     };
 
-    // Determinar título según rol
     const titulo = esComercial ? 'Mi Actividad Comercial' : 'Actividades Comerciales';
     const subtitulo = esComercial ? 'Gestión de tu actividad comercial' : 'Gestión y seguimiento de actividades comerciales';
-useEffect(() => {
-    // Guardar filtros actuales en sessionStorage cuando la página carga
-    const currentParams = new URLSearchParams(window.location.search);
-    const filtrosObj: Record<string, string> = {};
-    currentParams.forEach((value, key) => {
-        filtrosObj[key] = value;
-    });
-    
-    sessionStorage.setItem('actividad_filters', JSON.stringify(filtrosObj));
-    sessionStorage.setItem('actividad_filters_return_url', window.location.pathname + window.location.search);
-}, [window.location.search]);
+
+    useEffect(() => {
+        const currentParams = new URLSearchParams(window.location.search);
+        const filtrosObj: Record<string, string> = {};
+        currentParams.forEach((value, key) => {
+            filtrosObj[key] = value;
+        });
+        
+        sessionStorage.setItem('actividad_filters', JSON.stringify(filtrosObj));
+        sessionStorage.setItem('actividad_filters_return_url', window.location.pathname + window.location.search);
+    }, [window.location.search]);
+
     return (
         <AppLayout title={titulo}>
             <div className="max-w-8xl mx-auto px-4 sm:px-6 py-6">
@@ -262,7 +245,7 @@ useEffect(() => {
                             <div className="flex items-center gap-2">
                                 <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                 <select 
-                                    className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-sat focus:border-sat"
+                                    className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-orange-500 focus:border-orange-500"
                                     value={comercialId}
                                     onChange={(e) => setComercialId(e.target.value)}
                                 >
@@ -279,46 +262,16 @@ useEffect(() => {
                         <FiltroFechasRapido
                             opciones={opcionesFechas}
                             value={rangoRapido}
-                            onChange={handleRangoRapidoChange}
+                            onChange={handleFechaRapidaChange}
+                            fechaInicio={fechaInicio}
+                            fechaFin={fechaFin}
                         />
-
-                        {!rangoRapido && (
-                            <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                <DatePicker
-                                    selected={fechaInicio}
-                                    onChange={(date: Date | null) => setFechaInicio(date)}
-                                    selectsStart
-                                    startDate={fechaInicio || undefined}
-                                    endDate={fechaFin || undefined}
-                                    placeholderText="Fecha inicio"
-                                    dateFormat="dd/MM/yyyy"
-                                    className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-36 focus:ring-sat focus:border-sat"
-                                    popperClassName="z-[100000]"
-                                    locale={es}
-                                />
-                                <span className="text-gray-500">a</span>
-                                <DatePicker
-                                    selected={fechaFin}
-                                    onChange={(date: Date | null) => setFechaFin(date)}
-                                    selectsEnd
-                                    startDate={fechaInicio || undefined}
-                                    endDate={fechaFin || undefined}
-                                    minDate={fechaInicio || undefined}
-                                    placeholderText="Fecha fin"
-                                    dateFormat="dd/MM/yyyy"
-                                    className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-36 focus:ring-sat focus:border-sat"
-                                    popperClassName="z-[100000]"
-                                    locale={es}
-                                />
-                            </div>
-                        )}
 
                         <div className="lg:ml-auto flex gap-2">
                             <button 
                                 onClick={aplicarFiltros}
                                 disabled={cargando}
-                                className="px-4 py-1.5 text-sm font-medium text-white bg-sat rounded-md hover:bg-sat-600 disabled:opacity-50 flex items-center gap-2"
+                                className="px-4 py-1.5 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
                             >
                                 {cargando ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Filter className="h-4 w-4" />}
                                 Aplicar
@@ -337,11 +290,11 @@ useEffect(() => {
                 {/* Cards de estadísticas */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                     {/* Contactos Card */}
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-sat transition-all">
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-orange-300 transition-all">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-base font-medium text-gray-700">Contactos</p>
-                                <p className="text-3xl font-bold text-local mt-1">{estadisticas.contactos.total}</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-1">{estadisticas.contactos.total}</p>
                             </div>
                             <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
                                 <Users className="h-6 w-6 text-blue-600" />
@@ -369,11 +322,11 @@ useEffect(() => {
                     </div>
 
                     {/* Presupuestos Card */}
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-sat transition-all">
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-orange-300 transition-all">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-base font-medium text-gray-700">Presupuestos</p>
-                                <p className="text-3xl font-bold text-local mt-1">{estadisticas.presupuestos.total}</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-1">{estadisticas.presupuestos.total}</p>
                             </div>
                             <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
                                 <FileText className="h-6 w-6 text-green-600" />
@@ -408,11 +361,11 @@ useEffect(() => {
                     </div>
 
                     {/* Contratos Card */}
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-sat transition-all">
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-orange-300 transition-all">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-base font-medium text-gray-700">Contratos</p>
-                                <p className="text-3xl font-bold text-local mt-1">{estadisticas.contratos.total}</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-1">{estadisticas.contratos.total}</p>
                             </div>
                             <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
                                 <FileSignature className="h-6 w-6 text-purple-600" />
@@ -534,7 +487,7 @@ useEffect(() => {
                                                         <td className="py-3 px-4">
                                                             <button 
                                                                 onClick={() => router.visit(item.url)}
-                                                                className="text-sat hover:text-sat-600 text-sm font-medium flex items-center gap-1"
+                                                                className="text-orange-600 hover:text-orange-700 text-sm font-medium flex items-center gap-1"
                                                             >
                                                                 <Eye className="h-3 w-3" />
                                                                 Ver
@@ -561,9 +514,9 @@ useEffect(() => {
                                                 if (comercialId && !esComercial) params.comercial_id = comercialId;
                                                 if (rangoRapido) {
                                                     params.rango_rapido = rangoRapido;
-                                                } else {
-                                                    if (fechaInicio) params.fecha_inicio = fechaInicio?.toISOString().split('T')[0];
-                                                    if (fechaFin) params.fecha_fin = fechaFin?.toISOString().split('T')[0];
+                                                } else if (fechaInicio && fechaFin) {
+                                                    params.fecha_inicio = fechaInicio;
+                                                    params.fecha_fin = fechaFin;
                                                 }
                                                 params.page = page.toString();
                                                 router.get('/comercial/actividad', params, { preserveState: true, preserveScroll: true });

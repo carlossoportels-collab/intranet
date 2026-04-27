@@ -367,7 +367,7 @@ export default function Index({
     <AppLayout title="Leads Perdidos y Recontactados">
       <Head title="Leads Perdidos y Recontactados" />
       
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 py-6">
         {/* Header */}
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">

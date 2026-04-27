@@ -187,7 +187,7 @@ export default function Contactos({
         <AppLayout title="Contactos">
             <Head title="Contactos" />
             
-            <div className="mb-6">
+            <div className="max-w-8xl mx-auto px-4 sm:px-6 py-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900">

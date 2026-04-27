@@ -226,7 +226,7 @@ useEffect(() => {
 
     return (
         <AppLayout title="Presupuestos">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+            <div className="max-w-8xl mx-auto px-4 sm:px-6 py-6">
                 {/* Header */}
                 <div className="mb-4 sm:mb-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
